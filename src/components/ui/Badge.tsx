@@ -4,7 +4,7 @@ import { useTheme } from '@/hooks/useTheme';
 
 export type BadgeProps = {
   label: string;
-  variant?: 'default' | 'success' | 'warning' | 'error' | 'info';
+  variant?: 'default' | 'success' | 'warning' | 'error' | 'info' | 'brand';
   size?: 'sm' | 'md';
 };
 
@@ -27,6 +27,8 @@ export function Badge({
       case 'error':
         return { bg: theme.colors.error + '20', fg: theme.colors.error };
       case 'info':
+        return { bg: theme.colors.accent + '20', fg: theme.colors.accent };
+      case 'brand':
         return { bg: theme.colors.accent + '20', fg: theme.colors.accent };
       case 'default':
       default:

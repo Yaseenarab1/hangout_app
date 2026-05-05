@@ -76,7 +76,7 @@ export function RestaurantSearchPicker({
   const [minPrice, setMinPrice] = useState<number | undefined>(undefined);
   const [maxPrice, setMaxPrice] = useState<number | undefined>(undefined);
   const [radius, setRadius] = useState<number>(5000);
-  const [minRating, setMinRating] = useState<number>(3.5);
+  const [minRating, setMinRating] = useState<number>(0);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customName, setCustomName] = useState('');
   const [customAddress, setCustomAddress] = useState('');
@@ -86,6 +86,8 @@ export function RestaurantSearchPicker({
   const saveCustom = useSaveCustomRestaurant();
   const deleteCustom = useDeleteCustomRestaurant();
 
+  // Search runs whenever there's a query OR a cuisine filter
+  const searchEnabled = debouncedQuery.length > 0 || Boolean(selectedCuisine);
   const search = useRestaurantSearch(
     {
       query: debouncedQuery,
@@ -95,7 +97,7 @@ export function RestaurantSearchPicker({
       maxPriceLevel: maxPrice,
       minRating: minRating > 0 ? minRating : undefined,
     },
-    debouncedQuery.length > 0 || Boolean(selectedCuisine),
+    searchEnabled,
   );
 
   const selectedPlaceIds = useMemo(
@@ -110,11 +112,21 @@ export function RestaurantSearchPicker({
   const isAtMax = value.length >= max;
 
   const isPlaceSelected = (place: Place): boolean =>
-    Boolean(place.placeId && selectedPlaceIds.has(place.placeId));
+    Boolean(
+      (place.placeId && selectedPlaceIds.has(place.placeId)) ||
+        selectedNames.has(place.name.toLowerCase()),
+    );
 
   const togglePlace = (place: Place): void => {
     if (isPlaceSelected(place)) {
-      onChange(value.filter((v) => v.placeId !== place.placeId));
+      // Remove by both place id AND name match (handles duplicate from saved)
+      onChange(
+        value.filter(
+          (v) =>
+            v.placeId !== place.placeId &&
+            v.name.toLowerCase() !== place.name.toLowerCase(),
+        ),
+      );
       return;
     }
     if (isAtMax) return;
@@ -153,7 +165,7 @@ export function RestaurantSearchPicker({
     metadata: Record<string, unknown>;
   }): void => {
     const isSelected =
-      (item.google_place_id && selectedPlaceIds.has(item.google_place_id)) ||
+      Boolean(item.google_place_id && selectedPlaceIds.has(item.google_place_id)) ||
       selectedNames.has(item.name.toLowerCase());
     if (isSelected) {
       onChange(
@@ -209,330 +221,301 @@ export function RestaurantSearchPicker({
     (selectedCuisine ? 1 : 0) +
     (minPrice ? 1 : 0) +
     (radius !== 5000 ? 1 : 0) +
-    (minRating !== 3.5 ? 1 : 0);
+    (minRating > 0 ? 1 : 0);
 
   return (
     <View style={{ flex: 1 }}>
-      {value.length > 0 ? (
-        <Pressable
-          onPress={() => setShowReview(true)}
-          style={({ pressed }) => [
-            styles.selectedHeader,
-            {
-              backgroundColor: theme.colors.accent + '10',
-              borderColor: theme.colors.accent + '40',
-            },
-            pressed && { opacity: 0.7 },
-          ]}
-        >
-          <View style={{ flex: 1 }}>
-            <Text
-              style={[
-                theme.typography.bodySmallMedium,
-                { color: theme.colors.text.primary },
-              ]}
-            >
-              {value.length} selected
-              <Text style={{ color: theme.colors.text.tertiary, fontWeight: '400' }}>
-                {'  '}of {max}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 24 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {value.length > 0 ? (
+          <Pressable
+            onPress={() => setShowReview(true)}
+            style={({ pressed }) => [
+              styles.selectedHeader,
+              {
+                backgroundColor: theme.colors.accent + '10',
+                borderColor: theme.colors.accent + '40',
+              },
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[
+                  theme.typography.bodySmallMedium,
+                  { color: theme.colors.text.primary },
+                ]}
+              >
+                {value.length} selected
+                <Text style={{ color: theme.colors.text.tertiary, fontWeight: '400' }}>
+                  {'  '}of {max}
+                </Text>
               </Text>
-            </Text>
-            <Text
-              style={[
-                theme.typography.caption,
-                {
-                  color:
-                    value.length < min
-                      ? theme.colors.warning
-                      : theme.colors.text.tertiary,
-                  marginTop: 2,
-                },
-              ]}
+              <Text
+                style={[
+                  theme.typography.caption,
+                  {
+                    color:
+                      value.length < min
+                        ? theme.colors.warning
+                        : theme.colors.text.tertiary,
+                    marginTop: 2,
+                  },
+                ]}
+              >
+                {value.length < min
+                  ? `Add ${min - value.length} more to continue`
+                  : 'Tap to review or remove'}
+              </Text>
+            </View>
+            <ChevronRight size={18} color={theme.colors.text.tertiary} />
+          </Pressable>
+        ) : null}
+
+        {customRestaurants.data && customRestaurants.data.length > 0 ? (
+          <View style={{ marginBottom: 12 }}>
+            <View style={styles.savedHeader}>
+              <Star size={12} color={theme.colors.accent} fill={theme.colors.accent} />
+              <Text
+                style={[
+                  theme.typography.caption,
+                  { color: theme.colors.text.secondary, marginLeft: 4 },
+                ]}
+              >
+                My saved ({customRestaurants.data.length})
+              </Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 6, paddingRight: 16 }}
             >
-              {value.length < min
-                ? `Add ${min - value.length} more to continue`
-                : 'Tap to review or remove'}
-            </Text>
-          </View>
-          <ChevronRight size={18} color={theme.colors.text.tertiary} />
-        </Pressable>
-      ) : null}
-
-      {/* My saved — compact horizontal row */}
-      {customRestaurants.data && customRestaurants.data.length > 0 ? (
-        <View style={{ marginBottom: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-            <Star size={12} color={theme.colors.accent} fill={theme.colors.accent} />
-            <Text
-              style={[
-                theme.typography.caption,
-                { color: theme.colors.text.secondary, marginLeft: 4 },
-              ]}
-            >
-              My saved ({customRestaurants.data.length})
-            </Text>
-          </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 6, paddingRight: 16 }}
-          >
-            {customRestaurants.data.map((r) => {
-              const meta = r.metadata as { rating?: number; priceLevel?: number };
-              const isSelected =
-                (r.google_place_id && selectedPlaceIds.has(r.google_place_id)) ||
-                selectedNames.has(r.name.toLowerCase());
-              const disabled = !isSelected && isAtMax;
-              return (
-                <Pressable
-                  key={r.id}
-                  onPress={() => toggleSavedCustom(r)}
-                  onLongPress={() => deleteCustom.mutate(r.id)}
-                  delayLongPress={400}
-                  disabled={disabled}
-                  style={({ pressed }) => [
-                    styles.savedChip,
-                    {
-                      backgroundColor: isSelected
-                        ? theme.colors.accent + '20'
-                        : theme.colors.bg.surface,
-                      borderColor: isSelected
-                        ? theme.colors.accent
-                        : theme.colors.border.default,
-                      opacity: disabled ? 0.4 : 1,
-                    },
-                    pressed && { opacity: 0.7 },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      theme.typography.bodySmall,
-                      { color: theme.colors.text.primary, fontWeight: '500' },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {r.name}
-                  </Text>
-                  {meta.rating ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                      <Star size={10} color={theme.colors.warning} fill={theme.colors.warning} />
-                      <Text
-                        style={[
-                          theme.typography.caption,
-                          {
-                            color: theme.colors.text.tertiary,
-                            marginLeft: 3,
-                            fontSize: 11,
-                          },
-                        ]}
-                      >
-                        {meta.rating.toFixed(1)}
-                        {meta.priceLevel ? `  •  ${'$'.repeat(meta.priceLevel)}` : ''}
-                      </Text>
-                    </View>
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-          <Text
-            style={[
-              theme.typography.caption,
-              { color: theme.colors.text.tertiary, marginTop: 4, fontSize: 10 },
-            ]}
-          >
-            Long-press to forget a saved place
-          </Text>
-        </View>
-      ) : null}
-
-      <Input
-        placeholder="Search by name, type, neighborhood…"
-        value={query}
-        onChangeText={setQuery}
-        autoCapitalize="none"
-        autoCorrect={false}
-        trailing={<SearchIcon size={18} color={theme.colors.text.tertiary} />}
-        containerStyle={{ marginBottom: 6 }}
-      />
-
-      <Pressable onPress={() => setShowFilters(!showFilters)} style={styles.filtersToggle}>
-        <SlidersHorizontal size={14} color={theme.colors.text.secondary} />
-        <Text
-          style={[
-            theme.typography.caption,
-            { color: theme.colors.text.secondary, marginLeft: 6 },
-          ]}
-        >
-          {showFilters ? 'Hide filters' : 'Filters'}
-          {activeFilterCount > 0 ? ` • ${activeFilterCount} active` : ''}
-        </Text>
-      </Pressable>
-
-      {showFilters ? (
-        <View
-          style={[
-            styles.filtersBox,
-            {
-              backgroundColor: theme.colors.bg.subtle,
-              borderColor: theme.colors.border.default,
-            },
-          ]}
-        >
-          <FilterRow
-            icon={<Star size={13} color={theme.colors.text.secondary} />}
-            label="Rating"
-          >
-            {RATING_OPTIONS.map((r) => (
-              <FilterChip
-                key={r.value}
-                label={r.label}
-                active={minRating === r.value}
-                onPress={() => setMinRating(r.value)}
-              />
-            ))}
-          </FilterRow>
-          <FilterRow
-            icon={<DollarSign size={13} color={theme.colors.text.secondary} />}
-            label="Price"
-          >
-            {PRICE_LEVELS.map((p) => {
-              const active = minPrice === p.value && maxPrice === p.value;
-              return (
-                <FilterChip
-                  key={p.value}
-                  label={p.label}
-                  active={active}
-                  onPress={() => {
-                    if (active) {
-                      setMinPrice(undefined);
-                      setMaxPrice(undefined);
-                    } else {
-                      setMinPrice(p.value);
-                      setMaxPrice(p.value);
-                    }
-                  }}
-                />
-              );
-            })}
-          </FilterRow>
-          <FilterRow
-            icon={<MapPin size={13} color={theme.colors.text.secondary} />}
-            label="Distance"
-          >
-            {RADIUS_OPTIONS.map((r) => (
-              <FilterChip
-                key={r.value}
-                label={r.label}
-                active={radius === r.value}
-                onPress={() => setRadius(r.value)}
-              />
-            ))}
-          </FilterRow>
-          <Text
-            style={[
-              theme.typography.caption,
-              { color: theme.colors.text.secondary, marginTop: 4, marginBottom: 6 },
-            ]}
-          >
-            Cuisine
-          </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={[styles.row, { paddingRight: 16 }]}>
-              {CUISINE_CATALOG.slice(0, 12).map((c) => {
-                const active = selectedCuisine === c.label;
+              {customRestaurants.data.map((r) => {
+                const meta = r.metadata as { rating?: number; priceLevel?: number };
+                const isSelected =
+                  Boolean(r.google_place_id && selectedPlaceIds.has(r.google_place_id)) ||
+                  selectedNames.has(r.name.toLowerCase());
+                const disabled = !isSelected && isAtMax;
                 return (
                   <Pressable
-                    key={c.id}
-                    onPress={() => setSelectedCuisine(active ? undefined : c.label)}
+                    key={r.id}
+                    onPress={() => toggleSavedCustom(r)}
+                    onLongPress={() => deleteCustom.mutate(r.id)}
+                    delayLongPress={400}
+                    disabled={disabled}
                     style={({ pressed }) => [
-                      styles.miniChip,
+                      styles.savedChip,
                       {
-                        backgroundColor: active
+                        backgroundColor: isSelected
                           ? theme.colors.accent + '20'
                           : theme.colors.bg.surface,
-                        borderColor: active
+                        borderColor: isSelected
                           ? theme.colors.accent
                           : theme.colors.border.default,
+                        opacity: disabled ? 0.4 : 1,
                       },
                       pressed && { opacity: 0.7 },
                     ]}
                   >
-                    <Text style={{ fontSize: 12, marginRight: 4 }}>{c.emoji}</Text>
                     <Text
                       style={[
-                        theme.typography.caption,
-                        { color: theme.colors.text.primary },
+                        theme.typography.bodySmall,
+                        { color: theme.colors.text.primary, fontWeight: '500' },
                       ]}
+                      numberOfLines={1}
                     >
-                      {c.label}
+                      {r.name}
                     </Text>
+                    {meta.rating ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                        <Star size={10} color={theme.colors.warning} fill={theme.colors.warning} />
+                        <Text
+                          style={[
+                            theme.typography.caption,
+                            { color: theme.colors.text.tertiary, marginLeft: 3, fontSize: 11 },
+                          ]}
+                        >
+                          {meta.rating.toFixed(1)}
+                          {meta.priceLevel ? `  •  ${'$'.repeat(meta.priceLevel)}` : ''}
+                        </Text>
+                      </View>
+                    ) : null}
                   </Pressable>
                 );
               })}
-            </View>
-          </ScrollView>
-        </View>
-      ) : null}
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        style={{ marginTop: 8 }}
-      >
-        {search.isLoading ? (
-          <View style={{ padding: 16, alignItems: 'center' }}>
-            <ActivityIndicator color={theme.colors.text.tertiary} />
-          </View>
-        ) : search.data && search.data.length > 0 ? (
-          <View style={{ marginBottom: 16 }}>
+            </ScrollView>
             <Text
               style={[
-                theme.typography.bodySmallMedium,
-                { color: theme.colors.text.secondary, marginBottom: 8 },
+                theme.typography.caption,
+                { color: theme.colors.text.tertiary, marginTop: 4, fontSize: 10 },
               ]}
             >
-              Results
+              Long-press to forget a saved place
             </Text>
-            {search.data.slice(0, 15).map((p) => (
-              <RestaurantRow
-                key={p.placeId}
-                place={p}
-                isSelected={isPlaceSelected(p)}
-                onToggle={() => togglePlace(p)}
-                disabled={!isPlaceSelected(p) && isAtMax}
-              />
-            ))}
           </View>
-        ) : debouncedQuery.length > 0 || selectedCuisine ? (
-          <Text
-            style={[
-              theme.typography.bodySmall,
-              {
-                color: theme.colors.text.tertiary,
-                textAlign: 'center',
-                paddingVertical: 16,
-              },
-            ]}
-          >
-            No matches with these filters
-          </Text>
-        ) : (
-          <Text
-            style={[
-              theme.typography.bodySmall,
-              {
-                color: theme.colors.text.tertiary,
-                textAlign: 'center',
-                paddingVertical: 16,
-              },
-            ]}
-          >
-            Search for a restaurant or pick a cuisine filter
-          </Text>
-        )}
+        ) : null}
 
-        <View style={{ marginBottom: 24 }}>
+        <Input
+          placeholder="Search by name, type, neighborhood…"
+          value={query}
+          onChangeText={setQuery}
+          autoCapitalize="none"
+          autoCorrect={false}
+          trailing={<SearchIcon size={18} color={theme.colors.text.tertiary} />}
+          containerStyle={{ marginBottom: 6 }}
+        />
+
+        <Pressable onPress={() => setShowFilters(!showFilters)} style={styles.filtersToggle}>
+          <SlidersHorizontal size={14} color={theme.colors.text.secondary} />
+          <Text
+            style={[
+              theme.typography.caption,
+              { color: theme.colors.text.secondary, marginLeft: 6 },
+            ]}
+          >
+            {showFilters ? 'Hide filters' : 'Filters'}
+            {activeFilterCount > 0 ? ` • ${activeFilterCount} active` : ''}
+          </Text>
+        </Pressable>
+
+        {showFilters ? (
+          <View
+            style={[
+              styles.filtersBox,
+              {
+                backgroundColor: theme.colors.bg.subtle,
+                borderColor: theme.colors.border.default,
+              },
+            ]}
+          >
+            <FilterRow
+              icon={<Star size={13} color={theme.colors.text.secondary} />}
+              label="Rating"
+            >
+              {RATING_OPTIONS.map((r) => (
+                <FilterChip
+                  key={r.value}
+                  label={r.label}
+                  active={minRating === r.value}
+                  onPress={() => setMinRating(r.value)}
+                />
+              ))}
+            </FilterRow>
+            <FilterRow
+              icon={<DollarSign size={13} color={theme.colors.text.secondary} />}
+              label="Price"
+            >
+              {PRICE_LEVELS.map((p) => {
+                const active = minPrice === p.value && maxPrice === p.value;
+                return (
+                  <FilterChip
+                    key={p.value}
+                    label={p.label}
+                    active={active}
+                    onPress={() => {
+                      if (active) {
+                        setMinPrice(undefined);
+                        setMaxPrice(undefined);
+                      } else {
+                        setMinPrice(p.value);
+                        setMaxPrice(p.value);
+                      }
+                    }}
+                  />
+                );
+              })}
+            </FilterRow>
+            <FilterRow
+              icon={<MapPin size={13} color={theme.colors.text.secondary} />}
+              label="Distance"
+            >
+              {RADIUS_OPTIONS.map((r) => (
+                <FilterChip
+                  key={r.value}
+                  label={r.label}
+                  active={radius === r.value}
+                  onPress={() => setRadius(r.value)}
+                />
+              ))}
+            </FilterRow>
+            <View style={{ marginTop: 4 }}>
+              <Text
+                style={[
+                  theme.typography.caption,
+                  {
+                    color: theme.colors.text.secondary,
+                    marginBottom: 6,
+                    fontWeight: '500',
+                  },
+                ]}
+              >
+                Cuisine
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={[styles.row, { paddingRight: 16 }]}>
+                  {CUISINE_CATALOG.slice(0, 12).map((c) => {
+                    const active = selectedCuisine === c.label;
+                    return (
+                      <Pressable
+                        key={c.id}
+                        onPress={() =>
+                          setSelectedCuisine(active ? undefined : c.label)
+                        }
+                        style={({ pressed }) => [
+                          styles.miniChip,
+                          {
+                            backgroundColor: active
+                              ? theme.colors.accent + '20'
+                              : theme.colors.bg.surface,
+                            borderColor: active
+                              ? theme.colors.accent
+                              : theme.colors.border.default,
+                          },
+                          pressed && { opacity: 0.7 },
+                        ]}
+                      >
+                        <Text style={{ fontSize: 12, marginRight: 4 }}>
+                          {c.emoji}
+                        </Text>
+                        <Text
+                          style={[
+                            theme.typography.caption,
+                            { color: theme.colors.text.primary },
+                          ]}
+                        >
+                          {c.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        ) : null}
+
+        {/* Results / loading / empty / no-search-yet — proper state machine */}
+        <ResultsBlock
+          searchEnabled={searchEnabled}
+          isLoading={search.isLoading}
+          isError={search.isError}
+          data={search.data}
+          renderRow={(p) => (
+            <RestaurantRow
+              key={p.placeId}
+              place={p}
+              isSelected={isPlaceSelected(p)}
+              onToggle={() => togglePlace(p)}
+              disabled={!isPlaceSelected(p) && isAtMax}
+            />
+          )}
+        />
+
+        <View style={{ marginTop: 16 }}>
           {showCustomInput ? (
             <View style={{ gap: 8 }}>
               <Input
@@ -607,6 +590,93 @@ export function RestaurantSearchPicker({
         onRemove={remove}
         itemLabel="restaurants"
       />
+    </View>
+  );
+}
+
+/** Search results state machine — handles loading, empty, error, no-search-yet */
+function ResultsBlock({
+  searchEnabled,
+  isLoading,
+  isError,
+  data,
+  renderRow,
+}: {
+  searchEnabled: boolean;
+  isLoading: boolean;
+  isError: boolean;
+  data: Place[] | undefined;
+  renderRow: (p: Place) => React.ReactNode;
+}): React.ReactElement {
+  const theme = useTheme();
+
+  // No search initiated yet — gentle prompt
+  if (!searchEnabled) {
+    return (
+      <View style={styles.resultsState}>
+        <Text
+          style={[
+            theme.typography.bodySmall,
+            { color: theme.colors.text.tertiary, textAlign: 'center' },
+          ]}
+        >
+          Search for a restaurant or pick a cuisine filter
+        </Text>
+      </View>
+    );
+  }
+
+  // Loading
+  if (isLoading) {
+    return (
+      <View style={styles.resultsState}>
+        <ActivityIndicator color={theme.colors.text.tertiary} />
+      </View>
+    );
+  }
+
+  // Error
+  if (isError) {
+    return (
+      <View style={styles.resultsState}>
+        <Text
+          style={[
+            theme.typography.bodySmall,
+            { color: theme.colors.error, textAlign: 'center' },
+          ]}
+        >
+          Search failed. Try again or adjust your filters.
+        </Text>
+      </View>
+    );
+  }
+
+  // Returned but empty
+  if (!data || data.length === 0) {
+    return (
+      <View style={styles.resultsState}>
+        <Text
+          style={[
+            theme.typography.bodySmall,
+            { color: theme.colors.text.tertiary, textAlign: 'center' },
+          ]}
+        >
+          No matches with these filters.{'\n'}Try widening the distance or rating.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ marginTop: 12 }}>
+      <Text
+        style={[
+          { color: '#999', fontSize: 12, fontWeight: '500', marginBottom: 8 },
+        ]}
+      >
+        {data.length} {data.length === 1 ? 'result' : 'results'}
+      </Text>
+      {data.slice(0, 15).map((p) => renderRow(p))}
     </View>
   );
 }
@@ -693,9 +763,7 @@ function RestaurantRow({
           backgroundColor: isSelected
             ? theme.colors.accent + '15'
             : theme.colors.bg.surface,
-          borderColor: isSelected
-            ? theme.colors.accent
-            : theme.colors.border.default,
+          borderColor: isSelected ? theme.colors.accent : theme.colors.border.default,
           borderWidth: isSelected ? 1.5 : 1,
           opacity: disabled ? 0.4 : 1,
         },
@@ -794,6 +862,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 12,
   },
+  savedHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   savedChip: {
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -812,6 +881,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     borderWidth: 1,
+    marginBottom: 4,
   },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   miniChip: {
@@ -829,6 +899,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 6,
     gap: 8,
+  },
+  resultsState: {
+    paddingVertical: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addCustomButton: {
     flexDirection: 'row',

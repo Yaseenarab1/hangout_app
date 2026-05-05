@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,17 @@ import {
 } from 'react-native';
 import {
   Search as SearchIcon,
-  X,
   Star,
   Plus,
+  SlidersHorizontal,
+  ChevronRight,
+  Check,
+  MapPin,
+  DollarSign,
 } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { Input, Button } from '@/components/ui';
+import { SelectionReviewSheet } from '@/components/ui/SelectionReviewSheet';
 import { useDebounce } from '@/hooks/useDebounce';
 import { searchPlaces } from '@/features/places';
 import { useQuery } from '@tanstack/react-query';
@@ -26,6 +31,7 @@ export type ActivityVenueOption = {
   address?: string | null;
   placeId?: string;
   rating?: number | null;
+  priceLevel?: number | null;
   primaryType?: string | null;
   mapsUrl?: string | null;
   isCustom?: boolean;
@@ -34,7 +40,7 @@ export type ActivityVenueOption = {
 export type ActivityVenuePickerProps = {
   value: ActivityVenueOption[];
   onChange: (options: ActivityVenueOption[]) => void;
-  /** Activity-specific search query (e.g. "bar", "bowling alley"). */
+  /** Activity-specific search query (e.g. "bar", "bowling alley"). Pre-fills the search. */
   activityQuery: string;
   /** Display name (used in headers/titles). */
   activityLabel: string;
@@ -42,12 +48,30 @@ export type ActivityVenuePickerProps = {
   max?: number;
 };
 
+const PRICE_LEVELS = [
+  { value: 1, label: '$' },
+  { value: 2, label: '$$' },
+  { value: 3, label: '$$$' },
+  { value: 4, label: '$$$$' },
+];
+
+const RADIUS_OPTIONS = [
+  { value: 1500, label: '<1mi' },
+  { value: 5000, label: '<3mi' },
+  { value: 16000, label: '<10mi' },
+];
+
+const RATING_OPTIONS = [
+  { value: 0, label: 'Any' },
+  { value: 3.5, label: '3.5+' },
+  { value: 4.0, label: '4.0+' },
+  { value: 4.5, label: '4.5+' },
+];
+
 /**
  * Search Google Places for venues matching a specific activity.
- *
- * Used in the "find what to do AND where" flow — once the activity is
- * decided (or once an activity poll closes), this picker lets the host
- * pick specific venues from Google for the group to vote on.
+ * Activity query is pre-filled and editable. Same filter set as restaurants
+ * (no cuisine, since activity venues aren't food).
  */
 export function ActivityVenuePicker({
   value,
@@ -58,19 +82,39 @@ export function ActivityVenuePicker({
   max = 8,
 }: ActivityVenuePickerProps): React.ReactElement {
   const theme = useTheme();
-  const [extraQuery, setExtraQuery] = useState('');
+  // Pre-fill the search box with the activity query, but make it editable
+  const [extraQuery, setExtraQuery] = useState(activityQuery ?? '');
   const debouncedQuery = useDebounce(extraQuery, 300);
+  const [showFilters, setShowFilters] = useState(false);
+  const [minPrice, setMinPrice] = useState<number | undefined>(undefined);
+  const [maxPrice, setMaxPrice] = useState<number | undefined>(undefined);
+  const [radius, setRadius] = useState<number>(5000);
+  const [minRating, setMinRating] = useState<number>(0);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customName, setCustomName] = useState('');
   const [customAddress, setCustomAddress] = useState('');
+  const [showReview, setShowReview] = useState(false);
 
-  // Combine the activity query with any extra text (e.g. "bar" + "rooftop")
-  const fullQuery = [activityQuery, debouncedQuery].filter(Boolean).join(' ');
-
+  const searchEnabled = debouncedQuery.trim().length > 0;
   const search = useQuery({
-    queryKey: ['places', 'activity-search', fullQuery],
-    queryFn: () => searchPlaces({ query: fullQuery }),
-    enabled: fullQuery.length > 0,
+    queryKey: [
+      'places',
+      'activity-search',
+      debouncedQuery,
+      radius,
+      minRating,
+      minPrice,
+      maxPrice,
+    ],
+    queryFn: () =>
+      searchPlaces({
+        query: debouncedQuery,
+        radius,
+        minPriceLevel: minPrice,
+        maxPriceLevel: maxPrice,
+        minRating: minRating > 0 ? minRating : undefined,
+      }),
+    enabled: searchEnabled,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -78,11 +122,31 @@ export function ActivityVenuePicker({
     () => new Set(value.map((v) => v.placeId).filter(Boolean) as string[]),
     [value],
   );
+  const selectedNames = useMemo(
+    () => new Set(value.map((v) => v.name.toLowerCase())),
+    [value],
+  );
 
   const isAtMax = value.length >= max;
 
-  const addPlace = (place: Place): void => {
-    if (isAtMax || (place.placeId && selectedPlaceIds.has(place.placeId))) return;
+  const isPlaceSelected = (place: Place): boolean =>
+    Boolean(
+      (place.placeId && selectedPlaceIds.has(place.placeId)) ||
+        selectedNames.has(place.name.toLowerCase()),
+    );
+
+  const togglePlace = (place: Place): void => {
+    if (isPlaceSelected(place)) {
+      onChange(
+        value.filter(
+          (v) =>
+            v.placeId !== place.placeId &&
+            v.name.toLowerCase() !== place.name.toLowerCase(),
+        ),
+      );
+      return;
+    }
+    if (isAtMax) return;
     onChange([
       ...value,
       {
@@ -91,6 +155,7 @@ export function ActivityVenuePicker({
         address: place.address,
         placeId: place.placeId,
         rating: place.rating,
+        priceLevel: place.priceLevel,
         primaryType: place.primaryType,
         mapsUrl: place.mapsUrl,
         isCustom: false,
@@ -119,135 +184,190 @@ export function ActivityVenuePicker({
     setShowCustomInput(false);
   };
 
+  const activeFilterCount =
+    (minPrice ? 1 : 0) + (radius !== 5000 ? 1 : 0) + (minRating > 0 ? 1 : 0);
+
   return (
     <View style={{ flex: 1 }}>
-      {/* Activity context header */}
-      <View
-        style={[
-          styles.contextHeader,
-          {
-            backgroundColor: theme.colors.accent + '10',
-            borderColor: theme.colors.accent + '40',
-          },
-        ]}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 24 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <Text
+        <View
           style={[
-            theme.typography.bodySmall,
-            { color: theme.colors.text.secondary },
+            styles.contextHeader,
+            {
+              backgroundColor: theme.colors.accent + '10',
+              borderColor: theme.colors.accent + '40',
+            },
           ]}
         >
-          Looking for places to{' '}
-          <Text style={{ color: theme.colors.accent, fontWeight: '600' }}>
-            {activityLabel.toLowerCase()}
-          </Text>
-        </Text>
-      </View>
-
-      {/* Selected — horizontal scroll */}
-      {value.length > 0 ? (
-        <View style={{ marginBottom: 12 }}>
-          <Text
-            style={[
-              theme.typography.caption,
-              { color: theme.colors.text.tertiary, marginBottom: 8 },
-            ]}
-          >
-            Selected ({value.length}/{max})
-          </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 6, paddingRight: 16 }}
-          >
-            {value.map((opt) => (
-              <Pressable
-                key={opt.id}
-                onPress={() => remove(opt.id)}
-                style={({ pressed }) => [
-                  styles.selectedChip,
-                  {
-                    backgroundColor: theme.colors.accent + '20',
-                    borderColor: theme.colors.accent,
-                  },
-                  pressed && { opacity: 0.7 },
-                ]}
-              >
-                <Text
-                  style={[
-                    theme.typography.bodySmall,
-                    { color: theme.colors.text.primary },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {opt.name}
-                </Text>
-                <X size={14} color={theme.colors.text.secondary} style={{ marginLeft: 6 }} />
-              </Pressable>
-            ))}
-          </ScrollView>
-          {value.length < min ? (
-            <Text
-              style={[
-                theme.typography.caption,
-                { color: theme.colors.warning, marginTop: 8 },
-              ]}
-            >
-              Add at least {min - value.length} more
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
-
-      <Input
-        placeholder={`Refine search (e.g. "rooftop")`}
-        value={extraQuery}
-        onChangeText={setExtraQuery}
-        autoCapitalize="none"
-        autoCorrect={false}
-        trailing={<SearchIcon size={18} color={theme.colors.text.tertiary} />}
-        containerStyle={{ marginBottom: 12 }}
-      />
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {search.isLoading ? (
-          <View style={{ padding: 16, alignItems: 'center' }}>
-            <ActivityIndicator color={theme.colors.text.tertiary} />
-          </View>
-        ) : search.data && search.data.length > 0 ? (
-          <View style={{ marginBottom: 16 }}>
-            <Text
-              style={[
-                theme.typography.bodySmallMedium,
-                { color: theme.colors.text.secondary, marginBottom: 8 },
-              ]}
-            >
-              Nearby
-            </Text>
-            {search.data.slice(0, 15).map((p) => (
-              <PlaceRow key={p.placeId} place={p} onAdd={() => addPlace(p)} />
-            ))}
-          </View>
-        ) : (
           <Text
             style={[
               theme.typography.bodySmall,
+              { color: theme.colors.text.secondary },
+            ]}
+          >
+            Looking for places to{' '}
+            <Text style={{ color: theme.colors.accent, fontWeight: '600' }}>
+              {activityLabel.toLowerCase()}
+            </Text>
+          </Text>
+        </View>
+
+        {value.length > 0 ? (
+          <Pressable
+            onPress={() => setShowReview(true)}
+            style={({ pressed }) => [
+              styles.selectedHeader,
               {
-                color: theme.colors.text.tertiary,
-                textAlign: 'center',
-                paddingVertical: 16,
+                backgroundColor: theme.colors.accent + '10',
+                borderColor: theme.colors.accent + '40',
+              },
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[
+                  theme.typography.bodySmallMedium,
+                  { color: theme.colors.text.primary },
+                ]}
+              >
+                {value.length} selected
+                <Text style={{ color: theme.colors.text.tertiary, fontWeight: '400' }}>
+                  {'  '}of {max}
+                </Text>
+              </Text>
+              <Text
+                style={[
+                  theme.typography.caption,
+                  {
+                    color:
+                      value.length < min
+                        ? theme.colors.warning
+                        : theme.colors.text.tertiary,
+                    marginTop: 2,
+                  },
+                ]}
+              >
+                {value.length < min
+                  ? `Add ${min - value.length} more to continue`
+                  : 'Tap to review or remove'}
+              </Text>
+            </View>
+            <ChevronRight size={18} color={theme.colors.text.tertiary} />
+          </Pressable>
+        ) : null}
+
+        <Input
+          placeholder={`Search (e.g. "${activityQuery || 'venue'}", "rooftop")`}
+          value={extraQuery}
+          onChangeText={setExtraQuery}
+          autoCapitalize="none"
+          autoCorrect={false}
+          trailing={<SearchIcon size={18} color={theme.colors.text.tertiary} />}
+          containerStyle={{ marginBottom: 6 }}
+        />
+
+        <Pressable
+          onPress={() => setShowFilters(!showFilters)}
+          style={styles.filtersToggle}
+        >
+          <SlidersHorizontal size={14} color={theme.colors.text.secondary} />
+          <Text
+            style={[
+              theme.typography.caption,
+              { color: theme.colors.text.secondary, marginLeft: 6 },
+            ]}
+          >
+            {showFilters ? 'Hide filters' : 'Filters'}
+            {activeFilterCount > 0 ? ` • ${activeFilterCount} active` : ''}
+          </Text>
+        </Pressable>
+
+        {showFilters ? (
+          <View
+            style={[
+              styles.filtersBox,
+              {
+                backgroundColor: theme.colors.bg.subtle,
+                borderColor: theme.colors.border.default,
               },
             ]}
           >
-            {search.isError ? 'Search failed.' : 'Loading…'}
-          </Text>
-        )}
+            <FilterRow
+              icon={<Star size={13} color={theme.colors.text.secondary} />}
+              label="Rating"
+            >
+              {RATING_OPTIONS.map((r) => (
+                <FilterChip
+                  key={r.value}
+                  label={r.label}
+                  active={minRating === r.value}
+                  onPress={() => setMinRating(r.value)}
+                />
+              ))}
+            </FilterRow>
+            <FilterRow
+              icon={<DollarSign size={13} color={theme.colors.text.secondary} />}
+              label="Price"
+            >
+              {PRICE_LEVELS.map((p) => {
+                const active = minPrice === p.value && maxPrice === p.value;
+                return (
+                  <FilterChip
+                    key={p.value}
+                    label={p.label}
+                    active={active}
+                    onPress={() => {
+                      if (active) {
+                        setMinPrice(undefined);
+                        setMaxPrice(undefined);
+                      } else {
+                        setMinPrice(p.value);
+                        setMaxPrice(p.value);
+                      }
+                    }}
+                  />
+                );
+              })}
+            </FilterRow>
+            <FilterRow
+              icon={<MapPin size={13} color={theme.colors.text.secondary} />}
+              label="Distance"
+            >
+              {RADIUS_OPTIONS.map((r) => (
+                <FilterChip
+                  key={r.value}
+                  label={r.label}
+                  active={radius === r.value}
+                  onPress={() => setRadius(r.value)}
+                />
+              ))}
+            </FilterRow>
+          </View>
+        ) : null}
 
-        {/* Custom add */}
-        <View style={{ marginBottom: 24 }}>
+        <ResultsBlock
+          searchEnabled={searchEnabled}
+          isLoading={search.isLoading}
+          isError={search.isError}
+          data={search.data}
+          renderRow={(p) => (
+            <PlaceRow
+              key={p.placeId}
+              place={p}
+              isSelected={isPlaceSelected(p)}
+              onToggle={() => togglePlace(p)}
+              disabled={!isPlaceSelected(p) && isAtMax}
+            />
+          )}
+        />
+
+        <View style={{ marginTop: 16 }}>
           {showCustomInput ? (
             <View style={{ gap: 8 }}>
               <Input
@@ -308,33 +428,200 @@ export function ActivityVenuePicker({
           )}
         </View>
       </ScrollView>
+
+      <SelectionReviewSheet
+        visible={showReview}
+        onClose={() => setShowReview(false)}
+        items={value.map((v) => ({
+          id: v.id,
+          label: v.name,
+          subtitle: v.address ?? undefined,
+        }))}
+        min={min}
+        max={max}
+        onRemove={remove}
+        itemLabel="venues"
+      />
     </View>
+  );
+}
+
+function ResultsBlock({
+  searchEnabled,
+  isLoading,
+  isError,
+  data,
+  renderRow,
+}: {
+  searchEnabled: boolean;
+  isLoading: boolean;
+  isError: boolean;
+  data: Place[] | undefined;
+  renderRow: (p: Place) => React.ReactNode;
+}): React.ReactElement {
+  const theme = useTheme();
+
+  if (!searchEnabled) {
+    return (
+      <View style={styles.resultsState}>
+        <Text
+          style={[
+            theme.typography.bodySmall,
+            { color: theme.colors.text.tertiary, textAlign: 'center' },
+          ]}
+        >
+          Type something above to search
+        </Text>
+      </View>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <View style={styles.resultsState}>
+        <ActivityIndicator color={theme.colors.text.tertiary} />
+      </View>
+    );
+  }
+
+  if (isError) {
+    return (
+      <View style={styles.resultsState}>
+        <Text
+          style={[
+            theme.typography.bodySmall,
+            { color: theme.colors.error, textAlign: 'center' },
+          ]}
+        >
+          Search failed. Try again or adjust filters.
+        </Text>
+      </View>
+    );
+  }
+
+  if (!data || data.length === 0) {
+    return (
+      <View style={styles.resultsState}>
+        <Text
+          style={[
+            theme.typography.bodySmall,
+            { color: theme.colors.text.tertiary, textAlign: 'center' },
+          ]}
+        >
+          No matches.{'\n'}Try a different search or widen the filters.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ marginTop: 12 }}>
+      <Text style={{ color: '#999', fontSize: 12, fontWeight: '500', marginBottom: 8 }}>
+        {data.length} {data.length === 1 ? 'result' : 'results'}
+      </Text>
+      {data.slice(0, 15).map((p) => renderRow(p))}
+    </View>
+  );
+}
+
+function FilterRow({
+  icon,
+  label,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  children: React.ReactNode;
+}): React.ReactElement {
+  const theme = useTheme();
+  return (
+    <View style={{ marginBottom: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+        {icon}
+        <Text
+          style={[
+            theme.typography.caption,
+            { color: theme.colors.text.secondary, marginLeft: 6, fontWeight: '500' },
+          ]}
+        >
+          {label}
+        </Text>
+      </View>
+      <View style={[styles.row]}>{children}</View>
+    </View>
+  );
+}
+
+function FilterChip({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}): React.ReactElement {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.miniChip,
+        {
+          backgroundColor: active
+            ? theme.colors.accent + '20'
+            : theme.colors.bg.surface,
+          borderColor: active ? theme.colors.accent : theme.colors.border.default,
+        },
+        pressed && { opacity: 0.7 },
+      ]}
+    >
+      <Text style={[theme.typography.caption, { color: theme.colors.text.primary }]}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
 function PlaceRow({
   place,
-  onAdd,
+  isSelected,
+  onToggle,
+  disabled,
 }: {
   place: Place;
-  onAdd: () => void;
+  isSelected: boolean;
+  onToggle: () => void;
+  disabled: boolean;
 }): React.ReactElement {
   const theme = useTheme();
+  const priceStr = place.priceLevel ? '$'.repeat(place.priceLevel) : '';
   return (
     <Pressable
-      onPress={onAdd}
+      onPress={onToggle}
+      disabled={disabled}
       style={({ pressed }) => [
         styles.resultRow,
         {
-          backgroundColor: theme.colors.bg.surface,
-          borderColor: theme.colors.border.default,
+          backgroundColor: isSelected
+            ? theme.colors.accent + '15'
+            : theme.colors.bg.surface,
+          borderColor: isSelected ? theme.colors.accent : theme.colors.border.default,
+          borderWidth: isSelected ? 1.5 : 1,
+          opacity: disabled ? 0.4 : 1,
         },
-        pressed && { backgroundColor: theme.colors.bg.subtle },
+        pressed && { opacity: 0.7 },
       ]}
     >
       <View style={{ flex: 1 }}>
         <Text
-          style={[theme.typography.body, { color: theme.colors.text.primary }]}
+          style={[
+            theme.typography.body,
+            {
+              color: theme.colors.text.primary,
+              fontWeight: isSelected ? '600' : '400',
+            },
+          ]}
           numberOfLines={1}
         >
           {place.name}
@@ -352,6 +639,16 @@ function PlaceRow({
                 {place.rating.toFixed(1)}
               </Text>
             </>
+          ) : null}
+          {priceStr ? (
+            <Text
+              style={[
+                theme.typography.caption,
+                { color: theme.colors.text.secondary, marginRight: 8 },
+              ]}
+            >
+              {priceStr}
+            </Text>
           ) : null}
           {place.primaryType ? (
             <Text
@@ -374,7 +671,22 @@ function PlaceRow({
           </Text>
         ) : null}
       </View>
-      <Plus size={18} color={theme.colors.accent} />
+      {isSelected ? (
+        <View
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 14,
+            backgroundColor: theme.colors.accent,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Check size={16} color="#FFFFFF" />
+        </View>
+      ) : (
+        <Plus size={18} color={theme.colors.accent} />
+      )}
     </Pressable>
   );
 }
@@ -386,22 +698,48 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 12,
   },
-  selectedChip: {
+  selectedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  filtersToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    marginBottom: 4,
+  },
+  filtersBox: {
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 4,
+  },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  miniChip: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    maxWidth: 200,
   },
   resultRow: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
     borderRadius: 10,
-    borderWidth: 1,
     marginBottom: 6,
+    gap: 8,
+  },
+  resultsState: {
+    paddingVertical: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addCustomButton: {
     flexDirection: 'row',

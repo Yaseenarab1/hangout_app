@@ -25,6 +25,7 @@ import type {
   AddOptionInput,
   CastRankedVoteInput,
 } from '../schemas';
+import type { PollWithOptions } from '../types';
 
 export const pollKeys = {
   all: ['polls'] as const,
@@ -83,58 +84,196 @@ export function useCreateActivityPoll(hangoutId: string) {
   });
 }
 
+/**
+ * Cast vote with optimistic update — UI flips instantly, reverts if server fails.
+ * Handles edge cases:
+ *   - Tap option A then B fast → final state is B (no flicker)
+ *   - Server failure → revert to old state, show error
+ *   - Tap same option already voted → existing unvote behavior
+ */
 export function useCastVote() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: VoteInput) => castVote(input),
-    onSuccess: (_data, input) => {
-      qc.invalidateQueries({ queryKey: pollKeys.detail(input.pollId), refetchType: 'active' });
+    onMutate: async (input) => {
+      const key = pollKeys.detail(input.pollId);
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData<PollWithOptions>(key);
+      if (!prev) return { prev };
+
+      // Build new state: remove old vote (if any), add vote on input.optionId
+      const oldVotedOptionId = prev.options.find((o) => o.isMyVote)?.id ?? null;
+      const updated: PollWithOptions = {
+        ...prev,
+        options: prev.options.map((o) => {
+          let voteCount = o.voteCount;
+          let weightedScore = o.weightedScore;
+          let isMyVote = o.isMyVote;
+
+          if (o.id === oldVotedOptionId && oldVotedOptionId !== input.optionId) {
+            voteCount = Math.max(0, voteCount - 1);
+            weightedScore = Math.max(0, weightedScore - 1);
+            isMyVote = false;
+          }
+          if (o.id === input.optionId) {
+            if (!isMyVote) {
+              voteCount += 1;
+              weightedScore += 1;
+              isMyVote = true;
+            }
+          }
+          return { ...o, voteCount, weightedScore, isMyVote };
+        }),
+        // recompute total: count distinct voters but optimistically that's just incrementing if we didn't have a vote yet
+        totalVotes: oldVotedOptionId ? prev.totalVotes : prev.totalVotes + 1,
+        myVote: { ...(prev.myVote ?? {}), option_id: input.optionId } as PollWithOptions['myVote'],
+      };
+      qc.setQueryData(key, updated);
+      return { prev };
     },
-    onError: (error) => {
+    onError: (error, input, context) => {
+      const key = pollKeys.detail(input.pollId);
+      if (context?.prev) qc.setQueryData(key, context.prev);
       logError(error, { where: 'castVote' });
       toast.error(friendlyErrorMessage(error));
+    },
+    onSettled: (_data, _err, input) => {
+      qc.invalidateQueries({ queryKey: pollKeys.detail(input.pollId) });
     },
   });
 }
 
+/**
+ * Unvote with optimistic update.
+ */
 export function useUnvote() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (pollId: string) => unvote(pollId),
-    onSuccess: (_data, pollId) => {
-      qc.invalidateQueries({ queryKey: pollKeys.detail(pollId), refetchType: 'active' });
+    onMutate: async (pollId) => {
+      const key = pollKeys.detail(pollId);
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData<PollWithOptions>(key);
+      if (!prev) return { prev };
+      const updated: PollWithOptions = {
+        ...prev,
+        options: prev.options.map((o) =>
+          o.isMyVote
+            ? {
+                ...o,
+                voteCount: Math.max(0, o.voteCount - 1),
+                weightedScore: Math.max(0, o.weightedScore - 1),
+                isMyVote: false,
+              }
+            : o,
+        ),
+        totalVotes: Math.max(0, prev.totalVotes - 1),
+        myVote: null,
+      };
+      qc.setQueryData(key, updated);
+      return { prev };
     },
-    onError: (error) => {
+    onError: (error, pollId, context) => {
+      const key = pollKeys.detail(pollId);
+      if (context?.prev) qc.setQueryData(key, context.prev);
       logError(error, { where: 'unvote' });
       toast.error(friendlyErrorMessage(error));
+    },
+    onSettled: (_data, _err, pollId) => {
+      qc.invalidateQueries({ queryKey: pollKeys.detail(pollId) });
     },
   });
 }
 
+/**
+ * Cast ranked vote with optimistic update.
+ * Replaces all my rankings with the new list at once.
+ */
 export function useCastRankedVote() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CastRankedVoteInput) => castRankedVote(input),
-    onSuccess: (_data, input) => {
-      qc.invalidateQueries({ queryKey: pollKeys.detail(input.pollId), refetchType: 'active' });
+    onMutate: async (input) => {
+      const key = pollKeys.detail(input.pollId);
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData<PollWithOptions>(key);
+      if (!prev) return { prev };
+
+      const myRankMap = new Map<string, number>();
+      input.rankedOptionIds.forEach((id, idx) => myRankMap.set(id, idx + 1));
+
+      // Recount voters: was I a voter before? am I now?
+      const wasVoter = prev.myRanks.length > 0;
+      const isNowVoter = input.rankedOptionIds.length > 0;
+      const totalVotes =
+        prev.totalVotes + (isNowVoter ? 1 : 0) - (wasVoter ? 1 : 0);
+
+      const updated: PollWithOptions = {
+        ...prev,
+        options: prev.options.map((o) => {
+          const newRank = myRankMap.get(o.id) ?? null;
+          const wasFirstChoice = o.myRank === 1;
+          const isFirstChoice = newRank === 1;
+          let voteCount = o.voteCount;
+          if (wasFirstChoice && !isFirstChoice) voteCount = Math.max(0, voteCount - 1);
+          if (!wasFirstChoice && isFirstChoice) voteCount += 1;
+          return { ...o, myRank: newRank, voteCount };
+        }),
+        myRanks: input.rankedOptionIds.map((optionId, idx) => ({
+          optionId,
+          rank: idx + 1,
+        })),
+        totalVotes,
+      };
+      qc.setQueryData(key, updated);
+      return { prev };
     },
-    onError: (error) => {
+    onError: (error, input, context) => {
+      const key = pollKeys.detail(input.pollId);
+      if (context?.prev) qc.setQueryData(key, context.prev);
       logError(error, { where: 'castRankedVote' });
       toast.error(friendlyErrorMessage(error));
+    },
+    onSettled: (_data, _err, input) => {
+      qc.invalidateQueries({ queryKey: pollKeys.detail(input.pollId) });
     },
   });
 }
 
+/**
+ * Clear ranked vote with optimistic update.
+ */
 export function useClearRankedVote() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (pollId: string) => clearRankedVote(pollId),
-    onSuccess: (_data, pollId) => {
-      qc.invalidateQueries({ queryKey: pollKeys.detail(pollId), refetchType: 'active' });
+    onMutate: async (pollId) => {
+      const key = pollKeys.detail(pollId);
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData<PollWithOptions>(key);
+      if (!prev) return { prev };
+      const wasVoter = prev.myRanks.length > 0;
+      const updated: PollWithOptions = {
+        ...prev,
+        options: prev.options.map((o) => ({
+          ...o,
+          myRank: null,
+          voteCount: o.myRank === 1 ? Math.max(0, o.voteCount - 1) : o.voteCount,
+        })),
+        myRanks: [],
+        totalVotes: wasVoter ? Math.max(0, prev.totalVotes - 1) : prev.totalVotes,
+      };
+      qc.setQueryData(key, updated);
+      return { prev };
     },
-    onError: (error) => {
+    onError: (error, pollId, context) => {
+      const key = pollKeys.detail(pollId);
+      if (context?.prev) qc.setQueryData(key, context.prev);
       logError(error, { where: 'clearRankedVote' });
       toast.error(friendlyErrorMessage(error));
+    },
+    onSettled: (_data, _err, pollId) => {
+      qc.invalidateQueries({ queryKey: pollKeys.detail(pollId) });
     },
   });
 }

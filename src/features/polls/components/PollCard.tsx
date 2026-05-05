@@ -15,6 +15,8 @@ import {
   X,
   ListOrdered,
   ChevronRight,
+  Check,
+  Users,
 } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { Card, Button, Badge } from '@/components/ui';
@@ -72,13 +74,74 @@ export function PollCard({
 }
 
 // ============================================================================
+// Voter count component — clearer than just a badge
+// ============================================================================
+
+function VoterCount({
+  totalVotes,
+  hasVoted,
+}: {
+  totalVotes: number;
+  hasVoted: boolean;
+}): React.ReactElement {
+  const theme = useTheme();
+  if (totalVotes === 0) {
+    return (
+      <View style={styles.countRow}>
+        <Users size={12} color={theme.colors.text.tertiary} />
+        <Text
+          style={[
+            theme.typography.caption,
+            { color: theme.colors.text.tertiary, marginLeft: 4 },
+          ]}
+        >
+          No votes yet
+        </Text>
+      </View>
+    );
+  }
+  return (
+    <View style={styles.countRow}>
+      <Users size={12} color={theme.colors.text.secondary} />
+      <Text
+        style={[
+          theme.typography.caption,
+          { color: theme.colors.text.secondary, marginLeft: 4 },
+        ]}
+      >
+        {totalVotes} {totalVotes === 1 ? 'person' : 'people'} voted
+      </Text>
+      {hasVoted ? (
+        <View
+          style={[
+            styles.youVotedBadge,
+            { backgroundColor: theme.colors.success + '20' },
+          ]}
+        >
+          <Check size={10} color={theme.colors.success} />
+          <Text
+            style={[
+              theme.typography.caption,
+              {
+                color: theme.colors.success,
+                marginLeft: 3,
+                fontSize: 10,
+                fontWeight: '600',
+              },
+            ]}
+          >
+            you voted
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+// ============================================================================
 // Per-user sort helpers
 // ============================================================================
 
-/**
- * For SIMPLE voting: float the user's voted option to the top.
- * Other options stay in their original creation order.
- */
 function sortSimpleByMyVote<T extends PollOption & { isMyVote: boolean }>(
   options: T[],
 ): T[] {
@@ -87,10 +150,6 @@ function sortSimpleByMyVote<T extends PollOption & { isMyVote: boolean }>(
   return [...myVote, ...others];
 }
 
-/**
- * For RANKED voting: my ranked options first (in rank order: 1, 2, 3, ...),
- * unranked options after in creation order.
- */
 function sortRankedByMyRanks<
   T extends PollOption & { myRank: number | null },
 >(options: T[]): T[] {
@@ -121,11 +180,12 @@ function SimpleVotingCard({
   const [showManage, setShowManage] = useState(false);
   const [isApplyingChanges, setIsApplyingChanges] = useState(false);
 
-  // Sort by user's vote — their pick floats to top
   const sortedOptions = useMemo(
     () => sortSimpleByMyVote(poll.options),
     [poll.options],
   );
+
+  const hasVoted = !!poll.myVote;
 
   const handleVote = (optionId: string): void => {
     if (poll.myVote?.option_id === optionId) {
@@ -191,7 +251,7 @@ function SimpleVotingCard({
       }
       setShowManage(false);
     } catch (_e) {
-      // toast handled by mutation
+      // toast handled
     } finally {
       setIsApplyingChanges(false);
     }
@@ -210,16 +270,16 @@ function SimpleVotingCard({
           >
             {poll.title}
           </Text>
-          <Badge
-            label={`${poll.totalVotes} ${poll.totalVotes === 1 ? 'vote' : 'votes'}`}
-            variant="default"
-          />
+        </View>
+
+        <View style={{ marginTop: 6 }}>
+          <VoterCount totalVotes={poll.totalVotes} hasVoted={hasVoted} />
         </View>
 
         <Text
           style={[
             theme.typography.caption,
-            { color: theme.colors.text.tertiary, marginTop: 4 },
+            { color: theme.colors.text.tertiary, marginTop: 6 },
           ]}
         >
           Tap to vote • Tap again to undo
@@ -303,7 +363,7 @@ function SimpleVotingCard({
                       },
                     ]}
                   >
-                    {opt.voteCount} {opt.voteCount === 1 ? 'vote' : 'votes'}
+                    {opt.voteCount}
                   </Text>
                 </View>
               </Pressable>
@@ -371,13 +431,13 @@ function RankedVotingCard({
   const [showManage, setShowManage] = useState(false);
   const [isApplyingChanges, setIsApplyingChanges] = useState(false);
 
-  // Sort by user's ranks — ranked first (in rank order), unranked after
   const sortedOptions = useMemo(
     () => sortRankedByMyRanks(poll.options),
     [poll.options],
   );
 
   const myRankCount = poll.myRanks.length;
+  const hasVoted = myRankCount > 0;
 
   const handleClose = (): void => {
     closePollWithConfirm(poll, () => closePoll.mutate({ pollId: poll.id }));
@@ -452,15 +512,19 @@ function RankedVotingCard({
           <Badge label="Ranked" variant="default" />
         </View>
 
+        <View style={{ marginTop: 6 }}>
+          <VoterCount totalVotes={poll.totalVotes} hasVoted={hasVoted} />
+        </View>
+
         <Text
           style={[
             theme.typography.caption,
-            { color: theme.colors.text.tertiary, marginTop: 4 },
+            { color: theme.colors.text.tertiary, marginTop: 6 },
           ]}
         >
-          {myRankCount === 0
-            ? 'Tap below to rank your top picks.'
-            : `Your top ${myRankCount} ranked. Tap below to edit.`}
+          {hasVoted
+            ? `Your top ${myRankCount} ranked. Tap below to edit.`
+            : 'Tap below to rank your top picks.'}
         </Text>
 
         <View style={{ marginTop: 12, gap: 4 }}>
@@ -620,10 +684,6 @@ function RankedVotingCard({
   );
 }
 
-// ============================================================================
-// Suggesting + Closed
-// ============================================================================
-
 function SuggestingCard({ poll }: { poll: PollWithOptions }): React.ReactElement {
   const theme = useTheme();
   return (
@@ -759,6 +819,15 @@ function closePollWithConfirm(
 
 const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center' },
+  countRow: { flexDirection: 'row', alignItems: 'center' },
+  youVotedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
   optionRow: {
     borderRadius: 10,
     borderWidth: 1,

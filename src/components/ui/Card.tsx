@@ -1,25 +1,35 @@
 import React from 'react';
-import { View, StyleSheet, type ViewStyle } from 'react-native';
+import { View, Pressable, StyleSheet, type ViewStyle } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 
 export type CardProps = {
   children: React.ReactNode;
   /** Padding preset. Defaults to 'md'. */
   padding?: 'none' | 'sm' | 'md' | 'lg';
-  /** Variant — flat (no border), bordered (default), or filled. */
+  /** Variant — bordered (default), flat, or filled. */
   variant?: 'bordered' | 'flat' | 'filled';
+  /** If provided, the card becomes tappable. */
+  onPress?: () => void;
+  /** Long-press handler. */
+  onLongPress?: () => void;
+  /** Disable touch interactions. */
+  disabled?: boolean;
   style?: ViewStyle;
 };
 
 const PADDING_MAP = { none: 0, sm: 8, md: 14, lg: 20 };
 
 /**
- * Themed surface card. Used everywhere as a content container.
+ * Themed surface card. Acts as a Pressable when `onPress` is provided,
+ * otherwise a plain View.
  */
 export function Card({
   children,
   padding = 'md',
   variant = 'bordered',
+  onPress,
+  onLongPress,
+  disabled,
   style,
 }: CardProps): React.ReactElement {
   const theme = useTheme();
@@ -27,13 +37,9 @@ export function Card({
   const variantStyle: ViewStyle = (() => {
     switch (variant) {
       case 'flat':
-        return {
-          backgroundColor: theme.colors.bg.surface,
-        };
+        return { backgroundColor: theme.colors.bg.surface };
       case 'filled':
-        return {
-          backgroundColor: theme.colors.bg.subtle,
-        };
+        return { backgroundColor: theme.colors.bg.subtle };
       case 'bordered':
       default:
         return {
@@ -44,18 +50,29 @@ export function Card({
     }
   })();
 
-  return (
-    <View
-      style={[
-        {
-          borderRadius: 14,
-          padding: PADDING_MAP[padding],
-        },
-        variantStyle,
-        style,
-      ]}
-    >
-      {children}
-    </View>
-  );
+  const baseStyle: ViewStyle = {
+    borderRadius: 14,
+    padding: PADDING_MAP[padding],
+    ...variantStyle,
+  };
+
+  if (onPress || onLongPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        onLongPress={onLongPress}
+        disabled={disabled}
+        style={({ pressed }) => [
+          baseStyle,
+          pressed && { opacity: 0.7 },
+          disabled && { opacity: 0.4 },
+          style,
+        ]}
+      >
+        {children}
+      </Pressable>
+    );
+  }
+
+  return <View style={[baseStyle, style]}>{children}</View>;
 }
