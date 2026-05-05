@@ -1,10 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-} from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import {
@@ -16,6 +11,7 @@ import {
   ListOrdered,
   Calendar as CalIcon,
   Clock,
+  Search as SearchIcon,
 } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';
 import { Input, Textarea, Button } from '@/components/ui';
@@ -30,10 +26,16 @@ import {
   VotingStyleSheet,
   VoteDeadlineSheet,
   StartTimeSheet,
+  ACTIVITY_CATALOG,
+  ACTIVITY_CATEGORIES,
 } from '@/features/polls';
 
-type Step = 'flow' | 'options' | 'invite' | 'details';
-type Flow = 'activity_only' | 'activity_then_venue' | 'know_what_to_do';
+type Step = 'flow' | 'options' | 'pick_one' | 'invite' | 'details';
+type Flow =
+  | 'activity_only'         // vote on activities, no venue follow-up
+  | 'activity_then_venue'   // vote on activities, then venue poll after
+  | 'know_what_find_where'  // skip activity vote, pick activity inline, go straight to venue picker
+  | 'know_everything';      // skip everything
 
 type FormState = {
   title: string;
@@ -41,6 +43,8 @@ type FormState = {
   locationName: string;
   inviteUserIds: string[];
   options: ActivityOption[];
+  /** Single activity selected for know_what_find_where path. */
+  pickedActivity: { label: string; emoji?: string; placesQuery?: string } | null;
   voteDeadline: Date | null;
   startTime: Date | null;
   votingMethod: VotingMethod;
@@ -64,6 +68,7 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
       locationName: '',
       inviteUserIds: [],
       options: [],
+      pickedActivity: null,
       voteDeadline: null,
       startTime: null,
       votingMethod: 'simple',
@@ -71,21 +76,77 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
   });
 
   const options = watch('options');
+  const pickedActivity = watch('pickedActivity');
   const inviteUserIds = watch('inviteUserIds');
   const voteDeadline = watch('voteDeadline');
   const startTime = watch('startTime');
   const title = watch('title');
   const votingMethod = watch('votingMethod');
 
-  const usesPoll = flow === 'activity_only' || flow === 'activity_then_venue';
+  const usesActivityPoll =
+    flow === 'activity_only' || flow === 'activity_then_venue';
+  const isDirectVenue = flow === 'know_what_find_where';
+  const isNoPoll = flow === 'know_everything';
 
   const handleSubmit = (): void => {
     const v = getValues();
     if (!flow || !v.title.trim()) return;
 
-    const finalDeadline =
-      v.voteDeadline ?? new Date(Date.now() + 60 * 60 * 1000);
+    if (isDirectVenue) {
+      // Create the hangout, then push to follow-up-venue with the picked activity
+      const finalDeadline = v.voteDeadline ?? new Date(Date.now() + 60 * 60 * 1000);
+      createMutation.mutate(
+        {
+          hangout: {
+            title: v.title.trim(),
+            description: v.description.trim() || undefined,
+            startTime: v.startTime ? v.startTime.toISOString() : undefined,
+            locationName: v.locationName.trim() || undefined,
+            inviteUserIds: v.inviteUserIds,
+          },
+          poll: null, // no activity poll
+        },
+        {
+          onSuccess: ({ hangoutId }) => {
+            // Hand off to the venue picker route — same one used for follow-ups
+            router.replace({
+              pathname: '/hangout/[id]/follow-up-venue',
+              params: {
+                id: hangoutId,
+                activity: v.pickedActivity?.label ?? 'venue',
+                query: v.pickedActivity?.placesQuery ?? v.pickedActivity?.label ?? '',
+                returnDeadline: finalDeadline.toISOString(),
+              },
+            });
+          },
+        },
+      );
+      return;
+    }
 
+    if (isNoPoll) {
+      createMutation.mutate(
+        {
+          hangout: {
+            title: v.title.trim(),
+            description: v.description.trim() || undefined,
+            startTime: v.startTime ? v.startTime.toISOString() : undefined,
+            locationName: v.locationName.trim() || undefined,
+            inviteUserIds: v.inviteUserIds,
+          },
+          poll: null,
+        },
+        {
+          onSuccess: ({ hangoutId }) => {
+            router.replace(`/hangout/${hangoutId}`);
+          },
+        },
+      );
+      return;
+    }
+
+    // Activity-poll paths (activity_only, activity_then_venue)
+    const finalDeadline = v.voteDeadline ?? new Date(Date.now() + 60 * 60 * 1000);
     createMutation.mutate(
       {
         hangout: {
@@ -95,18 +156,16 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
           locationName: v.locationName.trim() || undefined,
           inviteUserIds: v.inviteUserIds,
         },
-        poll: usesPoll
-          ? {
-              mode: 'simple_vote',
-              votingMethod: v.votingMethod,
-              voteDeadline: finalDeadline.toISOString(),
-              options: v.options.map((o) => ({
-                label: o.label,
-                catalogId: o.catalogId,
-                emoji: o.emoji,
-              })),
-            }
-          : null,
+        poll: {
+          mode: 'simple_vote',
+          votingMethod: v.votingMethod,
+          voteDeadline: finalDeadline.toISOString(),
+          options: v.options.map((o) => ({
+            label: o.label,
+            catalogId: o.catalogId,
+            emoji: o.emoji,
+          })),
+        },
       },
       {
         onSuccess: ({ hangoutId }) => {
@@ -116,7 +175,7 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
     );
   };
 
-  // ---- Step: pick flow ----
+  // ============= Step: Flow =============
   if (step === 'flow') {
     return (
       <Screen header={{ title: 'Find what to do', showClose: true }} contentPadding={16}>
@@ -131,6 +190,7 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
         >
           Pick a path — you can always adjust later.
         </Text>
+
         <View style={{ gap: 12 }}>
           <FlowChoice
             icon={<Compass size={24} color={theme.colors.accent} />}
@@ -144,18 +204,27 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
           <FlowChoice
             icon={<MapPin size={24} color={theme.colors.accent} />}
             title="Activity, then where"
-            subtitle="Vote on what to do. Then vote on specific places (e.g. bars, escape rooms)."
+            subtitle="Vote on what to do. Then vote on specific places."
             onPress={() => {
               setFlow('activity_then_venue');
               setStep('options');
             }}
           />
           <FlowChoice
-            icon={<SkipForward size={24} color={theme.colors.text.secondary} />}
-            title="I already know what to do"
-            subtitle="Skip the poll, just create the hangout."
+            icon={<SearchIcon size={24} color={theme.colors.accent} />}
+            title="I know what to do, find where"
+            subtitle="Pick the activity, then we vote on specific places (e.g. bars, escape rooms)."
             onPress={() => {
-              setFlow('know_what_to_do');
+              setFlow('know_what_find_where');
+              setStep('pick_one');
+            }}
+          />
+          <FlowChoice
+            icon={<SkipForward size={24} color={theme.colors.text.secondary} />}
+            title="I know everything"
+            subtitle="Skip the polls, just create the hangout."
+            onPress={() => {
+              setFlow('know_everything');
               setStep('invite');
             }}
           />
@@ -164,8 +233,153 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
     );
   }
 
-  // ---- Step: options + secondary settings ----
-  if (step === 'options') {
+  // ============= Step: pick_one (single activity for direct-venue path) =============
+  if (step === 'pick_one') {
+    return (
+      <Screen
+        header={{
+          title: 'What activity?',
+          showBack: true,
+          onBack: () => setStep('flow'),
+        }}
+        contentPadding={0}
+      >
+        <View style={{ flex: 1 }}>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ padding: 16 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Text
+              style={[
+                theme.typography.bodySmall,
+                { color: theme.colors.text.secondary, marginBottom: 16 },
+              ]}
+            >
+              Pick what you want to do. We'll find specific places for it next.
+            </Text>
+
+            {ACTIVITY_CATEGORIES.map((cat) => {
+              const items = ACTIVITY_CATALOG.filter((a) => a.category === cat.id);
+              if (items.length === 0) return null;
+              return (
+                <View key={cat.id} style={{ marginBottom: 16 }}>
+                  <View style={styles.categoryHeader}>
+                    <View style={[styles.categoryDot, { backgroundColor: cat.color }]} />
+                    <Text
+                      style={[
+                        theme.typography.bodySmallMedium,
+                        { color: theme.colors.text.secondary, marginLeft: 6 },
+                      ]}
+                    >
+                      {cat.label}
+                    </Text>
+                  </View>
+                  <View style={styles.chipsWrap}>
+                    {items.map((item) => {
+                      const isSelected = pickedActivity?.label === item.label;
+                      return (
+                        <Pressable
+                          key={item.id}
+                          onPress={() => {
+                            setValue('pickedActivity', {
+                              label: item.label,
+                              emoji: item.emoji,
+                              placesQuery: item.placesQuery,
+                            });
+                          }}
+                          style={({ pressed }) => [
+                            styles.catalogChip,
+                            {
+                              backgroundColor: isSelected
+                                ? cat.color + '30'
+                                : cat.color + '10',
+                              borderColor: isSelected
+                                ? cat.color
+                                : cat.color + '40',
+                              borderWidth: isSelected ? 1.5 : 1,
+                            },
+                            pressed && { opacity: 0.7 },
+                          ]}
+                        >
+                          <Text style={{ fontSize: 16, marginRight: 6 }}>
+                            {item.emoji}
+                          </Text>
+                          <Text
+                            style={[
+                              theme.typography.bodySmall,
+                              {
+                                color: theme.colors.text.primary,
+                                fontWeight: isSelected ? '600' : '400',
+                              },
+                            ]}
+                          >
+                            {item.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              );
+            })}
+
+            {/* Custom free-text option */}
+            <View style={{ marginTop: 8, marginBottom: 24 }}>
+              <Text
+                style={[
+                  theme.typography.bodySmallMedium,
+                  { color: theme.colors.text.secondary, marginBottom: 8 },
+                ]}
+              >
+                Or describe it yourself
+              </Text>
+              <Input
+                placeholder="e.g. rooftop bar, vegan bakery, axe throwing"
+                value={
+                  pickedActivity && !pickedActivity.placesQuery
+                    ? pickedActivity.label
+                    : ''
+                }
+                onChangeText={(text) => {
+                  if (text.trim()) {
+                    setValue('pickedActivity', { label: text.trim() });
+                  } else {
+                    setValue('pickedActivity', null);
+                  }
+                }}
+                maxLength={100}
+              />
+            </View>
+          </ScrollView>
+
+          <View
+            style={[
+              styles.bottomBar,
+              {
+                borderTopColor: theme.colors.border.default,
+                backgroundColor: theme.colors.bg.canvas,
+              },
+            ]}
+          >
+            <Button
+              label={pickedActivity ? 'Next: invite friends' : 'Pick an activity'}
+              trailingIcon={
+                pickedActivity ? <ChevronRight size={16} color="#FFFFFF" /> : undefined
+              }
+              onPress={() => setStep('invite')}
+              disabled={!pickedActivity}
+              fullWidth
+              size="lg"
+            />
+          </View>
+        </View>
+      </Screen>
+    );
+  }
+
+  // ============= Step: options (activity poll) =============
+  if (step === 'options' && usesActivityPoll) {
     return (
       <Screen
         header={{
@@ -214,7 +428,6 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
             />
           </View>
 
-          {/* Compact summary rows */}
           <View
             style={[
               styles.summarySection,
@@ -242,11 +455,13 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
             />
           </View>
 
-          {/* Sticky bottom button */}
           <View
             style={[
               styles.bottomBar,
-              { borderTopColor: theme.colors.border.default, backgroundColor: theme.colors.bg.canvas },
+              {
+                borderTopColor: theme.colors.border.default,
+                backgroundColor: theme.colors.bg.canvas,
+              },
             ]}
           >
             <Button
@@ -282,14 +497,20 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
     );
   }
 
-  // ---- Step: invite ----
+  // ============= Step: Invite =============
   if (step === 'invite') {
+    const backStep: Step =
+      flow === 'know_what_find_where'
+        ? 'pick_one'
+        : usesActivityPoll
+          ? 'options'
+          : 'flow';
     return (
       <Screen
         header={{
           title: 'Invite friends',
           showBack: true,
-          onBack: () => setStep(usesPoll ? 'options' : 'flow'),
+          onBack: () => setStep(backStep),
         }}
         contentPadding={0}
       >
@@ -320,7 +541,10 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
           <View
             style={[
               styles.bottomBar,
-              { borderTopColor: theme.colors.border.default, backgroundColor: theme.colors.bg.canvas },
+              {
+                borderTopColor: theme.colors.border.default,
+                backgroundColor: theme.colors.bg.canvas,
+              },
             ]}
           >
             <Button
@@ -340,7 +564,7 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
     );
   }
 
-  // ---- Step: final touches ----
+  // ============= Step: Details =============
   return (
     <Screen
       header={{
@@ -351,14 +575,24 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
       contentPadding={0}
     >
       <View style={{ flex: 1 }}>
-        <View style={{ flex: 1, padding: 16, gap: 16 }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 16, gap: 16 }}
+          keyboardShouldPersistTaps="handled"
+        >
           <Controller
             control={control}
             name="title"
             render={({ field: { value, onChange, onBlur } }) => (
               <Input
                 label="Title"
-                placeholder={usesPoll ? 'Friday night vote' : 'Movie night'}
+                placeholder={
+                  isDirectVenue
+                    ? `${pickedActivity?.label ?? 'Find a place'} night`
+                    : usesActivityPoll
+                      ? 'Friday night vote'
+                      : 'Movie night'
+                }
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
@@ -404,16 +638,35 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
             onPress={() => setShowStartTimeSheet(true)}
             highlightValue={startTime !== null}
           />
-        </View>
+
+          {/* Voting closes — for direct-venue we still need a deadline for the venue poll that follows */}
+          {isDirectVenue ? (
+            <SummaryRow
+              label="Venue voting closes"
+              icon={<Clock size={18} color={theme.colors.text.tertiary} />}
+              value={voteDeadline ? formatDate(voteDeadline) : 'In 1 hour'}
+              onPress={() => setShowDeadlineSheet(true)}
+            />
+          ) : null}
+        </ScrollView>
 
         <View
           style={[
             styles.bottomBar,
-            { borderTopColor: theme.colors.border.default, backgroundColor: theme.colors.bg.canvas },
+            {
+              borderTopColor: theme.colors.border.default,
+              backgroundColor: theme.colors.bg.canvas,
+            },
           ]}
         >
           <Button
-            label={usesPoll ? 'Create & start vote' : 'Create hangout'}
+            label={
+              isDirectVenue
+                ? 'Create & pick venues'
+                : usesActivityPoll
+                  ? 'Create & start vote'
+                  : 'Create hangout'
+            }
             onPress={handleSubmit}
             loading={createMutation.isPending}
             disabled={!title.trim() || createMutation.isPending}
@@ -428,6 +681,12 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
         onClose={() => setShowStartTimeSheet(false)}
         value={startTime}
         onChange={(d) => setValue('startTime', d)}
+      />
+      <VoteDeadlineSheet
+        visible={showDeadlineSheet}
+        onClose={() => setShowDeadlineSheet(false)}
+        value={voteDeadline}
+        onChange={(d) => setValue('voteDeadline', d)}
       />
     </Screen>
   );
@@ -515,12 +774,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 12,
   },
-  summarySection: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
+  summarySection: { borderTopWidth: StyleSheet.hairlineWidth },
   bottomBar: {
     padding: 16,
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
+  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  catalogChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 16,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  categoryDot: { width: 8, height: 8, borderRadius: 4 },
 });

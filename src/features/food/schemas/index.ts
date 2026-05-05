@@ -28,6 +28,7 @@ export const createFoodHangoutSchema = z
       inviteUserIds: z.array(z.string().uuid()).default([]),
     }),
     flow: z.enum(['cuisine_only', 'cuisine_then_restaurant', 'restaurant_only']),
+    /** Voting method — simple or ranked. */
     votingMethod: z.enum(['simple', 'ranked']).default('simple'),
     voteDeadline: z.string().datetime(),
     cuisineOptions: z.array(cuisineOptionSchema).optional(),
@@ -50,8 +51,9 @@ export type CreateFoodHangoutInput = z.infer<typeof createFoodHangoutSchema>;
 
 export const createRestaurantPollSchema = z.object({
   hangoutId: z.string().uuid(),
+  /** Voting method — simple or ranked. */
+  votingMethod: z.enum(['simple', 'ranked']).default('simple'),
   voteDeadline: z.string().datetime(),
-  votingMethod: z.enum(['simple', 'ranked']).optional(),
   options: z.array(restaurantOptionSchema).min(2, 'Pick at least 2 restaurants.'),
 });
 

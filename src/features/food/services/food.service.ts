@@ -8,9 +8,8 @@ import type {
 import type { Poll } from '@/features/polls';
 
 /**
- * Food service. Creates the right kind of poll based on the user's chosen flow.
- *
- * As of 2C.1: passes votingMethod through to the poll insert.
+ * Food service. Creates the right kind of poll based on the user's chosen flow,
+ * with the user-selected voting method (simple or ranked).
  */
 
 export async function createFoodHangout(
@@ -52,7 +51,10 @@ export async function createFoodHangout(
     pollTitle = 'What kind of food?';
     optionRows = (input.cuisineOptions ?? []).map((c) => ({
       label: c.label,
-      metadata: { emoji: c.emoji ?? null, catalogId: c.catalogId ?? null },
+      metadata: {
+        emoji: c.emoji ?? null,
+        catalogId: c.catalogId ?? null,
+      },
     }));
   }
 
@@ -103,7 +105,7 @@ export async function createRestaurantPoll(
       created_by: auth.user.id,
       kind: 'restaurant',
       mode: 'simple_vote',
-      voting_method: input.votingMethod ?? 'simple',
+      voting_method: input.votingMethod,
       phase: 'voting',
       title: 'Which restaurant?',
       vote_deadline: input.voteDeadline,
@@ -138,7 +140,10 @@ export async function createRestaurantPoll(
   return poll as Poll;
 }
 
-// User custom restaurants — unchanged from 2C
+// -----------------------------------------------------------------------------
+// User custom restaurants
+// -----------------------------------------------------------------------------
+
 export type UserCustomRestaurant = {
   id: string;
   user_id: string;

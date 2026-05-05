@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -30,7 +30,7 @@ import {
 } from '../hooks/usePolls';
 import { RankedVoteSheet } from './RankedVoteSheet';
 import { ManagePollOptionsSheet } from './ManagePollOptionsSheet';
-import type { PollWithOptions } from '../types';
+import type { PollWithOptions, PollOption } from '../types';
 
 export type PollCardProps = {
   pollId: string;
@@ -71,7 +71,39 @@ export function PollCard({
   }
 }
 
-// ---------------- Simple voting ----------------
+// ============================================================================
+// Per-user sort helpers
+// ============================================================================
+
+/**
+ * For SIMPLE voting: float the user's voted option to the top.
+ * Other options stay in their original creation order.
+ */
+function sortSimpleByMyVote<T extends PollOption & { isMyVote: boolean }>(
+  options: T[],
+): T[] {
+  const myVote = options.filter((o) => o.isMyVote);
+  const others = options.filter((o) => !o.isMyVote);
+  return [...myVote, ...others];
+}
+
+/**
+ * For RANKED voting: my ranked options first (in rank order: 1, 2, 3, ...),
+ * unranked options after in creation order.
+ */
+function sortRankedByMyRanks<
+  T extends PollOption & { myRank: number | null },
+>(options: T[]): T[] {
+  const ranked = options
+    .filter((o) => o.myRank !== null)
+    .sort((a, b) => (a.myRank as number) - (b.myRank as number));
+  const unranked = options.filter((o) => o.myRank === null);
+  return [...ranked, ...unranked];
+}
+
+// ============================================================================
+// Simple voting card
+// ============================================================================
 
 function SimpleVotingCard({
   poll,
@@ -88,6 +120,12 @@ function SimpleVotingCard({
   const removeOption = useRemoveOption();
   const [showManage, setShowManage] = useState(false);
   const [isApplyingChanges, setIsApplyingChanges] = useState(false);
+
+  // Sort by user's vote — their pick floats to top
+  const sortedOptions = useMemo(
+    () => sortSimpleByMyVote(poll.options),
+    [poll.options],
+  );
 
   const handleVote = (optionId: string): void => {
     if (poll.myVote?.option_id === optionId) {
@@ -107,7 +145,6 @@ function SimpleVotingCard({
   }): Promise<void> => {
     setIsApplyingChanges(true);
     try {
-      // Confirm if removing options that have votes
       const optionsWithVotes = changes.removeOptionIds.filter(
         (id) => (poll.options.find((o) => o.id === id)?.voteCount ?? 0) > 0,
       );
@@ -136,8 +173,6 @@ function SimpleVotingCard({
           return;
         }
       }
-
-      // Remove (sequential, small N)
       for (const id of changes.removeOptionIds) {
         await new Promise<void>((resolve, reject) => {
           removeOption.mutate(
@@ -146,8 +181,6 @@ function SimpleVotingCard({
           );
         });
       }
-
-      // Add (single batch call)
       if (changes.addOptions.length > 0) {
         await new Promise<void>((resolve, reject) => {
           addBatch.mutate(
@@ -156,10 +189,9 @@ function SimpleVotingCard({
           );
         });
       }
-
       setShowManage(false);
     } catch (_e) {
-      // toast already shown by mutation hook
+      // toast handled by mutation
     } finally {
       setIsApplyingChanges(false);
     }
@@ -194,7 +226,7 @@ function SimpleVotingCard({
         </Text>
 
         <View style={{ marginTop: 12, gap: 6 }}>
-          {poll.options.map((opt) => {
+          {sortedOptions.map((opt) => {
             const isMyVote = opt.isMyVote;
             const pct =
               poll.totalVotes > 0
@@ -230,6 +262,20 @@ function SimpleVotingCard({
                   ]}
                 />
                 <View style={styles.optionContent}>
+                  {isMyVote ? (
+                    <View
+                      style={[
+                        styles.myVoteBadge,
+                        { backgroundColor: theme.colors.accent },
+                      ]}
+                    >
+                      <Text
+                        style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '700' }}
+                      >
+                        YOUR PICK
+                      </Text>
+                    </View>
+                  ) : null}
                   {meta.emoji ? (
                     <Text style={{ fontSize: 18, marginRight: 8 }}>{meta.emoji}</Text>
                   ) : null}
@@ -304,7 +350,9 @@ function SimpleVotingCard({
   );
 }
 
-// ---------------- Ranked voting ----------------
+// ============================================================================
+// Ranked voting card
+// ============================================================================
 
 function RankedVotingCard({
   poll,
@@ -322,6 +370,12 @@ function RankedVotingCard({
   const [showVoteSheet, setShowVoteSheet] = useState(false);
   const [showManage, setShowManage] = useState(false);
   const [isApplyingChanges, setIsApplyingChanges] = useState(false);
+
+  // Sort by user's ranks — ranked first (in rank order), unranked after
+  const sortedOptions = useMemo(
+    () => sortRankedByMyRanks(poll.options),
+    [poll.options],
+  );
 
   const myRankCount = poll.myRanks.length;
 
@@ -342,10 +396,14 @@ function RankedVotingCard({
         const ok = await new Promise<boolean>((resolve) => {
           Alert.alert(
             'Remove ranked options?',
-            'Some of these options have rankings. Removing them will affect voters\' ballots.',
+            "Some of these options have rankings. Removing them will affect voters' ballots.",
             [
               { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-              { text: 'Remove', style: 'destructive', onPress: () => resolve(true) },
+              {
+                text: 'Remove',
+                style: 'destructive',
+                onPress: () => resolve(true),
+              },
             ],
           );
         });
@@ -354,7 +412,6 @@ function RankedVotingCard({
           return;
         }
       }
-
       for (const id of changes.removeOptionIds) {
         await new Promise<void>((resolve, reject) => {
           removeOption.mutate(
@@ -363,7 +420,6 @@ function RankedVotingCard({
           );
         });
       }
-
       if (changes.addOptions.length > 0) {
         await new Promise<void>((resolve, reject) => {
           addBatch.mutate(
@@ -372,10 +428,9 @@ function RankedVotingCard({
           );
         });
       }
-
       setShowManage(false);
     } catch (_e) {
-      // handled by toast
+      // toast handled
     } finally {
       setIsApplyingChanges(false);
     }
@@ -403,12 +458,13 @@ function RankedVotingCard({
             { color: theme.colors.text.tertiary, marginTop: 4 },
           ]}
         >
-          Rank your top picks. {poll.totalVotes}{' '}
-          {poll.totalVotes === 1 ? 'person has' : 'people have'} voted.
+          {myRankCount === 0
+            ? 'Tap below to rank your top picks.'
+            : `Your top ${myRankCount} ranked. Tap below to edit.`}
         </Text>
 
         <View style={{ marginTop: 12, gap: 4 }}>
-          {poll.options.slice(0, 5).map((opt) => {
+          {sortedOptions.slice(0, 6).map((opt) => {
             const meta = (opt.metadata as { emoji?: string | null }) ?? {};
             const myRank = opt.myRank;
             return (
@@ -448,7 +504,11 @@ function RankedVotingCard({
                 <Text
                   style={[
                     theme.typography.bodySmall,
-                    { color: theme.colors.text.primary, flex: 1 },
+                    {
+                      color: theme.colors.text.primary,
+                      flex: 1,
+                      fontWeight: myRank !== null ? '600' : '400',
+                    },
                   ]}
                   numberOfLines={1}
                 >
@@ -457,14 +517,14 @@ function RankedVotingCard({
               </View>
             );
           })}
-          {poll.options.length > 5 ? (
+          {sortedOptions.length > 6 ? (
             <Text
               style={[
                 theme.typography.caption,
                 { color: theme.colors.text.tertiary, paddingLeft: 8 },
               ]}
             >
-              + {poll.options.length - 5} more
+              + {sortedOptions.length - 6} more
             </Text>
           ) : null}
         </View>
@@ -560,7 +620,9 @@ function RankedVotingCard({
   );
 }
 
-// ---------------- Suggesting + Closed ----------------
+// ============================================================================
+// Suggesting + Closed
+// ============================================================================
 
 function SuggestingCard({ poll }: { poll: PollWithOptions }): React.ReactElement {
   const theme = useTheme();
@@ -709,6 +771,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 10,
+  },
+  myVoteBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+    marginRight: 8,
   },
   winnerRow: {
     flexDirection: 'row',

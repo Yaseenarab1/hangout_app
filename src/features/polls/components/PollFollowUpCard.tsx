@@ -7,37 +7,35 @@ import { Card } from '@/components/ui';
 import type { Poll, PollOption } from '../types';
 
 export type PollFollowUpCardProps = {
-  /** The CLOSED poll whose winner triggers this follow-up. */
   poll: Poll & { options: PollOption[] };
   hangoutId: string;
-  /** Whether there's already a follow-up poll on this hangout (hide if yes). */
   alreadyHasFollowUp: boolean;
 };
 
 /**
- * After a cuisine/activity poll closes, show host a "Now pick a place" card.
+ * After an activity OR cuisine poll closes, show host a "Now pick a place" card.
  *
- * For cuisine winner → routes to follow-up restaurant picker
- * For activity winner with placesQuery → routes to follow-up venue picker
+ * - Cuisine winner → routes to follow-up restaurant picker pre-filtered by cuisine
+ * - Activity winner with catalog placesQuery → uses that query for Places search
+ * - Activity winner WITHOUT catalog placesQuery (custom activity) → uses the
+ *   winner's label as the search query directly. So "rooftop bar" → searches
+ *   Places for "rooftop bar".
  *
- * Hidden if a restaurant/activity-venue poll already exists on this hangout.
+ * This way, the follow-up flow ALWAYS works, regardless of whether the winner
+ * came from the catalog or was a custom user-added activity.
  */
 export function PollFollowUpCard({
   poll,
   hangoutId,
   alreadyHasFollowUp,
 }: PollFollowUpCardProps): React.ReactElement | null {
-  const theme = useTheme();
-
   if (alreadyHasFollowUp) return null;
   if (poll.phase !== 'closed' || !poll.winning_option_id) return null;
 
   const winner = poll.options.find((o) => o.id === poll.winning_option_id);
   if (!winner) return null;
 
-  // Decide if there's a meaningful follow-up
   if (poll.kind === 'cuisine') {
-    // Cuisine winner → suggest finding restaurants
     const meta = (winner.metadata as { emoji?: string | null }) ?? {};
     return (
       <FollowUpCardLayout
@@ -56,14 +54,13 @@ export function PollFollowUpCard({
   }
 
   if (poll.kind === 'activity') {
-    // Activity winner with placesQuery → suggest finding venues
     const meta = (winner.metadata as {
       emoji?: string | null;
       catalogId?: string | null;
     }) ?? {};
-    // Look up the catalog item to see if it has a placesQuery
-    const placesQuery = lookupPlacesQuery(meta.catalogId);
-    if (!placesQuery) return null;
+    // Try catalog mapping first, then fall back to the winner label
+    const placesQuery =
+      lookupPlacesQuery(meta.catalogId) ?? winner.label;
     return (
       <FollowUpCardLayout
         emoji={meta.emoji ?? '📍'}
@@ -105,19 +102,13 @@ function FollowUpCardLayout({
     <Card padding="md" style={{ marginTop: 12 }}>
       <View style={styles.row}>
         <View
-          style={[
-            styles.emojiBox,
-            { backgroundColor: theme.colors.accent + '15' },
-          ]}
+          style={[styles.emojiBox, { backgroundColor: theme.colors.accent + '15' }]}
         >
           <Text style={{ fontSize: 28 }}>{emoji}</Text>
         </View>
         <View style={{ flex: 1, marginLeft: 12 }}>
           <Text
-            style={[
-              theme.typography.bodyMedium,
-              { color: theme.colors.text.primary },
-            ]}
+            style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}
           >
             {title}
           </Text>
@@ -141,10 +132,7 @@ function FollowUpCardLayout({
       >
         <Sparkles size={16} color="#FFFFFF" />
         <Text
-          style={[
-            theme.typography.bodyMedium,
-            { color: '#FFFFFF', marginLeft: 8 },
-          ]}
+          style={[theme.typography.bodyMedium, { color: '#FFFFFF', marginLeft: 8 }]}
         >
           {ctaLabel}
         </Text>
@@ -154,10 +142,10 @@ function FollowUpCardLayout({
   );
 }
 
-/** Look up the placesQuery for a catalog item by id. */
 function lookupPlacesQuery(catalogId: string | null | undefined): string | null {
   if (!catalogId) return null;
   // Lazy import to avoid circular dependency
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { ACTIVITY_CATALOG } = require('../catalog/activities');
   const item = ACTIVITY_CATALOG.find((c: { id: string }) => c.id === catalogId);
   return item?.placesQuery ?? null;

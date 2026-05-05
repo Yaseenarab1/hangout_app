@@ -9,11 +9,13 @@ import {
 } from 'react-native';
 import {
   Search as SearchIcon,
-  X,
   Star,
   Plus,
   SlidersHorizontal,
   ChevronRight,
+  Check,
+  MapPin,
+  DollarSign,
 } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { Input, Button } from '@/components/ui';
@@ -50,6 +52,13 @@ const RADIUS_OPTIONS = [
   { value: 16000, label: '<10mi' },
 ];
 
+const RATING_OPTIONS = [
+  { value: 0, label: 'Any' },
+  { value: 3.5, label: '3.5+' },
+  { value: 4.0, label: '4.0+' },
+  { value: 4.5, label: '4.5+' },
+];
+
 export function RestaurantSearchPicker({
   value,
   onChange,
@@ -67,6 +76,7 @@ export function RestaurantSearchPicker({
   const [minPrice, setMinPrice] = useState<number | undefined>(undefined);
   const [maxPrice, setMaxPrice] = useState<number | undefined>(undefined);
   const [radius, setRadius] = useState<number>(5000);
+  const [minRating, setMinRating] = useState<number>(3.5);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customName, setCustomName] = useState('');
   const [customAddress, setCustomAddress] = useState('');
@@ -83,7 +93,7 @@ export function RestaurantSearchPicker({
       radius,
       minPriceLevel: minPrice,
       maxPriceLevel: maxPrice,
-      minRating: 3.5,
+      minRating: minRating > 0 ? minRating : undefined,
     },
     debouncedQuery.length > 0 || Boolean(selectedCuisine),
   );
@@ -92,11 +102,22 @@ export function RestaurantSearchPicker({
     () => new Set(value.map((v) => v.placeId).filter(Boolean) as string[]),
     [value],
   );
+  const selectedNames = useMemo(
+    () => new Set(value.map((v) => v.name.toLowerCase())),
+    [value],
+  );
 
   const isAtMax = value.length >= max;
 
-  const addPlace = (place: Place): void => {
-    if (isAtMax || (place.placeId && selectedPlaceIds.has(place.placeId))) return;
+  const isPlaceSelected = (place: Place): boolean =>
+    Boolean(place.placeId && selectedPlaceIds.has(place.placeId));
+
+  const togglePlace = (place: Place): void => {
+    if (isPlaceSelected(place)) {
+      onChange(value.filter((v) => v.placeId !== place.placeId));
+      return;
+    }
+    if (isAtMax) return;
     onChange([
       ...value,
       {
@@ -124,13 +145,26 @@ export function RestaurantSearchPicker({
     });
   };
 
-  const addCustomFromSaved = (item: {
+  const toggleSavedCustom = (item: {
     id: string;
     name: string;
     address: string | null;
     google_place_id: string | null;
     metadata: Record<string, unknown>;
   }): void => {
+    const isSelected =
+      (item.google_place_id && selectedPlaceIds.has(item.google_place_id)) ||
+      selectedNames.has(item.name.toLowerCase());
+    if (isSelected) {
+      onChange(
+        value.filter(
+          (v) =>
+            v.placeId !== item.google_place_id &&
+            v.name.toLowerCase() !== item.name.toLowerCase(),
+        ),
+      );
+      return;
+    }
     if (isAtMax) return;
     const m = item.metadata as Record<string, unknown>;
     onChange([
@@ -171,9 +205,14 @@ export function RestaurantSearchPicker({
     setShowCustomInput(false);
   };
 
+  const activeFilterCount =
+    (selectedCuisine ? 1 : 0) +
+    (minPrice ? 1 : 0) +
+    (radius !== 5000 ? 1 : 0) +
+    (minRating !== 3.5 ? 1 : 0);
+
   return (
     <View style={{ flex: 1 }}>
-      {/* Tappable selected header */}
       {value.length > 0 ? (
         <Pressable
           onPress={() => setShowReview(true)}
@@ -219,20 +258,105 @@ export function RestaurantSearchPicker({
         </Pressable>
       ) : null}
 
+      {/* My saved — compact horizontal row */}
+      {customRestaurants.data && customRestaurants.data.length > 0 ? (
+        <View style={{ marginBottom: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+            <Star size={12} color={theme.colors.accent} fill={theme.colors.accent} />
+            <Text
+              style={[
+                theme.typography.caption,
+                { color: theme.colors.text.secondary, marginLeft: 4 },
+              ]}
+            >
+              My saved ({customRestaurants.data.length})
+            </Text>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 6, paddingRight: 16 }}
+          >
+            {customRestaurants.data.map((r) => {
+              const meta = r.metadata as { rating?: number; priceLevel?: number };
+              const isSelected =
+                (r.google_place_id && selectedPlaceIds.has(r.google_place_id)) ||
+                selectedNames.has(r.name.toLowerCase());
+              const disabled = !isSelected && isAtMax;
+              return (
+                <Pressable
+                  key={r.id}
+                  onPress={() => toggleSavedCustom(r)}
+                  onLongPress={() => deleteCustom.mutate(r.id)}
+                  delayLongPress={400}
+                  disabled={disabled}
+                  style={({ pressed }) => [
+                    styles.savedChip,
+                    {
+                      backgroundColor: isSelected
+                        ? theme.colors.accent + '20'
+                        : theme.colors.bg.surface,
+                      borderColor: isSelected
+                        ? theme.colors.accent
+                        : theme.colors.border.default,
+                      opacity: disabled ? 0.4 : 1,
+                    },
+                    pressed && { opacity: 0.7 },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      theme.typography.bodySmall,
+                      { color: theme.colors.text.primary, fontWeight: '500' },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {r.name}
+                  </Text>
+                  {meta.rating ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                      <Star size={10} color={theme.colors.warning} fill={theme.colors.warning} />
+                      <Text
+                        style={[
+                          theme.typography.caption,
+                          {
+                            color: theme.colors.text.tertiary,
+                            marginLeft: 3,
+                            fontSize: 11,
+                          },
+                        ]}
+                      >
+                        {meta.rating.toFixed(1)}
+                        {meta.priceLevel ? `  •  ${'$'.repeat(meta.priceLevel)}` : ''}
+                      </Text>
+                    </View>
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          <Text
+            style={[
+              theme.typography.caption,
+              { color: theme.colors.text.tertiary, marginTop: 4, fontSize: 10 },
+            ]}
+          >
+            Long-press to forget a saved place
+          </Text>
+        </View>
+      ) : null}
+
       <Input
-        placeholder="Search restaurants"
+        placeholder="Search by name, type, neighborhood…"
         value={query}
         onChangeText={setQuery}
         autoCapitalize="none"
         autoCorrect={false}
         trailing={<SearchIcon size={18} color={theme.colors.text.tertiary} />}
-        containerStyle={{ marginBottom: 8 }}
+        containerStyle={{ marginBottom: 6 }}
       />
 
-      <Pressable
-        onPress={() => setShowFilters(!showFilters)}
-        style={styles.filtersToggle}
-      >
+      <Pressable onPress={() => setShowFilters(!showFilters)} style={styles.filtersToggle}>
         <SlidersHorizontal size={14} color={theme.colors.text.secondary} />
         <Text
           style={[
@@ -241,7 +365,7 @@ export function RestaurantSearchPicker({
           ]}
         >
           {showFilters ? 'Hide filters' : 'Filters'}
-          {selectedCuisine || minPrice || maxPrice ? ' • active' : ''}
+          {activeFilterCount > 0 ? ` • ${activeFilterCount} active` : ''}
         </Text>
       </Pressable>
 
@@ -255,60 +379,30 @@ export function RestaurantSearchPicker({
             },
           ]}
         >
-          <Text
-            style={[
-              theme.typography.caption,
-              { color: theme.colors.text.secondary, marginBottom: 6 },
-            ]}
+          <FilterRow
+            icon={<Star size={13} color={theme.colors.text.secondary} />}
+            label="Rating"
           >
-            Distance
-          </Text>
-          <View style={styles.row}>
-            {RADIUS_OPTIONS.map((r) => (
-              <Pressable
+            {RATING_OPTIONS.map((r) => (
+              <FilterChip
                 key={r.value}
-                onPress={() => setRadius(r.value)}
-                style={({ pressed }) => [
-                  styles.miniChip,
-                  {
-                    backgroundColor:
-                      radius === r.value
-                        ? theme.colors.accent + '20'
-                        : theme.colors.bg.surface,
-                    borderColor:
-                      radius === r.value
-                        ? theme.colors.accent
-                        : theme.colors.border.default,
-                  },
-                  pressed && { opacity: 0.7 },
-                ]}
-              >
-                <Text
-                  style={[
-                    theme.typography.caption,
-                    { color: theme.colors.text.primary },
-                  ]}
-                >
-                  {r.label}
-                </Text>
-              </Pressable>
+                label={r.label}
+                active={minRating === r.value}
+                onPress={() => setMinRating(r.value)}
+              />
             ))}
-          </View>
-
-          <Text
-            style={[
-              theme.typography.caption,
-              { color: theme.colors.text.secondary, marginTop: 12, marginBottom: 6 },
-            ]}
+          </FilterRow>
+          <FilterRow
+            icon={<DollarSign size={13} color={theme.colors.text.secondary} />}
+            label="Price"
           >
-            Price
-          </Text>
-          <View style={styles.row}>
             {PRICE_LEVELS.map((p) => {
               const active = minPrice === p.value && maxPrice === p.value;
               return (
-                <Pressable
+                <FilterChip
                   key={p.value}
+                  label={p.label}
+                  active={active}
                   onPress={() => {
                     if (active) {
                       setMinPrice(undefined);
@@ -318,36 +412,27 @@ export function RestaurantSearchPicker({
                       setMaxPrice(p.value);
                     }
                   }}
-                  style={({ pressed }) => [
-                    styles.miniChip,
-                    {
-                      backgroundColor: active
-                        ? theme.colors.accent + '20'
-                        : theme.colors.bg.surface,
-                      borderColor: active
-                        ? theme.colors.accent
-                        : theme.colors.border.default,
-                    },
-                    pressed && { opacity: 0.7 },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      theme.typography.caption,
-                      { color: theme.colors.text.primary },
-                    ]}
-                  >
-                    {p.label}
-                  </Text>
-                </Pressable>
+                />
               );
             })}
-          </View>
-
+          </FilterRow>
+          <FilterRow
+            icon={<MapPin size={13} color={theme.colors.text.secondary} />}
+            label="Distance"
+          >
+            {RADIUS_OPTIONS.map((r) => (
+              <FilterChip
+                key={r.value}
+                label={r.label}
+                active={radius === r.value}
+                onPress={() => setRadius(r.value)}
+              />
+            ))}
+          </FilterRow>
           <Text
             style={[
               theme.typography.caption,
-              { color: theme.colors.text.secondary, marginTop: 12, marginBottom: 6 },
+              { color: theme.colors.text.secondary, marginTop: 4, marginBottom: 6 },
             ]}
           >
             Cuisine
@@ -395,30 +480,6 @@ export function RestaurantSearchPicker({
         keyboardShouldPersistTaps="handled"
         style={{ marginTop: 8 }}
       >
-        {customRestaurants.data && customRestaurants.data.length > 0 ? (
-          <View style={{ marginBottom: 16 }}>
-            <Text
-              style={[
-                theme.typography.bodySmallMedium,
-                { color: theme.colors.text.secondary, marginBottom: 8 },
-              ]}
-            >
-              ⭐ My saved
-            </Text>
-            {customRestaurants.data.slice(0, 5).map((r) => (
-              <RestaurantRow
-                key={r.id}
-                name={r.name}
-                address={r.address ?? undefined}
-                rating={(r.metadata as { rating?: number }).rating ?? null}
-                priceLevel={(r.metadata as { priceLevel?: number }).priceLevel ?? null}
-                onAdd={() => addCustomFromSaved(r)}
-                onLongPress={() => deleteCustom.mutate(r.id)}
-              />
-            ))}
-          </View>
-        ) : null}
-
         {search.isLoading ? (
           <View style={{ padding: 16, alignItems: 'center' }}>
             <ActivityIndicator color={theme.colors.text.tertiary} />
@@ -436,16 +497,14 @@ export function RestaurantSearchPicker({
             {search.data.slice(0, 15).map((p) => (
               <RestaurantRow
                 key={p.placeId}
-                name={p.name}
-                address={p.address}
-                rating={p.rating}
-                priceLevel={p.priceLevel}
-                primaryType={p.primaryType}
-                onAdd={() => addPlace(p)}
+                place={p}
+                isSelected={isPlaceSelected(p)}
+                onToggle={() => togglePlace(p)}
+                disabled={!isPlaceSelected(p) && isAtMax}
               />
             ))}
           </View>
-        ) : (debouncedQuery.length > 0 || selectedCuisine) ? (
+        ) : debouncedQuery.length > 0 || selectedCuisine ? (
           <Text
             style={[
               theme.typography.bodySmall,
@@ -456,7 +515,7 @@ export function RestaurantSearchPicker({
               },
             ]}
           >
-            No matches
+            No matches with these filters
           </Text>
         ) : (
           <Text
@@ -552,57 +611,125 @@ export function RestaurantSearchPicker({
   );
 }
 
-function RestaurantRow({
-  name,
-  address,
-  rating,
-  priceLevel,
-  primaryType,
-  onAdd,
-  onLongPress,
+function FilterRow({
+  icon,
+  label,
+  children,
 }: {
-  name: string;
-  address?: string | null;
-  rating?: number | null;
-  priceLevel?: number | null;
-  primaryType?: string | null;
-  onAdd: () => void;
-  onLongPress?: () => void;
+  icon: React.ReactNode;
+  label: string;
+  children: React.ReactNode;
 }): React.ReactElement {
   const theme = useTheme();
-  const priceStr = priceLevel ? '$'.repeat(priceLevel) : '';
+  return (
+    <View style={{ marginBottom: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+        {icon}
+        <Text
+          style={[
+            theme.typography.caption,
+            { color: theme.colors.text.secondary, marginLeft: 6, fontWeight: '500' },
+          ]}
+        >
+          {label}
+        </Text>
+      </View>
+      <View style={[styles.row]}>{children}</View>
+    </View>
+  );
+}
+
+function FilterChip({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}): React.ReactElement {
+  const theme = useTheme();
   return (
     <Pressable
-      onPress={onAdd}
-      onLongPress={onLongPress}
-      delayLongPress={400}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.miniChip,
+        {
+          backgroundColor: active
+            ? theme.colors.accent + '20'
+            : theme.colors.bg.surface,
+          borderColor: active ? theme.colors.accent : theme.colors.border.default,
+        },
+        pressed && { opacity: 0.7 },
+      ]}
+    >
+      <Text style={[theme.typography.caption, { color: theme.colors.text.primary }]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function RestaurantRow({
+  place,
+  isSelected,
+  onToggle,
+  disabled,
+}: {
+  place: Place;
+  isSelected: boolean;
+  onToggle: () => void;
+  disabled: boolean;
+}): React.ReactElement {
+  const theme = useTheme();
+  const priceStr = place.priceLevel ? '$'.repeat(place.priceLevel) : '';
+  return (
+    <Pressable
+      onPress={onToggle}
+      disabled={disabled}
       style={({ pressed }) => [
         styles.resultRow,
         {
-          backgroundColor: theme.colors.bg.surface,
-          borderColor: theme.colors.border.default,
+          backgroundColor: isSelected
+            ? theme.colors.accent + '15'
+            : theme.colors.bg.surface,
+          borderColor: isSelected
+            ? theme.colors.accent
+            : theme.colors.border.default,
+          borderWidth: isSelected ? 1.5 : 1,
+          opacity: disabled ? 0.4 : 1,
         },
-        pressed && { backgroundColor: theme.colors.bg.subtle },
+        pressed && { opacity: 0.7 },
       ]}
     >
       <View style={{ flex: 1 }}>
         <Text
-          style={[theme.typography.body, { color: theme.colors.text.primary }]}
+          style={[
+            theme.typography.body,
+            {
+              color: theme.colors.text.primary,
+              fontWeight: isSelected ? '600' : '400',
+            },
+          ]}
           numberOfLines={1}
         >
-          {name}
+          {place.name}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-          {rating !== null && rating !== undefined ? (
+          {place.rating !== null && place.rating !== undefined ? (
             <>
               <Star size={12} color={theme.colors.warning} fill={theme.colors.warning} />
               <Text
                 style={[
                   theme.typography.caption,
-                  { color: theme.colors.text.secondary, marginLeft: 4, marginRight: 8 },
+                  {
+                    color: theme.colors.text.secondary,
+                    marginLeft: 4,
+                    marginRight: 8,
+                  },
                 ]}
               >
-                {rating.toFixed(1)}
+                {place.rating.toFixed(1)}
               </Text>
             </>
           ) : null}
@@ -616,16 +743,16 @@ function RestaurantRow({
               {priceStr}
             </Text>
           ) : null}
-          {primaryType ? (
+          {place.primaryType ? (
             <Text
               style={[theme.typography.caption, { color: theme.colors.text.tertiary }]}
               numberOfLines={1}
             >
-              {primaryType}
+              {place.primaryType}
             </Text>
           ) : null}
         </View>
-        {address ? (
+        {place.address ? (
           <Text
             style={[
               theme.typography.caption,
@@ -633,11 +760,26 @@ function RestaurantRow({
             ]}
             numberOfLines={1}
           >
-            {address}
+            {place.address}
           </Text>
         ) : null}
       </View>
-      <Plus size={18} color={theme.colors.accent} />
+      {isSelected ? (
+        <View
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 14,
+            backgroundColor: theme.colors.accent,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Check size={16} color="#FFFFFF" />
+        </View>
+      ) : (
+        <Plus size={18} color={theme.colors.accent} />
+      )}
     </Pressable>
   );
 }
@@ -651,6 +793,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 12,
+  },
+  savedChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    minWidth: 120,
+    maxWidth: 220,
   },
   filtersToggle: {
     flexDirection: 'row',
@@ -677,8 +827,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderRadius: 10,
-    borderWidth: 1,
     marginBottom: 6,
+    gap: 8,
   },
   addCustomButton: {
     flexDirection: 'row',

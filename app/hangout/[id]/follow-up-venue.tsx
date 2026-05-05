@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronRight, Clock } from 'lucide-react-native';
+import { ChevronRight, Clock, Vote as VoteIcon, ListOrdered } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';
 import { Button } from '@/components/ui';
 import { SummaryRow } from '@/components/ui/SummaryRow';
@@ -14,6 +14,8 @@ import {
   type ActivityVenueOption,
   pollKeys,
   VoteDeadlineSheet,
+  VotingStyleSheet,
+  type VotingMethod,
 } from '@/features/polls';
 import { hangoutKeys } from '@/features/hangouts';
 import { friendlyErrorMessage, logError } from '@/services/errors';
@@ -33,11 +35,14 @@ export default function FollowUpVenueScreen(): React.ReactElement {
   const [venues, setVenues] = useState<ActivityVenueOption[]>([]);
   const [voteDeadline, setVoteDeadline] = useState<Date | null>(null);
   const [showDeadlineSheet, setShowDeadlineSheet] = useState(false);
+  const [votingMethod, setVotingMethod] = useState<VotingMethod>('simple');
+  const [showStyleSheet, setShowStyleSheet] = useState(false);
 
   const qc = useQueryClient();
   const createPoll = useMutation({
     mutationFn: async (input: {
       hangoutId: string;
+      votingMethod: VotingMethod;
       voteDeadline: string;
       options: ActivityVenueOption[];
     }) => {
@@ -51,7 +56,7 @@ export default function FollowUpVenueScreen(): React.ReactElement {
           created_by: auth.user.id,
           kind: 'restaurant',
           mode: 'simple_vote',
-          voting_method: 'simple',
+          voting_method: input.votingMethod,
           phase: 'voting',
           title: `Where to ${activityLabel.toLowerCase()}?`,
           vote_deadline: input.voteDeadline,
@@ -98,6 +103,7 @@ export default function FollowUpVenueScreen(): React.ReactElement {
     const finalDeadline = voteDeadline ?? new Date(Date.now() + 60 * 60 * 1000);
     createPoll.mutate({
       hangoutId,
+      votingMethod,
       voteDeadline: finalDeadline.toISOString(),
       options: venues,
     });
@@ -124,11 +130,20 @@ export default function FollowUpVenueScreen(): React.ReactElement {
         </View>
 
         <View
-          style={[
-            styles.summarySection,
-            { borderTopColor: theme.colors.border.default },
-          ]}
+          style={[styles.summarySection, { borderTopColor: theme.colors.border.default }]}
         >
+          <SummaryRow
+            label="Voting style"
+            icon={
+              votingMethod === 'ranked' ? (
+                <ListOrdered size={18} color={theme.colors.text.tertiary} />
+              ) : (
+                <VoteIcon size={18} color={theme.colors.text.tertiary} />
+              )
+            }
+            value={votingMethod === 'ranked' ? 'Ranked vote' : 'Simple vote'}
+            onPress={() => setShowStyleSheet(true)}
+          />
           <SummaryRow
             label="Voting closes"
             icon={<Clock size={18} color={theme.colors.text.tertiary} />}
@@ -142,13 +157,17 @@ export default function FollowUpVenueScreen(): React.ReactElement {
                 : 'In 1 hour'
             }
             onPress={() => setShowDeadlineSheet(true)}
+            showTopSeparator
           />
         </View>
 
         <View
           style={[
             styles.bottomBar,
-            { borderTopColor: theme.colors.border.default, backgroundColor: theme.colors.bg.canvas },
+            {
+              borderTopColor: theme.colors.border.default,
+              backgroundColor: theme.colors.bg.canvas,
+            },
           ]}
         >
           <Button
@@ -174,6 +193,12 @@ export default function FollowUpVenueScreen(): React.ReactElement {
         onClose={() => setShowDeadlineSheet(false)}
         value={voteDeadline}
         onChange={setVoteDeadline}
+      />
+      <VotingStyleSheet
+        visible={showStyleSheet}
+        onClose={() => setShowStyleSheet(false)}
+        value={votingMethod}
+        onChange={setVotingMethod}
       />
     </Screen>
   );
