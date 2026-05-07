@@ -14,9 +14,12 @@ import {
   HelpCircle,
   MessageCircle,
   Images,
+  Receipt,
 } from 'lucide-react-native';
 import { UnreadBadge } from '@/features/messaging';
 import { usePhotosSummary } from '@/features/photos/hooks/usePhotosSummary';
+import { useUserBalance } from '@/features/bills/hooks/useUserBalance';
+import { formatCents } from '@/features/bills/utils/split';
 import { Image } from 'expo-image';
 import { Screen } from '@/components/layout/Screen';
 import {
@@ -76,6 +79,7 @@ export default function HangoutDetailScreen(): React.ReactElement {
 
   const photosSummary = usePhotosSummary(hangoutId);
   const previewPhotos = photosSummary.photos;
+  const myBalance = useUserBalance(hangoutId);
 
   const isHost = hangout.data?.host_id === user?.id;
   const myParticipationRole = hangout.data?.participants.find(
@@ -355,6 +359,40 @@ export default function HangoutDetailScreen(): React.ReactElement {
               />
             ))}
           </View>
+        )}
+      </Pressable>
+
+      {/* Bills entry */}
+      <SectionHeader title="Bills" />
+      <Pressable
+        onPress={() => router.push(`/hangout/${hangoutId}/bills` as any)}
+        style={({ pressed }) => [
+          styles.chatRow,
+          {
+            backgroundColor: theme.colors.bg.surface,
+            borderColor: theme.colors.border.default,
+          },
+          pressed && { opacity: 0.7 },
+        ]}
+      >
+        <Receipt size={20} color={theme.colors.accent} strokeWidth={1.5} />
+        <Text
+          style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, flex: 1 }]}
+        >
+          Expenses
+        </Text>
+        {myBalance.data && myBalance.data.net_cents !== 0 && (
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: '600',
+              color: myBalance.data.net_cents > 0 ? '#22C55E' : theme.colors.danger,
+            }}
+          >
+            {myBalance.data.net_cents > 0
+              ? `+${formatCents(myBalance.data.net_cents)}`
+              : formatCents(myBalance.data.net_cents)}
+          </Text>
         )}
       </Pressable>
 

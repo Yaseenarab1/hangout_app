@@ -68,6 +68,7 @@ export default function RootLayout(): React.ReactElement {
         <Stack.Screen name="hangout/[id]/chat" options={{ presentation: 'card' }} />
         <Stack.Screen name="hangout/[id]/photos" options={{ presentation: 'card' }} />
         <Stack.Screen name="hangout/[id]/bills" options={{ presentation: 'card' }} />
+        <Stack.Screen name="hangout/[id]/bills-new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="feed" options={{ presentation: 'card' }} />
         <Stack.Screen name="conversations/[id]" options={{ presentation: 'card' }} />
         <Stack.Screen name="conversations/new" options={{ presentation: 'modal' }} />
