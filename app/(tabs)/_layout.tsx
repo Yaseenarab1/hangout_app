@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, Users, MessageCircle, Calendar, User } from 'lucide-react-native';
+import { Home, Users, CalendarCheck, User } from 'lucide-react-native';
 import { Platform } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -34,28 +34,19 @@ export default function TabsLayout(): React.ReactElement {
         }}
       />
       <Tabs.Screen
+        name="hangouts"
+        options={{
+          title: 'Hangouts',
+          tabBarIcon: ({ color, size }) => (
+            <CalendarCheck color={color} size={size} strokeWidth={1.5} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="friends"
         options={{
           title: 'Friends',
           tabBarIcon: ({ color, size }) => <Users color={color} size={size} strokeWidth={1.5} />,
-        }}
-      />
-      <Tabs.Screen
-        name="messages"
-        options={{
-          title: 'Messages',
-          tabBarIcon: ({ color, size }) => (
-            <MessageCircle color={color} size={size} strokeWidth={1.5} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="find-time"
-        options={{
-          title: 'Find Time',
-          tabBarIcon: ({ color, size }) => (
-            <Calendar color={color} size={size} strokeWidth={1.5} />
-          ),
         }}
       />
       <Tabs.Screen
@@ -65,6 +56,9 @@ export default function TabsLayout(): React.ReactElement {
           tabBarIcon: ({ color, size }) => <User color={color} size={size} strokeWidth={1.5} />,
         }}
       />
+      {/* Phase 4+ screens — exist as routes but hidden from the tab bar */}
+      <Tabs.Screen name="messages" options={{ href: null }} />
+      <Tabs.Screen name="find-time" options={{ href: null }} />
     </Tabs>
   );
 }
