@@ -115,6 +115,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     'sentry-expo',
+    [
+      'expo-media-library',
+      {
+        photosPermission:
+          `${AppConfig.APP_NAME} saves hangout photos to your library when you request it.`,
+        savePhotosPermission:
+          `${AppConfig.APP_NAME} saves hangout photos to your library when you request it.`,
+        isAccessMediaLocationEnabled: false,
+      },
+    ],
   ],
 
   extra: {

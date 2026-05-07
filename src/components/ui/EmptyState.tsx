@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
+import { Button } from './Button';
 
 export type EmptyStateProps = {
   title: string;
@@ -9,6 +10,9 @@ export type EmptyStateProps = {
   icon?: React.ReactNode;
   /** Optional action button or other element. */
   action?: React.ReactNode;
+  /** Shorthand: renders a primary Button below the body. */
+  actionLabel?: string;
+  onAction?: () => void;
 };
 
 /**
@@ -19,6 +23,8 @@ export function EmptyState({
   body,
   icon,
   action,
+  actionLabel,
+  onAction,
 }: EmptyStateProps): React.ReactElement {
   const theme = useTheme();
   return (
@@ -48,6 +54,11 @@ export function EmptyState({
         </Text>
       ) : null}
       {action ? <View style={{ marginTop: 16 }}>{action}</View> : null}
+      {actionLabel && onAction ? (
+        <View style={{ marginTop: 16 }}>
+          <Button label={actionLabel} onPress={onAction} size="sm" />
+        </View>
+      ) : null}
     </View>
   );
 }

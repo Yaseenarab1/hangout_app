@@ -60,7 +60,7 @@ export default function FollowUpVenueScreen(): React.ReactElement {
           phase: 'voting',
           title: `Where to ${activityLabel.toLowerCase()}?`,
           vote_deadline: input.voteDeadline,
-        })
+        } as any)
         .select()
         .single();
 

@@ -55,14 +55,14 @@ export async function createActivityPoll(
     .insert({
       hangout_id: hangoutId,
       created_by: auth.user.id,
-      kind: input.kind ?? 'activity',
+      kind: 'activity' as const,
       mode: input.mode,
       voting_method: input.votingMethod,
       phase,
       title,
       suggest_deadline: input.suggestDeadline ?? null,
       vote_deadline: input.voteDeadline,
-    })
+    } as any)
     .select()
     .single();
 
@@ -74,7 +74,7 @@ export async function createActivityPoll(
       poll_id: poll.id,
       added_by: auth.user!.id,
       label: opt.label,
-      metadata: opt.metadata ?? {
+      metadata: {
         emoji: opt.emoji ?? null,
         catalogId: opt.catalogId ?? null,
       },
@@ -176,7 +176,7 @@ async function buildRankedPollDetail(
   options: PollOption[],
   myUserId: string | undefined,
 ): Promise<PollWithOptions> {
-  const { data: rankedVotes, error } = await supabase
+  const { data: rankedVotes, error } = await (supabase as any)
     .from('ranked_votes')
     .select('*')
     .eq('poll_id', poll.id);
@@ -292,7 +292,7 @@ export async function castRankedVote(input: CastRankedVoteInput): Promise<void> 
   if (pErr) throw pErr;
   const weight = participant?.vote_weight ?? 1.0;
 
-  const { error: delErr } = await supabase
+  const { error: delErr } = await (supabase as any)
     .from('ranked_votes')
     .delete()
     .eq('poll_id', input.pollId)
@@ -309,7 +309,7 @@ export async function castRankedVote(input: CastRankedVoteInput): Promise<void> 
     weight,
   }));
 
-  const { error: insErr } = await supabase.from('ranked_votes').insert(rows);
+  const { error: insErr } = await (supabase as any).from('ranked_votes').insert(rows);
   if (insErr) throw insErr;
 }
 
@@ -317,7 +317,7 @@ export async function clearRankedVote(pollId: string): Promise<void> {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error('Not authenticated');
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('ranked_votes')
     .delete()
     .eq('poll_id', pollId)
@@ -370,7 +370,7 @@ export async function addOptionsBatch(input: {
 
   const { data, error } = await supabase
     .from(TABLES.poll_options)
-    .insert(rows)
+    .insert(rows as any)
     .select();
 
   if (error) throw error;
@@ -408,7 +408,7 @@ export async function closePoll(
     if (!detailed) throw new Error('Poll not found');
 
     if (detailed.voting_method === 'ranked') {
-      const { data: rankedRows } = await supabase
+      const { data: rankedRows } = await (supabase as any)
         .from('ranked_votes')
         .select('*')
         .eq('poll_id', pollId);

@@ -16,18 +16,18 @@ type State = { hasError: boolean; error?: Error };
  * event-handler errors won't be caught here.
  */
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, State> {
-  state: State = { hasError: false };
+  override state: State = { hasError: false };
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, info: React.ErrorInfo): void {
+  override componentDidCatch(error: Error, info: React.ErrorInfo): void {
     // eslint-disable-next-line no-console
     console.error('[ErrorBoundary]', error, info);
   }
 
-  render(): React.ReactNode {
+  override render(): React.ReactNode {
     if (this.state.hasError) {
       if (this.props.fallback !== undefined) return this.props.fallback;
       return (

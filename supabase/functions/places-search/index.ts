@@ -127,7 +127,7 @@ serve(async (req: Request) => {
       ratingCount: p.userRatingCount ?? null,
       priceLevel: priceLevelToNumber(p.priceLevel),
       primaryType: p.primaryTypeDisplayName?.text ?? null,
-      photoRef: p.photos?.[0]?.name ?? null, // can build photo URL from this
+      photos: (p.photos ?? []).slice(0, 5).map((ph: any) => ph.name).filter(Boolean),
       mapsUrl: p.googleMapsUri ?? null,
       types: p.types ?? [],
     }));
@@ -157,7 +157,8 @@ function priceLevelEnumList(min: number, max: number): string[] {
   };
   const result: string[] = [];
   for (let i = min; i <= max; i++) {
-    if (enumMap[i]) result.push(enumMap[i]);
+    const level = enumMap[i];
+    if (level) result.push(level);
   }
   return result;
 }

@@ -47,14 +47,14 @@ export function useSendMessage() {
     },
 
     onSuccess: (realMessage, { hangoutId }, ctx) => {
-      // Swap optimistic placeholder with the real server row
       qc.setQueryData<any>(messagesKey(hangoutId), (prev: any) => {
         if (!prev) return prev;
-        const newPages = prev.pages.map((page: Message[]) =>
-          page.map((m) =>
+        const newPages = prev.pages.map((page: Message[]) => {
+          const deduped = page.filter((m) => m.id !== realMessage.id);
+          return deduped.map((m) =>
             m.id === ctx?.optimisticId ? { ...realMessage, pending: false } : m,
-          ),
-        );
+          );
+        });
         return { ...prev, pages: newPages };
       });
     },

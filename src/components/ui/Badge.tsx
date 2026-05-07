@@ -4,8 +4,9 @@ import { useTheme } from '@/hooks/useTheme';
 
 export type BadgeProps = {
   label: string;
-  variant?: 'default' | 'success' | 'warning' | 'error' | 'info' | 'brand';
+  variant?: 'default' | 'success' | 'warning' | 'error' | 'danger' | 'info' | 'brand';
   size?: 'sm' | 'md';
+  style?: import('react-native').ViewStyle;
 };
 
 /**
@@ -15,6 +16,7 @@ export function Badge({
   label,
   variant = 'default',
   size = 'sm',
+  style,
 }: BadgeProps): React.ReactElement {
   const theme = useTheme();
 
@@ -25,7 +27,8 @@ export function Badge({
       case 'warning':
         return { bg: theme.colors.warning + '20', fg: theme.colors.warning };
       case 'error':
-        return { bg: theme.colors.error + '20', fg: theme.colors.error };
+      case 'danger':
+        return { bg: theme.colors.danger + '20', fg: theme.colors.danger };
       case 'info':
         return { bg: theme.colors.accent + '20', fg: theme.colors.accent };
       case 'brand':
@@ -45,6 +48,7 @@ export function Badge({
           paddingHorizontal: size === 'sm' ? 8 : 10,
           paddingVertical: size === 'sm' ? 2 : 4,
         },
+        style,
       ]}
     >
       <Text

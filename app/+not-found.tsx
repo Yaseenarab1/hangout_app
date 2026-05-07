@@ -14,7 +14,7 @@ export default function NotFoundScreen(): React.ReactElement {
         title="That screen doesn't exist"
         body="The link you followed is broken, or this screen has moved."
         actionLabel="Go home"
-        onAction={() => router.replace('/(tabs)/')}
+        onAction={() => router.replace('/(tabs)/' as any)}
       />
     </Screen>
   );

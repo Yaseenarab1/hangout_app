@@ -25,6 +25,10 @@ export type AvatarProps = {
   uri?: string | null;
   /** Display name — used to compute initials when no image. */
   name?: string | null;
+  /** Alias for `name` — accepted for ergonomics at callsites. */
+  displayName?: string | null;
+  /** Accepted but unused — lets callers pass an entity id without errors. */
+  id?: string;
   size?: AvatarSize;
   /** Custom background color (defaults to a theme-aware tint). */
   backgroundColor?: string;
@@ -38,16 +42,19 @@ export type AvatarProps = {
 export function Avatar({
   uri,
   name,
+  displayName,
+  id: _id,
   size = 'md',
   backgroundColor,
   style,
 }: AvatarProps): React.ReactElement {
+  const resolvedName = name ?? displayName;
   const theme = useTheme();
   const [errored, setErrored] = useState(false);
 
   const dim = SIZE_MAP[size];
   const fontSize = FONT_SIZE_MAP[size];
-  const initials = computeInitials(name);
+  const initials = computeInitials(resolvedName);
   const bg = backgroundColor ?? theme.colors.accent + '30';
   const showImage = !!uri && !errored;
 

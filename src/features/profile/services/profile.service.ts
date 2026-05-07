@@ -80,7 +80,7 @@ export async function updateProfile(input: UpdateProfileInput): Promise<Profile>
 
   const { data, error } = await supabase
     .from(TABLES.profiles)
-    .update(update)
+    .update(update as any)
     .eq('id', auth.user.id)
     .select()
     .single();

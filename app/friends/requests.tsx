@@ -77,10 +77,8 @@ export default function FriendRequestsScreen(): React.ReactElement {
           // Type narrowing: incoming has 'sender', outgoing has 'recipient'
           const otherUser =
             tab === 'incoming'
-              ? // @ts-expect-error joined relation
-                item.sender
-              : // @ts-expect-error joined relation
-                item.recipient;
+              ? (item as any).sender
+              : (item as any).recipient;
           if (!otherUser) return null;
 
           return (

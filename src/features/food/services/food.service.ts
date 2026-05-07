@@ -69,7 +69,7 @@ export async function createFoodHangout(
       phase: 'voting',
       title: pollTitle,
       vote_deadline: input.voteDeadline,
-    })
+    } as any)
     .select()
     .single();
 
@@ -85,7 +85,7 @@ export async function createFoodHangout(
     }));
     const { error: optErr } = await supabase
       .from(TABLES.poll_options)
-      .insert(fullRows);
+      .insert(fullRows as any);
     if (optErr) throw optErr;
   }
 
@@ -109,7 +109,7 @@ export async function createRestaurantPoll(
       phase: 'voting',
       title: 'Which restaurant?',
       vote_deadline: input.voteDeadline,
-    })
+    } as any)
     .select()
     .single();
 
@@ -158,7 +158,7 @@ export async function listMyCustomRestaurants(): Promise<UserCustomRestaurant[]>
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return [];
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('user_custom_restaurants')
     .select('*')
     .order('created_at', { ascending: false })
@@ -182,7 +182,7 @@ export async function saveCustomRestaurant(input: {
 
   const onConflict = input.placeId ? 'user_id,google_place_id' : 'user_id,name';
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('user_custom_restaurants')
     .upsert(
       {
@@ -205,7 +205,7 @@ export async function saveCustomRestaurant(input: {
 }
 
 export async function deleteCustomRestaurant(id: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('user_custom_restaurants')
     .delete()
     .eq('id', id);

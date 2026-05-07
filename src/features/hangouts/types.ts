@@ -39,8 +39,8 @@ export type Hangout = {
   primary_location_address: string | null;
   primary_location_geo: unknown; // PostGIS geography — opaque to JS
   cover_photo_url: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
+  updated_at: string | null;
   cancelled_at: string | null;
 };
 

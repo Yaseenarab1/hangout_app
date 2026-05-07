@@ -70,14 +70,18 @@ export function RankedVoteSheet({
   const moveUp = (idx: number): void => {
     if (idx <= 0) return;
     const next = [...ranked];
-    [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+    const tmp = next[idx - 1];
+    next[idx - 1] = next[idx]!;
+    next[idx] = tmp!;
     setRanked(next);
   };
 
   const moveDown = (idx: number): void => {
     if (idx >= ranked.length - 1) return;
     const next = [...ranked];
-    [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+    const tmp = next[idx + 1];
+    next[idx + 1] = next[idx]!;
+    next[idx] = tmp!;
     setRanked(next);
   };
 

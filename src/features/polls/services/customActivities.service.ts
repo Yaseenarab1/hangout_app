@@ -21,7 +21,7 @@ export async function listMyCustomActivities(): Promise<UserCustomActivity[]> {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return [];
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('user_custom_activities')
     .select('*')
     .order('created_at', { ascending: false })
@@ -45,7 +45,7 @@ export async function saveCustomActivity(
   const trimmed = label.trim();
   if (!trimmed) return null;
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('user_custom_activities')
     .upsert(
       {
@@ -67,7 +67,7 @@ export async function saveCustomActivity(
 }
 
 export async function deleteCustomActivity(id: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('user_custom_activities')
     .delete()
     .eq('id', id);

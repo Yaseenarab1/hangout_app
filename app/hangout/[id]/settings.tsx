@@ -110,7 +110,7 @@ export default function HangoutSettingsScreen(): React.ReactElement {
           onPress: () =>
             deleteHangout.mutate(hangoutId, {
               onSuccess: () => {
-                router.replace('/(tabs)/');
+                router.replace('/(tabs)/' as any);
               },
             }),
         },

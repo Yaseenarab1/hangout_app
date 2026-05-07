@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable } from 'react-native';
+import { View, StyleSheet, FlatList, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import { Search, UserPlus, Users } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';

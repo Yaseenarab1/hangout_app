@@ -69,7 +69,7 @@ export default function CreateProfileScreen(): React.ReactElement {
       { ...input, avatarUri },
       {
         onSuccess: () => {
-          router.replace('/(tabs)/');
+          router.replace('/(tabs)/' as any);
         },
       },
     );

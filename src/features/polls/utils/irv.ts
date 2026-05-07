@@ -60,15 +60,16 @@ export function runIRV(
 
   // Single option: it wins.
   if (allOptionIds.length === 1) {
+    const soleId = allOptionIds[0]!;
     return {
-      winnerId: allOptionIds[0],
+      winnerId: soleId,
       rounds: [
         {
           round: 1,
-          scores: { [allOptionIds[0]]: ballots.reduce((s, b) => s + b.weight, 0) },
+          scores: { [soleId]: ballots.reduce((s, b) => s + b.weight, 0) },
           totalWeight: ballots.reduce((s, b) => s + b.weight, 0),
           eliminated: null,
-          winner: allOptionIds[0],
+          winner: soleId,
         },
       ],
       totalBallots: ballots.length,
@@ -105,9 +106,11 @@ export function runIRV(
 
     // Check for majority winner.
     const majorityThreshold = totalWeight / 2;
-    const sortedDesc = [...active].sort((a, b) => scores[b] - scores[a]);
-    const topId = sortedDesc[0];
-    const topScore = scores[topId];
+    const sortedDesc = [...active].sort(
+      (a, b) => (scores[b] ?? 0) - (scores[a] ?? 0),
+    );
+    const topId = sortedDesc[0]!;
+    const topScore = scores[topId] ?? 0;
 
     if (active.length === 1) {
       // Last one standing.
@@ -116,9 +119,9 @@ export function runIRV(
         scores: { ...scores },
         totalWeight,
         eliminated: null,
-        winner: topId,
+        winner: topId ?? null,
       });
-      return { winnerId: topId, rounds, totalBallots: ballots.length };
+      return { winnerId: topId ?? null, rounds, totalBallots: ballots.length };
     }
 
     if (topScore > majorityThreshold) {
@@ -127,19 +130,19 @@ export function runIRV(
         scores: { ...scores },
         totalWeight,
         eliminated: null,
-        winner: topId,
+        winner: topId ?? null,
       });
-      return { winnerId: topId, rounds, totalBallots: ballots.length };
+      return { winnerId: topId ?? null, rounds, totalBallots: ballots.length };
     }
 
     // No majority: eliminate the lowest. For ties, eliminate the option
     // that came LATER in allOptionIds (so earlier options are favored).
     const sortedAsc = [...active].sort((a, b) => {
-      if (scores[a] !== scores[b]) return scores[a] - scores[b];
+      if ((scores[a] ?? 0) !== (scores[b] ?? 0)) return (scores[a] ?? 0) - (scores[b] ?? 0);
       // Tie: later in allOptionIds gets eliminated first
       return allOptionIds.indexOf(b) - allOptionIds.indexOf(a);
     });
-    const toEliminate = sortedAsc[0];
+    const toEliminate = sortedAsc[0]!;
     eliminated.add(toEliminate);
 
     rounds.push({

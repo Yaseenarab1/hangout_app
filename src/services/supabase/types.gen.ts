@@ -1596,3 +1596,18 @@ export const Constants = {
     },
   },
 } as const
+
+// ---------------------------------------------------------------------------
+// Convenience aliases for commonly imported table row types.
+// Using `Database['public']['Tables'][...]['Row']` keeps them in sync with
+// the generated schema automatically.
+// ---------------------------------------------------------------------------
+
+export type Profile =
+  Database['public']['Tables']['profiles']['Row'];
+
+export type FriendRequest =
+  Database['public']['Tables']['friend_requests']['Row'];
+
+export type NotificationPreferences =
+  Database['public']['Tables']['notification_preferences']['Row'];

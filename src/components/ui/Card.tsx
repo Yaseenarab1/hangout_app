@@ -6,8 +6,8 @@ export type CardProps = {
   children: React.ReactNode;
   /** Padding preset. Defaults to 'md'. */
   padding?: 'none' | 'sm' | 'md' | 'lg';
-  /** Variant — bordered (default), flat, or filled. */
-  variant?: 'bordered' | 'flat' | 'filled';
+  /** Variant — bordered (default), flat, filled, subtle (alias for filled), or danger. */
+  variant?: 'bordered' | 'flat' | 'filled' | 'subtle' | 'danger';
   /** If provided, the card becomes tappable. */
   onPress?: () => void;
   /** Long-press handler. */
@@ -39,7 +39,14 @@ export function Card({
       case 'flat':
         return { backgroundColor: theme.colors.bg.surface };
       case 'filled':
+      case 'subtle':
         return { backgroundColor: theme.colors.bg.subtle };
+      case 'danger':
+        return {
+          backgroundColor: theme.colors.dangerSubtle,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: theme.colors.danger,
+        };
       case 'bordered':
       default:
         return {

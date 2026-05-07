@@ -95,8 +95,26 @@ export const darkColors = {
   overlay: 'rgba(0, 0, 0, 0.7)',
 } as const;
 
-// Both color sets MUST have identical shapes — TS enforces this.
-export type ColorTokens = typeof lightColors;
+// Structural type — lets both light and dark themes satisfy the same interface.
+// Using string (not literal) so both color sets pass without widening.
+export type ColorTokens = {
+  bg: { canvas: string; surface: string; subtle: string; muted: string };
+  border: { default: string; strong: string };
+  text: { primary: string; secondary: string; tertiary: string; inverse: string };
+  accent: string;
+  accentHover: string;
+  accentSubtle: string;
+  accentText: string;
+  success: string;
+  successSubtle: string;
+  warning: string;
+  warningSubtle: string;
+  danger: string;
+  dangerSubtle: string;
+  info: string;
+  infoSubtle: string;
+  overlay: string;
+};
 
 // -----------------------------------------------------------------------------
 // Spacing — 4-point grid

@@ -43,7 +43,7 @@ export function Toaster(): React.ReactElement {
 function ToastItem({ toast }: { toast: ToastType }): React.ReactElement {
   const theme = useTheme();
   const dismiss = useUIStore((s) => s.dismissToast);
-  const Icon = ICONS[toast.kind];
+  const Icon = ICONS[toast.kind] as React.ComponentType<{ size?: number; color?: string }>;
 
   const palette = (() => {
     switch (toast.kind) {
@@ -72,7 +72,7 @@ function ToastItem({ toast }: { toast: ToastType }): React.ReactElement {
       style={[
         styles.toast,
         Platform.select({
-          ios: theme.elevations.e2,
+          ios: theme.elevations.e2 as object,
           android: { elevation: 4 },
         }),
         {

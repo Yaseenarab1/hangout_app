@@ -13,8 +13,11 @@ import {
   CheckCircle,
   HelpCircle,
   MessageCircle,
+  Images,
 } from 'lucide-react-native';
 import { UnreadBadge } from '@/features/messaging';
+import { usePhotosSummary } from '@/features/photos/hooks/usePhotosSummary';
+import { Image } from 'expo-image';
 import { Screen } from '@/components/layout/Screen';
 import {
   Button,
@@ -70,6 +73,9 @@ export default function HangoutDetailScreen(): React.ReactElement {
     if (!hangout.data || !user) return null;
     return hangout.data.participants.find((p) => p.user_id === user.id) ?? null;
   }, [hangout.data, user]);
+
+  const photosSummary = usePhotosSummary(hangoutId);
+  const previewPhotos = photosSummary.photos;
 
   const isHost = hangout.data?.host_id === user?.id;
   const myParticipationRole = hangout.data?.participants.find(
@@ -312,6 +318,44 @@ export default function HangoutDetailScreen(): React.ReactElement {
           Group chat
         </Text>
         <UnreadBadge hangoutId={hangoutId} />
+      </Pressable>
+
+      {/* Photos entry */}
+      <SectionHeader title="Photos" />
+      <Pressable
+        onPress={() => router.push(`/hangout/${hangoutId}/photos` as any)}
+        style={({ pressed }) => [
+          styles.chatRow,
+          {
+            backgroundColor: theme.colors.bg.surface,
+            borderColor: theme.colors.border.default,
+          },
+          pressed && { opacity: 0.7 },
+        ]}
+      >
+        <Images size={20} color={theme.colors.accent} strokeWidth={1.5} />
+        <Text
+          style={[
+            theme.typography.bodyMedium,
+            { color: theme.colors.text.primary, flex: 1 },
+          ]}
+        >
+          {photosSummary.count > 0
+            ? `${photosSummary.count} photo${photosSummary.count === 1 ? '' : 's'}`
+            : 'Add photos'}
+        </Text>
+        {previewPhotos.length > 0 && (
+          <View style={{ flexDirection: 'row', gap: 4 }}>
+            {previewPhotos.map((p) => (
+              <Image
+                key={p.id}
+                source={{ uri: p.thumbnailSignedUrl ?? p.signedUrl }}
+                style={{ width: 36, height: 36, borderRadius: 6 }}
+                contentFit="cover"
+              />
+            ))}
+          </View>
+        )}
       </Pressable>
 
       {/* Host: cancel hangout */}

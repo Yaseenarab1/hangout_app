@@ -74,7 +74,7 @@ async function updatePreference(key: PrefKey, value: boolean): Promise<void> {
 
   const { error } = await supabase
     .from(TABLES.notification_preferences)
-    .update({ [key]: value })
+    .update({ [key]: value } as any)
     .eq('user_id', auth.user.id);
   if (error) throw error;
 }

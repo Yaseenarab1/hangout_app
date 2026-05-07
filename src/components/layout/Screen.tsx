@@ -24,6 +24,8 @@ export type ScreenProps = {
   avoidKeyboard?: boolean;
   /** Extra props for the inner ScrollView. */
   scrollProps?: Omit<ScrollViewProps, 'children' | 'contentContainerStyle'>;
+  /** Pull-to-refresh control. Passed directly to the inner ScrollView. */
+  refreshControl?: React.ReactElement;
   contentContainerStyle?: ViewStyle;
   style?: ViewStyle;
   /** Background color override. */
@@ -41,6 +43,7 @@ export function Screen({
   contentPadding,
   avoidKeyboard = Platform.OS === 'ios',
   scrollProps,
+  refreshControl,
   contentContainerStyle,
   style,
   backgroundColor,
@@ -64,6 +67,7 @@ export function Screen({
       ]}
       style={{ flex: 1 }}
       showsVerticalScrollIndicator={false}
+      refreshControl={refreshControl}
       {...scrollProps}
     >
       {children}

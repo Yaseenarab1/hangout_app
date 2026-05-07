@@ -54,7 +54,7 @@ export function track(
 
 export function identifyUser(userId: string, properties?: Record<string, unknown>): void {
   if (env.isDev) return;
-  posthogClient?.identify(userId, properties);
+  posthogClient?.identify(userId, properties as Record<string, string>);
 }
 
 export function resetAnalytics(): void {

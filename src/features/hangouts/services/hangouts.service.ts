@@ -154,13 +154,13 @@ export async function updateHangout(
 
   const { data, error } = await supabase
     .from(TABLES.hangouts)
-    .update(update)
+    .update(update as any)
     .eq('id', id)
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+  return data as Hangout;
 }
 
 /** Soft-cancel a hangout (sets status=cancelled, cancelled_at=now). */
@@ -176,7 +176,7 @@ export async function cancelHangout(id: string): Promise<Hangout> {
     .single();
 
   if (error) throw error;
-  return data;
+  return data as Hangout;
 }
 
 /** Hard-delete a hangout. RLS restricts to host. Cascades to participants, polls, etc. */
@@ -226,7 +226,7 @@ export async function updateParticipant(
 
   const { data, error } = await supabase
     .from(TABLES.hangout_participants)
-    .update(update)
+    .update(update as any)
     .eq('hangout_id', input.hangoutId)
     .eq('user_id', input.userId)
     .select()

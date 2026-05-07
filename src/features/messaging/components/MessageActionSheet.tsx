@@ -13,6 +13,16 @@ import { useTheme } from '@/hooks/useTheme';
 import { toast } from '@/stores/ui.store';
 import type { Message } from '../types';
 
+const REACTION_EMOJIS = [
+  String.fromCodePoint(0x2764, 0xFE0F),
+  String.fromCodePoint(0x1F602),
+  String.fromCodePoint(0x1F62E),
+  String.fromCodePoint(0x1F622),
+  String.fromCodePoint(0x1F44D),
+  String.fromCodePoint(0x1F525),
+];
+
+
 type Props = {
   visible: boolean;
   message: Message | null;
@@ -107,17 +117,19 @@ export function MessageActionSheet({
           ]}
         >
           {/* Reaction row */}
-          <Pressable
-            style={[styles.reactRow, { borderBottomColor: theme.colors.border.default }]}
-            onPress={() => {
-              onReact(message.id);
-              onClose();
-            }}
-          >
-            {['❤️', '😂', '😮', '😢', '👍', '🔥'].map((e) => (
-              <Text key={e} style={styles.emoji}>{e}</Text>
+          <View style={[styles.reactRow, { borderBottomColor: theme.colors.border.default }]}>
+            {REACTION_EMOJIS.map((e) => (
+              <Text
+                key={e}
+                onPress={() => { onReact(message.id); onClose(); }}
+                style={styles.emoji}
+                allowFontScaling={false}
+                suppressHighlighting
+              >
+                {e}
+              </Text>
             ))}
-          </Pressable>
+          </View>
 
           {actions.map((action) => (
             <Pressable
@@ -161,7 +173,6 @@ const styles = StyleSheet.create({
   sheet: {
     borderRadius: 16,
     borderWidth: 1,
-    overflow: 'hidden',
   },
   reactRow: {
     flexDirection: 'row',
@@ -170,7 +181,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  emoji: { fontSize: 26, fontFamily: undefined },
+  emoji: { fontSize: 28, padding: 6 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

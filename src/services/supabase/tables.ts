@@ -43,6 +43,7 @@ export const STORAGE_BUCKETS = {
   postImages: 'post-images',
   albumPhotos: 'album-photos',
   receipts: 'receipts',
+  hangoutPhotos: 'hangout-photos',
 } as const;
 
 export const QUERY_KEYS = {

@@ -56,7 +56,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
           ]}
           placeholderTextColor={theme.colors.text.tertiary}
           accessibilityLabel={label}
-          accessibilityState={hasError ? { invalid: true } : undefined}
+          accessibilityState={hasError ? ({ invalid: true } as object) : undefined}
           {...inputProps}
         />
         {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
