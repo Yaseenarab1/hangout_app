@@ -12,7 +12,9 @@ import {
   XCircle,
   CheckCircle,
   HelpCircle,
+  MessageCircle,
 } from 'lucide-react-native';
+import { UnreadBadge } from '@/features/messaging';
 import { Screen } from '@/components/layout/Screen';
 import {
   Button,
@@ -292,30 +294,25 @@ export default function HangoutDetailScreen(): React.ReactElement {
   );
 })}
 
-{/* Phase 2B+ placeholders */}
-<SectionHeader title="Coming soon" />
-<Card padding="md" variant="subtle">
-  <Text
-    style={[
-      theme.typography.bodySmall,
-      { color: theme.colors.text.secondary },
-    ]}
-  >
-    Chat, photos, and bills unlock in upcoming phases.
-  </Text>
-</Card>
-      <SectionHeader title="Coming soon" />
-      <Card padding="md" variant="subtle">
-        <Text
-          style={[
-            theme.typography.bodySmall,
-            { color: theme.colors.text.secondary },
-          ]}
-        >
-          Polls, chat, photos, and bills unlock in upcoming phases. For now, you can plan and
-          invite — that's it.
+      {/* Chat entry */}
+      <SectionHeader title="Group chat" />
+      <Pressable
+        onPress={() => router.push(`/hangout/${hangoutId}/chat` as any)}
+        style={({ pressed }) => [
+          styles.chatRow,
+          {
+            backgroundColor: theme.colors.bg.surface,
+            borderColor: theme.colors.border.default,
+          },
+          pressed && { opacity: 0.7 },
+        ]}
+      >
+        <MessageCircle size={20} color={theme.colors.accent} strokeWidth={1.5} />
+        <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, flex: 1 }]}>
+          Group chat
         </Text>
-      </Card>
+        <UnreadBadge hangoutId={hangoutId} />
+      </Pressable>
 
       {/* Host: cancel hangout */}
       {isHost && !isCancelled ? (
@@ -411,6 +408,15 @@ function formatDateTime(iso: string): string {
 }
 
 const styles = StyleSheet.create({
+  chatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
   header: {
     paddingTop: 8,
   },
