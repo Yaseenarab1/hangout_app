@@ -34,6 +34,12 @@ export default function SettingsScreen(): React.ReactElement {
       <SectionHeader title="Preferences" />
       <Card padding="none">
         <ListItem
+          title="Search location"
+          subtitle="Center point for restaurant and venue searches"
+          onPress={() => router.push('/profile/settings/search-location')}
+        />
+        <Divider />
+        <ListItem
           title="Notifications"
           subtitle="Choose what you want to be notified about"
           onPress={() => router.push('/profile/settings/notifications')}

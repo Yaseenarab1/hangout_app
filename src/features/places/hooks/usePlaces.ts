@@ -5,6 +5,7 @@ import {
   autocompleteAddress,
   getPlaceDetails,
 } from '../services/places.service';
+import { useSearchLocation } from './useSearchLocation';
 import type { RestaurantSearchFilters } from '../types';
 
 const placesKeys = {
@@ -18,11 +19,16 @@ export function useRestaurantSearch(
   filters: RestaurantSearchFilters,
   enabled = true,
 ) {
+  const searchLoc = useSearchLocation();
+  // Caller-provided location wins; fall back to user's saved location; NYC is the edge-function default
+  const location = filters.location ?? searchLoc.data ?? undefined;
+  const filtersWithLoc = { ...filters, location };
+
   return useQuery({
-    queryKey: placesKeys.search(filters),
-    queryFn: () => searchRestaurants(filters),
+    queryKey: placesKeys.search(filtersWithLoc),
+    queryFn: () => searchRestaurants(filtersWithLoc),
     enabled: enabled && Boolean(filters.query || filters.cuisine),
-    staleTime: 5 * 60 * 1000, // Restaurants don't change much; cache 5 min
+    staleTime: 5 * 60 * 1000,
   });
 }
 

@@ -23,6 +23,7 @@ import { Input, Button } from '@/components/ui';
 import { SelectionReviewSheet } from '@/components/ui/SelectionReviewSheet';
 import { useDebounce } from '@/hooks/useDebounce';
 import { searchPlaces, PlaceDetailSheet } from '@/features/places';
+import { useSearchLocation } from '@/features/places/hooks/useSearchLocation';
 import { useQuery } from '@tanstack/react-query';
 import type { Place } from '@/features/places';
 
@@ -97,6 +98,9 @@ export function ActivityVenuePicker({
   const [showReview, setShowReview] = useState(false);
   const [sheetPlace, setSheetPlace] = useState<Place | null>(null);
 
+  const searchLoc = useSearchLocation();
+  const location = searchLoc.data ?? undefined;
+
   const searchEnabled = debouncedQuery.trim().length > 0;
   const search = useQuery({
     queryKey: [
@@ -107,10 +111,12 @@ export function ActivityVenuePicker({
       minRating,
       minPrice,
       maxPrice,
+      location,
     ],
     queryFn: () =>
       searchPlaces({
         query: debouncedQuery,
+        location,
         radius,
         minPriceLevel: minPrice,
         maxPriceLevel: maxPrice,
