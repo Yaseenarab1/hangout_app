@@ -7,3 +7,4 @@ export {
   type ParticipantPickerProps,
 } from './components/ParticipantPicker';
 export { ParticipantRow, type ParticipantRowProps } from './components/ParticipantRow';
+export { NewHangoutSheet, type NewHangoutSheetProps } from './components/NewHangoutSheet';

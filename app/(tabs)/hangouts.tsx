@@ -1,15 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, RefreshControl } from 'react-native';
-import { router } from 'expo-router';
 import { Plus } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';
 import { EmptyState, Skeleton, Button } from '@/components/ui';
-import { useMyHangouts, HangoutCard } from '@/features/hangouts';
+import { useMyHangouts, HangoutCard, NewHangoutSheet } from '@/features/hangouts';
 import { useTheme } from '@/hooks/useTheme';
 
 export default function HangoutsTab(): React.ReactElement {
   const theme = useTheme();
   const hangouts = useMyHangouts();
+  const [showNewSheet, setShowNewSheet] = useState(false);
 
   return (
     <Screen
@@ -20,7 +20,7 @@ export default function HangoutsTab(): React.ReactElement {
             label="New"
             size="sm"
             leadingIcon={<Plus size={14} color="#FFFFFF" />}
-            onPress={() => router.push('/hangout/new')}
+            onPress={() => setShowNewSheet(true)}
           />
         ),
       }}
@@ -54,11 +54,12 @@ export default function HangoutsTab(): React.ReactElement {
             <Button
               label="New hangout"
               leadingIcon={<Plus size={16} color="#FFFFFF" />}
-              onPress={() => router.push('/hangout/new')}
+              onPress={() => setShowNewSheet(true)}
             />
           }
         />
       )}
+      <NewHangoutSheet visible={showNewSheet} onClose={() => setShowNewSheet(false)} />
     </Screen>
   );
 }
