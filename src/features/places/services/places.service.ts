@@ -1,4 +1,5 @@
 import { supabase } from '@/services/supabase/client';
+import { env } from '@/config/env';
 import type {
   Place,
   PlaceDetails,
@@ -53,6 +54,9 @@ export async function searchPlaces(filters: {
   location?: { lat: number; lng: number };
   radius?: number;
   includedTypes?: string[];
+  minPriceLevel?: number;
+  maxPriceLevel?: number;
+  minRating?: number;
 }): Promise<Place[]> {
   const { data, error } = await supabase.functions.invoke('places-search', {
     body: filters,
@@ -101,15 +105,11 @@ export async function getPlaceDetails(
 }
 
 /**
- * Build a URL to a place photo. Photos are served by Google directly with
- * the API key, so we have a slight problem: the photo URL needs the API key,
- * which means either embedding the key (bad) or proxying photos through our
- * Edge Function (slower, more bandwidth).
- *
- * For now: we DON'T show photos in 2C. We show a fallback icon instead.
- * Phase 5 polish: add a places-photo Edge Function that streams the image.
+ * Build a proxied URL for a Google Places photo resource name.
+ * The API key stays server-side in the places-photo Edge Function.
+ * React Native Image loads it via source={{ uri, headers: { Authorization } }}.
  */
-export function getPlacePhotoUrl(_photoRef: string | null): string | null {
-  // Deliberately returns null — we'll add real photo support in a future phase.
-  return null;
+export function getPlacePhotoUrl(photoName: string, maxWidthPx = 800): string {
+  const base = `${env.supabaseUrl}/functions/v1/places-photo`;
+  return `${base}?photoName=${encodeURIComponent(photoName)}&maxWidthPx=${maxWidthPx}`;
 }

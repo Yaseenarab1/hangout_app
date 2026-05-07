@@ -19,8 +19,8 @@ export type Place = {
   priceLevel: number | null;
   /** "Italian restaurant", "Cafe", etc. */
   primaryType: string | null;
-  /** Google's photo reference; build URL via getPlacePhotoUrl(). */
-  photoRef: string | null;
+  /** Up to 5 Google photo resource names; build URLs via getPlacePhotoUrl(). */
+  photos: string[] | null;
   /** Direct link to Google Maps. */
   mapsUrl: string | null;
   types: string[];
@@ -31,6 +31,7 @@ export type PlaceDetails = Place & {
   website: string | null;
   phone: string | null;
   openingHours: string[] | null;
+  isOpenNow: boolean | null;
 };
 
 /** A single autocomplete prediction. */

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { Card, Button, Badge } from '@/components/ui';
+import { PlaceDetailSheet } from '@/features/places';
 import {
   usePoll,
   useCastVote,
@@ -179,6 +180,12 @@ function SimpleVotingCard({
   const removeOption = useRemoveOption();
   const [showManage, setShowManage] = useState(false);
   const [isApplyingChanges, setIsApplyingChanges] = useState(false);
+  const [sheetOption, setSheetOption] = useState<{
+    placeId: string;
+    placeName: string;
+    optionId: string;
+    isMyVote: boolean;
+  } | null>(null);
 
   const sortedOptions = useMemo(
     () => sortSimpleByMyVote(poll.options),
@@ -283,6 +290,9 @@ function SimpleVotingCard({
           ]}
         >
           Tap to vote • Tap again to undo
+          {poll.options.some((o) => (o.metadata as { placeId?: string }).placeId)
+            ? ' • Long-press for details'
+            : ''}
         </Text>
 
         <View style={{ marginTop: 12, gap: 6 }}>
@@ -292,11 +302,23 @@ function SimpleVotingCard({
               poll.totalVotes > 0
                 ? Math.round((opt.voteCount / poll.totalVotes) * 100)
                 : 0;
-            const meta = (opt.metadata as { emoji?: string | null }) ?? {};
+            const meta = (opt.metadata as { emoji?: string | null; placeId?: string | null }) ?? {};
             return (
               <Pressable
                 key={opt.id}
                 onPress={() => handleVote(opt.id)}
+                onLongPress={
+                  meta.placeId
+                    ? () =>
+                        setSheetOption({
+                          placeId: meta.placeId!,
+                          placeName: opt.label,
+                          optionId: opt.id,
+                          isMyVote: opt.isMyVote,
+                        })
+                    : undefined
+                }
+                delayLongPress={350}
                 style={({ pressed }) => [
                   styles.optionRow,
                   {
@@ -406,6 +428,21 @@ function SimpleVotingCard({
         onSave={handleApplyChanges}
         isSubmitting={isApplyingChanges}
       />
+
+      <PlaceDetailSheet
+        visible={sheetOption !== null}
+        onClose={() => setSheetOption(null)}
+        placeId={sheetOption?.placeId ?? null}
+        placeName={sheetOption?.placeName}
+        pollPhase="voting"
+        isMyVote={sheetOption?.isMyVote}
+        onVote={() => {
+          if (sheetOption) {
+            castVote.mutate({ pollId: poll.id, optionId: sheetOption.optionId });
+          }
+        }}
+        onUnvote={() => unvote.mutate(poll.id)}
+      />
     </>
   );
 }
@@ -430,6 +467,10 @@ function RankedVotingCard({
   const [showVoteSheet, setShowVoteSheet] = useState(false);
   const [showManage, setShowManage] = useState(false);
   const [isApplyingChanges, setIsApplyingChanges] = useState(false);
+  const [sheetOption, setSheetOption] = useState<{
+    placeId: string;
+    placeName: string;
+  } | null>(null);
 
   const sortedOptions = useMemo(
     () => sortRankedByMyRanks(poll.options),
@@ -529,11 +570,21 @@ function RankedVotingCard({
 
         <View style={{ marginTop: 12, gap: 4 }}>
           {sortedOptions.slice(0, 6).map((opt) => {
-            const meta = (opt.metadata as { emoji?: string | null }) ?? {};
+            const meta = (opt.metadata as { emoji?: string | null; placeId?: string | null }) ?? {};
             const myRank = opt.myRank;
             return (
-              <View
+              <Pressable
                 key={opt.id}
+                onLongPress={
+                  meta.placeId
+                    ? () =>
+                        setSheetOption({
+                          placeId: meta.placeId!,
+                          placeName: opt.label,
+                        })
+                    : undefined
+                }
+                delayLongPress={350}
                 style={[
                   styles.previewRow,
                   {
@@ -578,7 +629,7 @@ function RankedVotingCard({
                 >
                   {opt.label}
                 </Text>
-              </View>
+              </Pressable>
             );
           })}
           {sortedOptions.length > 6 ? (
@@ -680,6 +731,13 @@ function RankedVotingCard({
         onSave={handleApplyChanges}
         isSubmitting={isApplyingChanges}
       />
+
+      <PlaceDetailSheet
+        visible={sheetOption !== null}
+        onClose={() => setSheetOption(null)}
+        placeId={sheetOption?.placeId ?? null}
+        placeName={sheetOption?.placeName}
+      />
     </>
   );
 }
@@ -716,10 +774,12 @@ function SuggestingCard({ poll }: { poll: PollWithOptions }): React.ReactElement
 
 function ClosedCard({ poll }: { poll: PollWithOptions }): React.ReactElement {
   const theme = useTheme();
+  const [sheetOpen, setSheetOpen] = useState(false);
   const winner = poll.options.find((o) => o.id === poll.winning_option_id);
-  const winnerMeta = (winner?.metadata as { emoji?: string | null }) ?? {};
+  const winnerMeta = (winner?.metadata as { emoji?: string | null; placeId?: string | null }) ?? {};
 
   return (
+    <>
     <Card padding="md" style={{ marginTop: 12 }}>
       <View style={styles.headerRow}>
         <Trophy size={18} color={theme.colors.warning} />
@@ -737,7 +797,9 @@ function ClosedCard({ poll }: { poll: PollWithOptions }): React.ReactElement {
       </View>
 
       {winner ? (
-        <View
+        <Pressable
+          onLongPress={winnerMeta.placeId ? () => setSheetOpen(true) : undefined}
+          delayLongPress={350}
           style={[
             styles.winnerRow,
             {
@@ -775,7 +837,7 @@ function ClosedCard({ poll }: { poll: PollWithOptions }): React.ReactElement {
               {poll.totalVotes} {poll.totalVotes === 1 ? 'voter' : 'voters'}
             </Text>
           </View>
-        </View>
+        </Pressable>
       ) : (
         <Text
           style={[
@@ -787,6 +849,17 @@ function ClosedCard({ poll }: { poll: PollWithOptions }): React.ReactElement {
         </Text>
       )}
     </Card>
+
+    {winnerMeta.placeId ? (
+      <PlaceDetailSheet
+        visible={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        placeId={winnerMeta.placeId}
+        placeName={winner!.label}
+        pollPhase="closed"
+      />
+    ) : null}
+    </>
   );
 }
 

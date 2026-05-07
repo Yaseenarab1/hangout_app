@@ -15,3 +15,8 @@ export {
   AddressAutocomplete,
   type AddressAutocompleteProps,
 } from './components/AddressAutocomplete';
+export { PlacePhoto } from './components/PlacePhoto';
+export {
+  PlaceDetailSheet,
+  type PlaceDetailSheetProps,
+} from './components/PlaceDetailSheet';

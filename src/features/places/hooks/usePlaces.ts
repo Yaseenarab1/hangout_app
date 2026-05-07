@@ -40,7 +40,7 @@ export function usePlaceDetails(placeId: string | undefined) {
     queryKey: placeId ? placesKeys.details(placeId) : ['places', 'details', 'noop'],
     queryFn: () => (placeId ? getPlaceDetails(placeId) : Promise.resolve(null)),
     enabled: Boolean(placeId),
-    staleTime: 60 * 60 * 1000, // 1 hour
+    staleTime: 10 * 60 * 1000, // 10 min — detail sheet data
   });
 }
 

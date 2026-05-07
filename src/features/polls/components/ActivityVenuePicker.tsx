@@ -16,12 +16,13 @@ import {
   Check,
   MapPin,
   DollarSign,
+  Info,
 } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { Input, Button } from '@/components/ui';
 import { SelectionReviewSheet } from '@/components/ui/SelectionReviewSheet';
 import { useDebounce } from '@/hooks/useDebounce';
-import { searchPlaces } from '@/features/places';
+import { searchPlaces, PlaceDetailSheet } from '@/features/places';
 import { useQuery } from '@tanstack/react-query';
 import type { Place } from '@/features/places';
 
@@ -94,6 +95,7 @@ export function ActivityVenuePicker({
   const [customName, setCustomName] = useState('');
   const [customAddress, setCustomAddress] = useState('');
   const [showReview, setShowReview] = useState(false);
+  const [sheetPlace, setSheetPlace] = useState<Place | null>(null);
 
   const searchEnabled = debouncedQuery.trim().length > 0;
   const search = useQuery({
@@ -362,6 +364,7 @@ export function ActivityVenuePicker({
               place={p}
               isSelected={isPlaceSelected(p)}
               onToggle={() => togglePlace(p)}
+              onInfo={() => setSheetPlace(p)}
               disabled={!isPlaceSelected(p) && isAtMax}
             />
           )}
@@ -442,6 +445,13 @@ export function ActivityVenuePicker({
         onRemove={remove}
         itemLabel="venues"
       />
+
+      <PlaceDetailSheet
+        visible={sheetPlace !== null}
+        onClose={() => setSheetPlace(null)}
+        placeId={sheetPlace?.placeId ?? null}
+        placeName={sheetPlace?.name}
+      />
     </View>
   );
 }
@@ -490,7 +500,7 @@ function ResultsBlock({
         <Text
           style={[
             theme.typography.bodySmall,
-            { color: theme.colors.error, textAlign: 'center' },
+            { color: theme.colors.danger, textAlign: 'center' },
           ]}
         >
           Search failed. Try again or adjust filters.
@@ -587,11 +597,13 @@ function PlaceRow({
   place,
   isSelected,
   onToggle,
+  onInfo,
   disabled,
 }: {
   place: Place;
   isSelected: boolean;
   onToggle: () => void;
+  onInfo: () => void;
   disabled: boolean;
 }): React.ReactElement {
   const theme = useTheme();
@@ -671,6 +683,9 @@ function PlaceRow({
           </Text>
         ) : null}
       </View>
+      <Pressable onPress={onInfo} hitSlop={8} style={{ padding: 4 }}>
+        <Info size={16} color={theme.colors.text.tertiary} />
+      </Pressable>
       {isSelected ? (
         <View
           style={{

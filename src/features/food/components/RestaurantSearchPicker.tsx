@@ -16,12 +16,13 @@ import {
   Check,
   MapPin,
   DollarSign,
+  Info,
 } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { Input, Button } from '@/components/ui';
 import { SelectionReviewSheet } from '@/components/ui/SelectionReviewSheet';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useRestaurantSearch } from '@/features/places';
+import { useRestaurantSearch, PlaceDetailSheet } from '@/features/places';
 import type { Place } from '@/features/places';
 import {
   useMyCustomRestaurants,
@@ -81,6 +82,7 @@ export function RestaurantSearchPicker({
   const [customName, setCustomName] = useState('');
   const [customAddress, setCustomAddress] = useState('');
   const [showReview, setShowReview] = useState(false);
+  const [sheetPlace, setSheetPlace] = useState<Place | null>(null);
 
   const customRestaurants = useMyCustomRestaurants();
   const saveCustom = useSaveCustomRestaurant();
@@ -510,6 +512,7 @@ export function RestaurantSearchPicker({
               place={p}
               isSelected={isPlaceSelected(p)}
               onToggle={() => togglePlace(p)}
+              onInfo={() => setSheetPlace(p)}
               disabled={!isPlaceSelected(p) && isAtMax}
             />
           )}
@@ -590,6 +593,13 @@ export function RestaurantSearchPicker({
         onRemove={remove}
         itemLabel="restaurants"
       />
+
+      <PlaceDetailSheet
+        visible={sheetPlace !== null}
+        onClose={() => setSheetPlace(null)}
+        placeId={sheetPlace?.placeId ?? null}
+        placeName={sheetPlace?.name}
+      />
     </View>
   );
 }
@@ -642,7 +652,7 @@ function ResultsBlock({
         <Text
           style={[
             theme.typography.bodySmall,
-            { color: theme.colors.error, textAlign: 'center' },
+            { color: theme.colors.danger, textAlign: 'center' },
           ]}
         >
           Search failed. Try again or adjust your filters.
@@ -744,11 +754,13 @@ function RestaurantRow({
   place,
   isSelected,
   onToggle,
+  onInfo,
   disabled,
 }: {
   place: Place;
   isSelected: boolean;
   onToggle: () => void;
+  onInfo: () => void;
   disabled: boolean;
 }): React.ReactElement {
   const theme = useTheme();
@@ -832,6 +844,9 @@ function RestaurantRow({
           </Text>
         ) : null}
       </View>
+      <Pressable onPress={onInfo} hitSlop={8} style={{ padding: 4 }}>
+        <Info size={16} color={theme.colors.text.tertiary} />
+      </Pressable>
       {isSelected ? (
         <View
           style={{

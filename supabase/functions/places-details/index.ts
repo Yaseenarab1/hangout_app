@@ -41,6 +41,7 @@ serve(async (req: Request) => {
       'websiteUri',
       'nationalPhoneNumber',
       'regularOpeningHours',
+      'currentOpeningHours',
     ].join(',');
 
     const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(
@@ -73,11 +74,12 @@ serve(async (req: Request) => {
       ratingCount: p.userRatingCount ?? null,
       priceLevel: priceLevelToNumber(p.priceLevel),
       primaryType: p.primaryTypeDisplayName?.text ?? null,
-      photoRef: p.photos?.[0]?.name ?? null,
+      photos: (p.photos ?? []).slice(0, 5).map((ph: any) => ph.name).filter(Boolean),
       mapsUrl: p.googleMapsUri ?? null,
       website: p.websiteUri ?? null,
       phone: p.nationalPhoneNumber ?? null,
       openingHours: p.regularOpeningHours?.weekdayDescriptions ?? null,
+      isOpenNow: p.currentOpeningHours?.openNow ?? null,
       types: p.types ?? [],
     };
 
