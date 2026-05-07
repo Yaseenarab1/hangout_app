@@ -87,6 +87,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: [
     'expo-router',
     'expo-secure-store',
+    [
+      'expo-notifications',
+      {
+        icon: './assets/notification-icon.png',
+        color: '#8B5CF6',
+        sounds: [],
+      },
+    ],
     '@react-native-community/datetimepicker',
     'expo-apple-authentication',
     [
@@ -120,9 +128,4 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     typedRoutes: true, // Strongly-typed routes for Expo Router
   },
 
-  hooks: {
-    postPublish: [
-      // Sentry sourcemap upload runs on EAS builds; configured later.
-    ],
-  },
 });

@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import 'react-native-reanimated';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Stack, router, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -8,6 +8,11 @@ import { AppProviders } from '@/providers/AppProviders';
 import { useSession } from '@/features/auth';
 import { useTheme } from '@/hooks/useTheme';
 import { useMyProfile } from '@/features/profile';
+import {
+  registerForPushNotifications,
+  setupNotificationListeners,
+  deleteDeviceToken,
+} from '@/services/notifications';
 
 // Keep splash visible until we know whether the user is signed in.
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -24,6 +29,7 @@ export default function RootLayout(): React.ReactElement {
   return (
     <AppProviders>
       <RouteGuard />
+      <NotificationSetup />
       <ThemedStatusBar />
       <Stack
         screenOptions={{
@@ -59,10 +65,39 @@ export default function RootLayout(): React.ReactElement {
         <Stack.Screen name="hangout/[id]/follow-up-venue" options={{ presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="hangout/new-activity" options={{ presentation: 'modal' }} />
         <Stack.Screen name="hangout/[id]" options={{ presentation: 'card' }} />
+        <Stack.Screen name="hangout/[id]/chat" options={{ presentation: 'card' }} />
+        <Stack.Screen name="hangout/[id]/photos" options={{ presentation: 'card' }} />
+        <Stack.Screen name="hangout/[id]/bills" options={{ presentation: 'card' }} />
+        <Stack.Screen name="feed" options={{ presentation: 'card' }} />
         <Stack.Screen name="+not-found" />
       </Stack>
     </AppProviders>
   );
+}
+
+function NotificationSetup(): null {
+  const { isAuthenticated } = useSession();
+  const prevAuthRef = useRef<boolean | null>(null);
+
+  // Set up tap handler + foreground listener once at root level
+  useEffect(() => {
+    const cleanup = setupNotificationListeners();
+    return cleanup;
+  }, []);
+
+  // Register / deregister token as auth state changes
+  useEffect(() => {
+    const prev = prevAuthRef.current;
+    prevAuthRef.current = isAuthenticated;
+
+    if (isAuthenticated && prev !== true) {
+      registerForPushNotifications();
+    } else if (!isAuthenticated && prev === true) {
+      deleteDeviceToken();
+    }
+  }, [isAuthenticated]);
+
+  return null;
 }
 
 function ThemedStatusBar(): React.ReactElement {
@@ -119,7 +154,7 @@ function RouteGuard(): null {
 
     // Authenticated, profile complete, but still in auth group → go home
     if (isAuthenticated && profile?.profile_complete && inAuthGroup) {
-      router.replace('/(tabs)/');
+      router.replace('/(tabs)/' as any);
     }
   }, [isAuthenticated, isLoading, profile, profileLoading, segments]);
 
