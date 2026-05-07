@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, Users, CalendarCheck, User } from 'lucide-react-native';
+import { Home, CalendarCheck, MessageCircle, User } from 'lucide-react-native';
 import { Platform } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -43,10 +43,12 @@ export default function TabsLayout(): React.ReactElement {
         }}
       />
       <Tabs.Screen
-        name="friends"
+        name="messages"
         options={{
-          title: 'Friends',
-          tabBarIcon: ({ color, size }) => <Users color={color} size={size} strokeWidth={1.5} />,
+          title: 'Messages',
+          tabBarIcon: ({ color, size }) => (
+            <MessageCircle color={color} size={size} strokeWidth={1.5} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -56,8 +58,9 @@ export default function TabsLayout(): React.ReactElement {
           tabBarIcon: ({ color, size }) => <User color={color} size={size} strokeWidth={1.5} />,
         }}
       />
-      {/* Phase 4+ screens — exist as routes but hidden from the tab bar */}
-      <Tabs.Screen name="messages" options={{ href: null }} />
+      {/* Friends is reachable from Profile tab — hidden from tab bar */}
+      <Tabs.Screen name="friends" options={{ href: null }} />
+      {/* Phase 4+ screens */}
       <Tabs.Screen name="find-time" options={{ href: null }} />
     </Tabs>
   );

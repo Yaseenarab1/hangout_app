@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  emoji: { fontSize: 26 },
+  emoji: { fontSize: 26, fontFamily: undefined },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

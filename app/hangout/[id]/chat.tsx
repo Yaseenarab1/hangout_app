@@ -123,7 +123,7 @@ export default function ChatScreen(): React.ReactElement {
   }, [messages.length, isNearBottom]);
 
   const handleSend = (body: string, replyToMessageId?: string) => {
-    sendMessage.mutate({ hangoutId, body, replyToMessageId });
+    sendMessage.mutate({ hangoutId, body, replyToMessageId, replyToMessage: replyTo ?? undefined });
     if (isNearBottom) {
       setTimeout(() => listRef.current?.scrollToOffset({ offset: 0, animated: true }), 50);
     }

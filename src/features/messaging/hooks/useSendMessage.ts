@@ -8,6 +8,7 @@ type SendParams = {
   hangoutId: string;
   body: string;
   replyToMessageId?: string;
+  replyToMessage?: Message; // full object for optimistic UI only
 };
 
 export function useSendMessage() {
@@ -16,7 +17,7 @@ export function useSendMessage() {
   return useMutation({
     mutationFn: sendMessage,
 
-    onMutate: async ({ hangoutId, body, replyToMessageId }: SendParams) => {
+    onMutate: async ({ hangoutId, body, replyToMessageId, replyToMessage }: SendParams) => {
       await qc.cancelQueries({ queryKey: messagesKey(hangoutId) });
 
       const optimisticId = `optimistic-${Date.now()}`;
@@ -26,6 +27,9 @@ export function useSendMessage() {
         sender_id: '',
         body,
         reply_to_message_id: replyToMessageId ?? null,
+        reply_to: replyToMessage
+          ? { id: replyToMessage.id, body: replyToMessage.body, deleted_at: replyToMessage.deleted_at, sender: replyToMessage.sender }
+          : undefined,
         edited_at: null,
         deleted_at: null,
         created_at: new Date().toISOString(),
@@ -53,6 +57,10 @@ export function useSendMessage() {
         );
         return { ...prev, pages: newPages };
       });
+    },
+
+    onSettled: (_data, _err, { hangoutId }) => {
+      qc.invalidateQueries({ queryKey: messagesKey(hangoutId) });
     },
 
     onError: (_err, { hangoutId }, ctx) => {

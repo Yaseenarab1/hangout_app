@@ -59,5 +59,5 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   emojiBtn: { padding: 6 },
-  emoji: { fontSize: 26 },
+  emoji: { fontSize: 26, fontFamily: undefined },
 });

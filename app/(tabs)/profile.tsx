@@ -99,10 +99,23 @@ export default function ProfileTab(): React.ReactElement {
       )}
 
       <View style={styles.statsRow}>
-        <StatBox label="Friends" value={String(friends.data?.length ?? 0)} />
-        <StatBox label="Hangouts" value={hangouts.data?.length ?? 0} />
+        <StatBox
+          label="Friends"
+          value={String(friends.data?.length ?? 0)}
+          onPress={() => router.push('/(tabs)/friends')}
+        />
+        <StatBox label="Hangouts" value={String(hangouts.data?.length ?? 0)} />
         <StatBox label="Posts" value="0" />
       </View>
+
+      <SectionHeader title="Social" />
+      <Card padding="none">
+        <ListItem
+          title="Friends"
+          subtitle="Manage your friends list"
+          onPress={() => router.push('/(tabs)/friends')}
+        />
+      </Card>
 
       <SectionHeader title="Account" />
       <Card padding="none">
@@ -130,23 +143,25 @@ export default function ProfileTab(): React.ReactElement {
   );
 }
 
-function StatBox({ label, value }: { label: string; value: string }): React.ReactElement {
+function StatBox({ label, value, onPress }: { label: string; value: string; onPress?: () => void }): React.ReactElement {
   const theme = useTheme();
   return (
-    <View
-      style={[
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
         styles.stat,
         {
           backgroundColor: theme.colors.bg.surface,
           borderColor: theme.colors.border.default,
         },
+        pressed && onPress ? { opacity: 0.7 } : undefined,
       ]}
     >
       <Text style={[theme.typography.h2, { color: theme.colors.text.primary }]}>{value}</Text>
       <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>
         {label}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 

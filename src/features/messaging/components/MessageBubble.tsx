@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     gap: 2,
   },
-  reactionEmoji: { fontSize: 14 },
+  reactionEmoji: { fontSize: 14, fontFamily: undefined },
   reactionCount: { fontSize: 12, fontWeight: '600' },
   failedRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   failedText: { fontSize: 11 },
