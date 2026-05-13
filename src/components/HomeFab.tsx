@@ -8,7 +8,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Plus, X, Receipt, CalendarPlus } from 'lucide-react-native';
+import { Plus, X, Receipt, Compass, UtensilsCrossed, CalendarPlus } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -28,16 +28,34 @@ export function HomeFab() {
     {
       key: 'bill',
       icon: <Receipt size={20} color={theme.colors.accent} />,
-      label: 'New bill',
+      label: 'Split a bill',
       onPress: () => {
         setOpen(false);
         router.push('/bill/new');
       },
     },
     {
+      key: 'activity',
+      icon: <Compass size={20} color={theme.colors.accent} />,
+      label: 'What to do?',
+      onPress: () => {
+        setOpen(false);
+        router.push('/hangout/new-activity');
+      },
+    },
+    {
+      key: 'food',
+      icon: <UtensilsCrossed size={20} color={theme.colors.accent} />,
+      label: 'Where to eat?',
+      onPress: () => {
+        setOpen(false);
+        router.push('/hangout/new-food');
+      },
+    },
+    {
       key: 'hangout',
       icon: <CalendarPlus size={20} color={theme.colors.accent} />,
-      label: 'New hangout',
+      label: 'Plan a hangout',
       onPress: () => {
         setOpen(false);
         router.push('/hangout/new');

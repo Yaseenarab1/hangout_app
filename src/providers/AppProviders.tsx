@@ -6,6 +6,7 @@ import { AppState, type AppStateStatus, View } from 'react-native';
 import { Toaster } from '@/components/ui/Toast';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { useSessionListener } from '@/features/auth';
+import { BillDraftProvider } from '@/features/bills/context/BillDraftContext';
 import { initErrorTracking } from '@/services/errors';
 import { initAnalytics } from '@/services/analytics';
 
@@ -62,8 +63,10 @@ export function AppProviders({ children }: { children: React.ReactNode }): React
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <SessionGate>
-            <ErrorBoundary>{children}</ErrorBoundary>
-            <Toaster />
+            <BillDraftProvider>
+              <ErrorBoundary>{children}</ErrorBoundary>
+              <Toaster />
+            </BillDraftProvider>
           </SessionGate>
         </QueryClientProvider>
       </SafeAreaProvider>
