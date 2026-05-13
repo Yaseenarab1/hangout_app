@@ -91,7 +91,7 @@ export function BillDetailSheet({
         {bill.isLoading ? (
           <ActivityIndicator color={theme.colors.accent} style={{ marginTop: 40 }} />
         ) : !b ? null : (
-          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+          <ScrollView showsVerticalScrollIndicator={false}>
             {/* Bill summary */}
             <View style={[styles.summaryCard, { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default }]}>
               <Text style={[theme.typography.h1, { color: theme.colors.text.primary }]}>

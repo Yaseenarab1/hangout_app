@@ -101,6 +101,9 @@ after public launch. Initial launch target: NYC.
 - All amounts in cents, BIGINT, never floats.
 - Splits computed server-side (via SQL function or edge function), never
   client-side, to prevent rounding-disagreement.
+  - **3E exception:** itemized bill share totals are computed client-side
+    (in `compute-item-shares.ts`) and inserted as `bill_shares.amount_cents`
+    only when the user taps "Save bill." The review step is the safety net.
 - Bill status enum: `pending` / `partially_paid` / `paid` / `void`.
 - Greedy debt simplification: when N people owe each other, reduce to
   minimum number of payments using net-balance algorithm.

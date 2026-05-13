@@ -1,5 +1,12 @@
 import { supabase } from '@/services/supabase/client';
-import type { Bill, BillShare, UserBalance, CreateBillParams } from '../types';
+import type {
+  Bill,
+  BillShare,
+  UserBalance,
+  CreateBillParams,
+  CreateItemizedBillParams,
+  ParsedReceiptResult,
+} from '../types';
 import { BILL_RECEIPT_BUCKET } from '../types';
 import * as FileSystem from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
@@ -189,4 +196,109 @@ export async function uploadReceipt(
 
   if (error) throw error;
   return storagePath;
+}
+
+export async function scanReceiptImage(imageBase64: string): Promise<ParsedReceiptResult> {
+  const { data, error } = await supabase.functions.invoke('scan-receipt', {
+    body: { imageBase64 },
+  });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error as string);
+  return data as ParsedReceiptResult;
+}
+
+export async function fetchMyBills(): Promise<Bill[]> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error('Not authenticated');
+
+  const { data, error } = await db()
+    .from('bills')
+    .select(BILL_SELECT)
+    .or(`payer_id.eq.${auth.user.id},created_by.eq.${auth.user.id}`)
+    .is('hangout_id', null)
+    .is('voided_at', null)
+    .order('paid_at', { ascending: false })
+    .limit(50);
+
+  if (error) throw error;
+  return (data ?? []) as Bill[];
+}
+
+export async function createItemizedBill(params: CreateItemizedBillParams): Promise<Bill> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error('Not authenticated');
+
+  const subtotalCents = params.items.reduce(
+    (s, i) => s + i.amount_cents * i.quantity,
+    0,
+  );
+  const totalCents = subtotalCents + params.tax_cents + params.tip_cents;
+
+  const { data: bill, error: billError } = await db()
+    .from('bills')
+    .insert({
+      hangout_id: params.hangout_id ?? null,
+      payer_id: params.payer_id,
+      mode: 'itemized',
+      amount_cents: totalCents,
+      subtotal_cents: subtotalCents,
+      tax_cents: params.tax_cents,
+      tip_cents: params.tip_cents,
+      currency: 'USD',
+      description: params.description,
+      paid_at: params.paid_at ?? new Date().toISOString(),
+      created_by: auth.user.id,
+    })
+    .select(BILL_SELECT)
+    .single();
+
+  if (billError) throw billError;
+  const billId = (bill as any).id as string;
+
+  // Insert guest participants first so we can get their IDs
+  const guestRows = params.shares
+    .filter((s) => s.guest_name)
+    .map((s) => ({ bill_id: billId, name: s.guest_name!, added_by: auth.user!.id }));
+
+  let guestMap = new Map<string, string>(); // name → id
+  if (guestRows.length > 0) {
+    const { data: guests, error: guestErr } = await db()
+      .from('bill_guest_participants')
+      .insert(guestRows)
+      .select('id, name');
+    if (guestErr) throw guestErr;
+    for (const g of guests ?? []) {
+      guestMap.set(g.name, g.id);
+    }
+  }
+
+  // Insert shares
+  const shareRows = params.shares.map((s) => ({
+    bill_id: billId,
+    user_id: s.user_id ?? null,
+    guest_participant_id: s.guest_name ? (guestMap.get(s.guest_name) ?? null) : null,
+    amount_cents: s.amount_cents,
+    split_method: 'exact' as const,
+    weight: null,
+  }));
+
+  const { error: sharesError } = await db().from('bill_shares').insert(shareRows);
+  if (sharesError) throw sharesError;
+
+  // Insert items
+  const itemRows = params.items.map((item, i) => ({
+    bill_id: billId,
+    description: item.description,
+    amount_cents: item.amount_cents,
+    quantity: item.quantity,
+    source: item.source,
+    position: item.position ?? i,
+  }));
+
+  if (itemRows.length > 0) {
+    const { error: itemsError } = await db().from('bill_items').insert(itemRows);
+    if (itemsError) throw itemsError;
+  }
+
+  return bill as Bill;
 }

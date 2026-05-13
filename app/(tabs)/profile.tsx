@@ -117,6 +117,15 @@ export default function ProfileTab(): React.ReactElement {
         />
       </Card>
 
+      <SectionHeader title="Bills" />
+      <Card padding="none">
+        <ListItem
+          title="My bills"
+          subtitle="Bills you created outside hangouts"
+          onPress={() => router.push('/profile/bills')}
+        />
+      </Card>
+
       <SectionHeader title="Account" />
       <Card padding="none">
         <ListItem

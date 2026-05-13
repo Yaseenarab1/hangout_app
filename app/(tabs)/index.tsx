@@ -7,6 +7,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useMyProfile } from '@/features/profile';
 import { useMyHangouts } from '@/features/hangouts';
 import { SectionHeader } from '@/components/ui';
+import { HomeFab } from '@/components/HomeFab';
 import type { Hangout } from '@/features/hangouts';
 
 export default function HomeTab(): React.ReactElement {
@@ -22,6 +23,7 @@ export default function HomeTab(): React.ReactElement {
     .slice(0, 3);
 
   return (
+    <View style={{ flex: 1 }}>
     <Screen header={{ title: 'Home' }} scroll>
       {/* Greeting */}
       <Text style={[theme.typography.h2, { color: theme.colors.text.primary }]}>
@@ -74,6 +76,8 @@ export default function HomeTab(): React.ReactElement {
         </>
       ) : null}
     </Screen>
+    <HomeFab />
+    </View>
   );
 }
 
