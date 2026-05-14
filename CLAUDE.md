@@ -219,8 +219,99 @@ Never let a query stay in "loading" forever after returning empty.
 - 3A — Group messaging (per-hangout chat)
 - 3B — Shared photo albums (per-hangout)
 - 3D — Bills / expense splitting (complete)
-- **3E — Receipt OCR + item-level splitting + standalone bills (active)**
-- 3C — Social feed (consumes posts from all the above)
+- 3E — Receipt OCR + item-level splitting + standalone bills (complete)
+- **3C — Story-style social feed (active)**
 
 Each sub-phase has its own plan doc in `docs/`. Read the active sub-phase
 plan in full before starting.
+
+---
+
+### Feed posts (Phase 3C)
+- A "post" is a single photo with optional caption. Visibility: `hangout` /
+  `friends` / `public`. Public = friends-of-friends for v1 (not true-public).
+- Visibility persists forever at creation time. Unfriending after the fact
+  does not retroactively remove access.
+- `expires_at`: default = `created_at + 24h`. NULL = permanent (keep on profile).
+- Expired posts stay in DB for 7 days for recovery, then hard-deleted by
+  scheduled function.
+
+### Story rail (Phase 3C)
+- Top of Home screen. Horizontal scroll. One circle per author with unexpired
+  posts. Tap opens full-screen viewer.
+- Auto-collapses when user scrolls Home content past ~50px.
+- "Your story" always first. "+" in header opens creation flow.
+
+### Story viewer (Phase 3C)
+- Full-screen modal. Auto-advance every 5 seconds.
+- Tap left/right thirds → prev/next post (same author).
+- Tap-and-hold → pause. Swipe down → dismiss. Swipe up → comments sheet.
+- Swipe left/right edge → next/prev author's stories.
+- Progress bar segments at top (one per post). Must be 60fps — use
+  `react-native-gesture-handler` + `react-native-reanimated`.
+- AppState listener pauses auto-advance when app loses focus.
+
+### Profile privacy (Phase 3C)
+- `profiles.profile_visibility` enum: `everyone` / `friends_only` / `nobody`.
+- `nobody` → others see minimal placeholder.
+- Profile photo grid (permanent posts) respects this setting.
+- Author always sees their own profile regardless of setting.
+
+### Mentions (Phase 3C)
+- Regex: `/@([a-zA-Z0-9_]{3,30})/g` — SAME pattern in SQL trigger and
+  client-side `parse-mentions.ts`. Case-insensitive against `profiles.username`.
+- Mentioned users get push notification with `postId` in payload for deep-link.
+- Users can untag themselves (`untagged_at` set, link broken, caption stays).
+
+### Comments (Phase 3C)
+- Text + emoji only. Max 500 chars. Visibility = same as post.
+- Author can edit own comment within 5 min. Author and post owner can delete.
+- Realtime via `post:<postId>:comments` channel. Optimistic on send.
+
+### Feed storage (Phase 3C)
+- Bucket: `feed-posts`. Path: `<user_id>/<post_id>.jpg` + `<post_id>_thumb.webp`.
+- Same EXIF-strip + resize pipeline as Phase 3B (max 1600px JPEG 80%).
+- Storage RLS parses UUID from path. Test thoroughly with both ephemeral
+  and permanent posts.
+
+### Moderation (Phase 3C)
+- Report action on every post + comment → `content_reports` table.
+- Block: uses existing `public.blocks` table (NOT `user_blocks` — table is
+  called `blocks` with `blocker_id` / `blocked_id`).
+- Blocks are bilateral and exclude content in both directions.
+
+### Hangout integration (Phase 3C)
+- `visibility='hangout'` posts automatically create a `hangout_photos` row
+  via trigger. `linked_hangout_photo_id` FK keeps them in sync.
+- Delete from either side cascades to the other.
+
+### DB schema notes for 3C
+- `public.friendships` has NO `status` column — accepted friendships are
+  simply rows in the table. There is a separate `friend_requests` table for
+  pending requests.
+- Blocks are in `public.blocks` (not `user_blocks`).
+- `are_mutual_friends()` helper does NOT exist yet — create it in 3C migration.
+- The friends-of-friends join in `feed_post_visible_to` must NOT reference
+  `f.status = 'accepted'` (no such column). Simplify accordingly.
+- Fallback acceptable for v1: `public` visibility = friends only (no fof join)
+  if the fof query turns out to be too complex or slow.
+
+### DM share (Phase 3C — ask user first)
+- Default plan: add `hangouts.kind` enum ('event' | 'direct_message') so 1:1
+  DM threads can be created without being full hangouts.
+- If retrofitting feels invasive: fall back to "copy link" for v1. ASK before
+  implementing.
+
+## Common bugs (Phase 3C additions)
+13. Story auto-advance doesn't pause on app background → use AppState listener.
+14. Tap-and-hold triggers iOS context menu if using `onLongPress` → use
+    `onPressIn` / `onPressOut` instead.
+15. Comments sheet + story viewer stacking → comments must be a separate
+    Modal, not overlaid in same view.
+16. Username mention matching: case-insensitive but stored as-typed.
+17. Story viewer memory: prefetch next post, unload posts >2 behind/ahead.
+
+## Communication style (Phase 3C additions)
+- Story viewer is the "wow" UX — get it smooth. 60fps, instant transitions.
+- Be explicit about what "keep forever" means vs ephemeral. Ephemeral is
+  the default — make that unmissable.
