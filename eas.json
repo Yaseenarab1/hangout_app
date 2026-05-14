@@ -40,8 +40,8 @@
   "submit": {
     "production": {
       "ios": {
-        "ascAppId": "PLACEHOLDER_ASC_APP_ID",
-        "appleTeamId": "PLACEHOLDER_TEAM_ID"
+        "appleTeamId": "FILL_IN_AFTER_APPLE_ENROLLMENT",
+        "ascAppId": "FILL_IN_AFTER_CREATING_APP_IN_APP_STORE_CONNECT"
       }
     }
   }
