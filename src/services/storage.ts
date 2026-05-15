@@ -60,6 +60,35 @@ export async function getSignedUrl(
   return data.signedUrl;
 }
 
+export interface FeedPostUploadResult {
+  storagePath: string;
+  width: number;
+  height: number;
+}
+
+/** Upload a local image as a feed post. Returns storage path + dimensions. */
+export async function uploadFeedPost(
+  localUri: string,
+  userId: string,
+  postId: string,
+): Promise<FeedPostUploadResult> {
+  // Resize to max 1600px on the long edge, strip EXIF via re-encode, JPEG 80%
+  const processed = await ImageManipulator.manipulateAsync(
+    localUri,
+    [{ resize: { width: 1600 } }],
+    { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
+  );
+
+  const path = `${userId}/${postId}.jpg`;
+  await uploadProcessedFile(processed.uri, STORAGE_BUCKETS.feedPosts, path, 'image/jpeg');
+
+  return {
+    storagePath: path,
+    width: processed.width,
+    height: processed.height,
+  };
+}
+
 async function uploadProcessedFile(
   localUri: string,
   bucket: Bucket,

@@ -36,6 +36,10 @@ export const TABLES = {
   notification_preferences: 'notification_preferences',
   reports: 'reports',
   blocks: 'blocks',
+  feed_posts: 'feed_posts',
+  feed_post_likes: 'feed_post_likes',
+  feed_post_comments: 'feed_post_comments',
+  feed_post_mentions: 'feed_post_mentions',
 } as const;
 
 export const STORAGE_BUCKETS = {
@@ -44,6 +48,7 @@ export const STORAGE_BUCKETS = {
   albumPhotos: 'album-photos',
   receipts: 'receipts',
   hangoutPhotos: 'hangout-photos',
+  feedPosts: 'feed-posts',
 } as const;
 
 export const QUERY_KEYS = {
@@ -56,4 +61,8 @@ export const QUERY_KEYS = {
   friendSearch: (query: string) => ['friend-search', query] as const,
   blockedUsers: ['blocked-users'] as const,
   notificationPreferences: ['notification-preferences'] as const,
+  feedPosts: (userId?: string) =>
+    userId ? (['feed', 'posts', userId] as const) : (['feed', 'posts'] as const),
+  feedPost: (postId: string) => ['feed', 'post', postId] as const,
+  feedComments: (postId: string) => ['feed', 'comments', postId] as const,
 } as const;
