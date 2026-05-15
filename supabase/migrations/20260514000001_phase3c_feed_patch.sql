@@ -360,9 +360,20 @@ end;
 $$;
 
 -- ── Realtime ──────────────────────────────────────────────────────────────────
+-- Wrapped in DO blocks so re-running doesn't error when tables are already members.
 
-alter publication supabase_realtime
-  add table public.feed_posts,
-            public.feed_post_likes,
-            public.feed_post_comments,
-            public.feed_post_mentions;
+do $$ begin
+  alter publication supabase_realtime add table public.feed_posts;
+exception when others then null; end $$;
+
+do $$ begin
+  alter publication supabase_realtime add table public.feed_post_likes;
+exception when others then null; end $$;
+
+do $$ begin
+  alter publication supabase_realtime add table public.feed_post_comments;
+exception when others then null; end $$;
+
+do $$ begin
+  alter publication supabase_realtime add table public.feed_post_mentions;
+exception when others then null; end $$;
