@@ -96,7 +96,7 @@ export function ParticipantRow({
 
   return (
     <Pressable
-      onPress={() => router.push(`/users/${profile.id}`)}
+      onPress={() => router.push(`/profile/${profile.id}`)}
       style={({ pressed }) => [
         pressed && { backgroundColor: theme.colors.bg.subtle },
       ]}

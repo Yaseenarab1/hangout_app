@@ -41,7 +41,7 @@ export default function RootLayout(): React.ReactElement {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen
-          name="users/[id]"
+          name="profile/[userId]"
           options={{ presentation: 'card' }}
         />
         <Stack.Screen
