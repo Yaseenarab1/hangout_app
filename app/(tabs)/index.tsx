@@ -8,6 +8,7 @@ import { useMyProfile } from '@/features/profile';
 import { useMyHangouts } from '@/features/hangouts';
 import { SectionHeader } from '@/components/ui';
 import { HomeFab } from '@/components/HomeFab';
+import { StoryRail } from '@/features/feed/components/StoryRail';
 import type { Hangout } from '@/features/hangouts';
 
 export default function HomeTab(): React.ReactElement {
@@ -25,6 +26,9 @@ export default function HomeTab(): React.ReactElement {
   return (
     <View style={{ flex: 1 }}>
     <Screen header={{ title: 'Home' }} scroll>
+      {/* Story rail */}
+      <StoryRail />
+
       {/* Greeting */}
       <Text style={[theme.typography.h2, { color: theme.colors.text.primary }]}>
         Hi {greetingName} 👋
