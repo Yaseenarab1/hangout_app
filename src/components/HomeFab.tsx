@@ -8,7 +8,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Plus, X, Receipt, Compass, UtensilsCrossed, CalendarPlus } from 'lucide-react-native';
+import { Plus, X, Receipt, Compass, UtensilsCrossed, CalendarPlus, Camera } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -25,6 +25,15 @@ export function HomeFab() {
   const [open, setOpen] = useState(false);
 
   const actions: FabAction[] = [
+    {
+      key: 'post',
+      icon: <Camera size={20} color={theme.colors.accent} />,
+      label: 'New post',
+      onPress: () => {
+        setOpen(false);
+        router.push('/post/new');
+      },
+    },
     {
       key: 'bill',
       icon: <Receipt size={20} color={theme.colors.accent} />,
