@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, Alert, Pressable } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Alert, Pressable, Modal, Image, FlatList, Dimensions } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import {
   Settings as SettingsIcon,
@@ -30,6 +30,9 @@ import {
   useBlockUser,
   useCancelFriendRequest,
 } from '@/features/friends';
+import { useAuthorPosts } from '@/features/feed/hooks/useFeedPosts';
+import { StoryViewer } from '@/features/feed/components/StoryViewer';
+import type { FeedPostWithUrl, StoryGroup } from '@/features/feed';
 
 export default function ProfileScreen(): React.ReactElement {
   const theme = useTheme();
@@ -112,6 +115,9 @@ export default function ProfileScreen(): React.ReactElement {
       </Screen>
     );
   }
+
+  const authorPosts = useAuthorPosts(userId);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const isFriend = !isMe && (friends.data ?? []).some((f) => f.id === p.id);
   const outgoingReq = !isMe
@@ -215,7 +221,7 @@ export default function ProfileScreen(): React.ReactElement {
               onPress={() => router.push('/(tabs)/friends')}
             />
             <StatBox label="Hangouts" value={String(hangouts.data?.length ?? 0)} />
-            <StatBox label="Posts" value="0" />
+            <StatBox label="Posts" value={String(authorPosts.data?.length ?? 0)} />
           </View>
 
           <SectionHeader title="Social" />
@@ -312,7 +318,61 @@ export default function ProfileScreen(): React.ReactElement {
           />
         </Card>
       )}
+
+      {/* ── Post gallery (permanent posts) ── */}
+      {(isMe || isFriend) && authorPosts.data && authorPosts.data.length > 0 && (
+        <>
+          <SectionHeader title="Posts" />
+          <PostGallery
+            posts={authorPosts.data}
+            onTap={(i) => setViewerIndex(i)}
+          />
+        </>
+      )}
+
+      {/* Story-style viewer for gallery taps */}
+      {viewerIndex !== null && authorPosts.data && authorPosts.data.length > 0 && (
+        <StoryViewer
+          groups={[{
+            author: {
+              id: p.id,
+              display_name: p.display_name,
+              username: p.username,
+              avatar_url: p.avatar_url,
+            },
+            posts: authorPosts.data,
+            hasUnviewed: false,
+          }]}
+          initialGroupIndex={0}
+          onClose={() => setViewerIndex(null)}
+        />
+      )}
     </Screen>
+  );
+}
+
+const GALLERY_COLS = 3;
+const GALLERY_ITEM_SIZE = Dimensions.get('window').width / GALLERY_COLS;
+
+function PostGallery({
+  posts,
+  onTap,
+}: {
+  posts: FeedPostWithUrl[];
+  onTap: (index: number) => void;
+}): React.ReactElement {
+  return (
+    <View style={styles.gallery}>
+      {posts.map((post, i) => (
+        <Pressable key={post.id} onPress={() => onTap(i)} style={styles.galleryItem}>
+          <Image
+            source={{ uri: post.image_url }}
+            style={styles.galleryImage}
+            resizeMode="cover"
+          />
+        </Pressable>
+      ))}
+    </View>
   );
 }
 
@@ -360,6 +420,19 @@ function Divider(): React.ReactElement {
 }
 
 const styles = StyleSheet.create({
+  gallery: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -16, // bleed past Screen padding
+  },
+  galleryItem: {
+    width: GALLERY_ITEM_SIZE,
+    height: GALLERY_ITEM_SIZE,
+  },
+  galleryImage: {
+    width: '100%',
+    height: '100%',
+  },
   hero: {
     alignItems: 'center',
     paddingTop: 16,

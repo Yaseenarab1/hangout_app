@@ -77,6 +77,8 @@ export async function updateProfile(input: UpdateProfileInput): Promise<Profile>
     update.default_post_visibility = input.defaultPostVisibility;
   if (input.defaultCalendarVisibility !== undefined)
     update.default_calendar_visibility = input.defaultCalendarVisibility;
+  if (input.profileVisibility !== undefined)
+    update.profile_visibility = input.profileVisibility;
 
   const { data, error } = await supabase
     .from(TABLES.profiles)

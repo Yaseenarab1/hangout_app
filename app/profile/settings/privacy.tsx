@@ -6,6 +6,12 @@ import { Card, SectionHeader, Spinner } from '@/components/ui';
 import { useTheme } from '@/hooks/useTheme';
 import { useMyProfile, useUpdateProfile } from '@/features/profile';
 
+const PROFILE_VIS_OPTIONS = [
+  { value: 'everyone' as const, label: 'Everyone', desc: 'Anyone can view your profile' },
+  { value: 'friends_only' as const, label: 'Friends only', desc: 'Only mutual friends see your profile' },
+  { value: 'nobody' as const, label: 'Nobody', desc: 'Others see only your name and avatar' },
+];
+
 const POST_OPTIONS = [
   { value: 'friends' as const, label: 'All friends', desc: 'Posts visible to all your friends' },
   {
@@ -49,6 +55,22 @@ export default function PrivacySettingsScreen(): React.ReactElement {
 
   return (
     <Screen header={{ title: 'Privacy', showBack: true }} scroll>
+      <SectionHeader title="Profile visibility" />
+      <Card padding="none">
+        {PROFILE_VIS_OPTIONS.map((opt, i) => (
+          <Row
+            key={opt.value}
+            label={opt.label}
+            desc={opt.desc}
+            selected={
+              ((myProfile.data as any).profile_visibility ?? 'everyone') === opt.value
+            }
+            onPress={() => update.mutate({ profileVisibility: opt.value })}
+            divider={i < PROFILE_VIS_OPTIONS.length - 1}
+          />
+        ))}
+      </Card>
+
       <SectionHeader title="Default post visibility" />
       <Card padding="none">
         {POST_OPTIONS.map((opt, i) => (

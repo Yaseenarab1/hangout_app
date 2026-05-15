@@ -11,6 +11,7 @@ import {
   AppState,
   Platform,
   StatusBar,
+  Alert,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -19,9 +20,15 @@ import Animated, {
   cancelAnimation,
   runOnJS,
 } from 'react-native-reanimated';
-import { X, MessageCircle } from 'lucide-react-native';
+import { X, MessageCircle, Heart, MoreHorizontal, Share2 } from 'lucide-react-native';
+import * as Clipboard from 'expo-clipboard';
 import { Avatar } from '@/components/ui';
 import { useTheme } from '@/hooks/useTheme';
+import { useSession } from '@/features/auth';
+import { toast } from '@/stores/ui.store';
+import { useLikePost } from '../hooks/useLikePost';
+import { useDeletePost } from '../hooks/useDeletePost';
+import { CommentsSheet } from './CommentsSheet';
 import type { StoryGroup } from '../types';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -39,6 +46,9 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: Props): Reac
   const [postIdx, setPostIdx] = useState(0);
   const [paused, setPaused] = useState(false);
   const [commentsVisible, setCommentsVisible] = useState(false);
+  const { user } = useSession();
+  const likePost = useLikePost();
+  const deletePost = useDeletePost();
 
   const group = groups[groupIdx];
   const post = group?.posts[postIdx];
@@ -213,12 +223,58 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: Props): Reac
             <Text style={styles.timeAgo}>{timeAgo}</Text>
           </View>
           <Pressable
+            onPress={() =>
+              likePost.mutate({ postId: post.id, liked: !post.viewer_has_liked })
+            }
+            hitSlop={12}
+            style={{ padding: 6 }}
+          >
+            <Heart
+              size={22}
+              color="#FFFFFF"
+              fill={post.viewer_has_liked ? '#FFFFFF' : 'transparent'}
+            />
+          </Pressable>
+          <Pressable
             onPress={() => setCommentsVisible(true)}
             hitSlop={12}
             style={{ padding: 6 }}
           >
             <MessageCircle size={22} color="#FFFFFF" />
           </Pressable>
+          {/* Share link */}
+          <Pressable
+            onPress={async () => {
+              await Clipboard.setStringAsync(`hangoutplanner://post/${post.id}`);
+              toast.success('Link copied!');
+            }}
+            hitSlop={12}
+            style={{ padding: 6 }}
+          >
+            <Share2 size={20} color="#FFFFFF" />
+          </Pressable>
+
+          {/* Delete (own posts only) */}
+          {post.author_id === user?.id && (
+            <Pressable
+              onPress={() =>
+                Alert.alert('Delete post?', 'This cannot be undone.', [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => {
+                      deletePost.mutate(post.id, { onSuccess: goNextPost });
+                    },
+                  },
+                ])
+              }
+              hitSlop={12}
+              style={{ padding: 6 }}
+            >
+              <MoreHorizontal size={22} color="#FFFFFF" />
+            </Pressable>
+          )}
           <Pressable onPress={onClose} hitSlop={12} style={{ padding: 6 }}>
             <X size={22} color="#FFFFFF" />
           </Pressable>
@@ -256,25 +312,8 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: Props): Reac
         presentationStyle="pageSheet"
         onRequestClose={() => setCommentsVisible(false)}
       >
-        <View style={[styles.commentsSheet, { backgroundColor: theme.colors.bg.canvas }]}>
-          <View style={styles.sheetHandle} />
-          <Text
-            style={[
-              theme.typography.bodyMedium,
-              { color: theme.colors.text.primary, textAlign: 'center', marginBottom: 16 },
-            ]}
-          >
-            Comments
-          </Text>
-          {/* Full comment list built in step 5 */}
-          <Text
-            style={[
-              theme.typography.body,
-              { color: theme.colors.text.secondary, textAlign: 'center', marginTop: 40 },
-            ]}
-          >
-            No comments yet
-          </Text>
+        <View style={[{ flex: 1 }, { backgroundColor: theme.colors.bg.canvas }]}>
+          <CommentsSheet postId={post.id} postAuthorId={post.author_id} />
         </View>
       </Modal>
     </Modal>

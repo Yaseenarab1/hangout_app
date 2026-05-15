@@ -33,6 +33,7 @@ export const updateProfileSchema = z.object({
   bio: bioSchema,
   defaultPostVisibility: z.enum(['friends', 'hangout_only', 'selected']).optional(),
   defaultCalendarVisibility: z.enum(['friends', 'private', 'selected']).optional(),
+  profileVisibility: z.enum(['everyone', 'friends_only', 'nobody']).optional(),
 });
 
 export type CreateProfileInput = z.infer<typeof createProfileSchema>;
