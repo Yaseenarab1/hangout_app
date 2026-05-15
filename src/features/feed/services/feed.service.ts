@@ -5,6 +5,14 @@ import type { FeedPost, FeedPostWithUrl, FeedPostComment, CreatePostParams } fro
 
 const SIGNED_URL_TTL = 3600; // 1 hour
 
+// crypto.randomUUID() is not available in Hermes — use Math.random() fallback
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 const POST_SELECT = `
   *,
   author:profiles!feed_posts_author_id_fkey(id, display_name, username, avatar_url),
@@ -73,8 +81,7 @@ export async function createFeedPost(params: CreatePostParams): Promise<FeedPost
   if (!auth.user) throw new Error('Not authenticated');
   const userId = auth.user.id;
 
-  // Generate post ID client-side so we can use it for the storage path
-  const postId = crypto.randomUUID();
+  const postId = generateUUID();
 
   const { storagePath, width, height } = await uploadFeedPost(params.localUri, userId, postId);
 
