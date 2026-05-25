@@ -57,7 +57,6 @@ export function useCreateHangout() {
     mutationFn: (input: CreateHangoutInput) => createHangout(input),
     onSuccess: (hangout) => {
       qc.invalidateQueries({ queryKey: hangoutKeys.list() });
-      qc.setQueryData(hangoutKeys.detail(hangout.id), null); // force re-fetch on navigate
       toast.success('Hangout created!');
     },
     onError: (error) => {
