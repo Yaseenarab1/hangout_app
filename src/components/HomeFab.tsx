@@ -12,9 +12,12 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
+  FadeInUp,
+  FadeOutDown,
+  Easing,
 } from 'react-native-reanimated';
 import { router } from 'expo-router';
-import { Plus, X, Receipt, Compass, UtensilsCrossed, CalendarPlus, Camera } from 'lucide-react-native';
+import { Plus, Receipt, Compass, UtensilsCrossed, CalendarPlus, Camera } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -30,20 +33,40 @@ export function HomeFab({ visible = true }: { visible?: boolean }) {
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
 
-  const scale = useSharedValue(1);
+  // FAB visibility (scale + opacity)
+  const fabScale = useSharedValue(1);
+  const fabOpacity = useSharedValue(1);
   const fabAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: scale.value,
+    transform: [{ scale: fabScale.value }],
+    opacity: fabOpacity.value,
+  }));
+
+  // Plus icon rotation: 0° closed → 45° open (morphs to X)
+  const rotation = useSharedValue(0);
+  const iconRotateStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
   }));
 
   useEffect(() => {
+    rotation.value = withTiming(open ? 45 : 0, {
+      duration: 220,
+      easing: Easing.bezier(0.34, 1.56, 0.64, 1),
+    });
+  }, [open]);
+
+  useEffect(() => {
     if (open) {
-      scale.value = withSpring(1, { damping: 15, stiffness: 350 });
+      fabScale.value = withSpring(1, { damping: 15, stiffness: 350 });
+      fabOpacity.value = withTiming(1, { duration: 120 });
       return;
     }
-    scale.value = visible
-      ? withSpring(1, { damping: 15, stiffness: 350 })
-      : withTiming(0, { duration: 180 });
+    if (visible) {
+      fabScale.value = withSpring(1, { damping: 15, stiffness: 350 });
+      fabOpacity.value = withTiming(1, { duration: 120 });
+    } else {
+      fabScale.value = withTiming(0.7, { duration: 180 });
+      fabOpacity.value = withTiming(0, { duration: 180 });
+    }
   }, [visible, open]);
 
   const actions: FabAction[] = [
@@ -101,27 +124,37 @@ export function HomeFab({ visible = true }: { visible?: boolean }) {
         <TouchableWithoutFeedback onPress={() => setOpen(false)}>
           <View style={styles.backdrop} />
         </TouchableWithoutFeedback>
-        <View style={[styles.actionsContainer, { bottom: insets.bottom + 90 }]}>
-          {actions.map((action) => (
-            <Pressable
+
+        {/* Staggered action rows */}
+        <View style={[styles.actionsContainer, { bottom: insets.bottom + 92 }]}>
+          {actions.map((action, index) => (
+            <Animated.View
               key={action.key}
-              onPress={action.onPress}
-              style={({ pressed }) => [
-                styles.actionRow,
-                {
-                  backgroundColor: theme.colors.bg.surface,
-                  borderColor: theme.colors.border.default,
-                  opacity: pressed ? 0.8 : 1,
-                },
-              ]}
+              entering={FadeInUp.delay(index * 55)
+                .springify()
+                .damping(20)
+                .stiffness(320)}
+              exiting={FadeOutDown.duration(120)}
             >
-              <View style={[styles.actionIcon, { backgroundColor: theme.colors.accentSubtle }]}>
-                {action.icon}
-              </View>
-              <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
-                {action.label}
-              </Text>
-            </Pressable>
+              <Pressable
+                onPress={action.onPress}
+                style={({ pressed }) => [
+                  styles.actionRow,
+                  {
+                    backgroundColor: theme.colors.bg.surface,
+                    borderColor: theme.colors.border.default,
+                    transform: [{ scale: pressed ? 0.97 : 1 }],
+                  },
+                ]}
+              >
+                <View style={[styles.actionIcon, { backgroundColor: theme.colors.accentSubtle }]}>
+                  {action.icon}
+                </View>
+                <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
+                  {action.label}
+                </Text>
+              </Pressable>
+            </Animated.View>
           ))}
         </View>
       </Modal>
@@ -130,22 +163,25 @@ export function HomeFab({ visible = true }: { visible?: boolean }) {
       <Animated.View style={[styles.fabWrap, { bottom: insets.bottom + 24 }, fabAnimStyle]}>
         <Pressable
           onPress={() => setOpen((v) => !v)}
-          style={({ pressed }) => [
+          onPressIn={() => {
+            fabScale.value = withTiming(0.92, { duration: 100, easing: Easing.out(Easing.cubic) });
+          }}
+          onPressOut={() => {
+            fabScale.value = withSpring(1, { damping: 14, stiffness: 380 });
+          }}
+          style={[
             styles.fab,
             {
               backgroundColor: theme.colors.accent,
-              shadowColor: '#000',
-              opacity: pressed ? 0.85 : 1,
+              shadowColor: theme.colors.accent,
             },
           ]}
           accessibilityLabel={open ? 'Close menu' : 'Quick actions'}
           accessibilityRole="button"
         >
-          {open ? (
-            <X size={24} color="#fff" />
-          ) : (
-            <Plus size={24} color="#fff" />
-          )}
+          <Animated.View style={iconRotateStyle}>
+            <Plus size={26} color="#fff" strokeWidth={2.5} />
+          </Animated.View>
         </Pressable>
       </Animated.View>
     </>
@@ -155,7 +191,7 @@ export function HomeFab({ visible = true }: { visible?: boolean }) {
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.35)',
   },
   actionsContainer: {
     position: 'absolute',
@@ -165,16 +201,16 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 13,
     gap: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
   },
   actionIcon: {
     width: 36,
@@ -194,8 +230,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
   },
 });

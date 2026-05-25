@@ -10,6 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { Send } from 'lucide-react-native';
+import { router } from 'expo-router';
 import { Avatar } from '@/components/ui';
 import { useTheme } from '@/hooks/useTheme';
 import { useSession } from '@/features/auth';
@@ -182,14 +183,19 @@ function CommentRow({
         delayLongPress={300}
         style={styles.commentRow}
       >
-        <Avatar
-          id={comment.user_id}
-          displayName={author?.display_name}
-          uri={author?.avatar_url}
-          size="xs"
-        />
+        <Pressable onPress={() => router.push(`/profile/${comment.user_id}`)} hitSlop={8}>
+          <Avatar
+            id={comment.user_id}
+            displayName={author?.display_name}
+            uri={author?.avatar_url}
+            size="xs"
+          />
+        </Pressable>
         <View style={{ flex: 1, marginLeft: 8 }}>
-          <Text style={[theme.typography.bodySmallMedium, { color: theme.colors.text.primary }]}>
+          <Text
+            style={[theme.typography.bodySmallMedium, { color: theme.colors.text.primary }]}
+            onPress={() => router.push(`/profile/${comment.user_id}`)}
+          >
             {author?.display_name ?? 'Unknown'}
           </Text>
           <Text style={[theme.typography.bodySmall, { color: theme.colors.text.primary }]}>

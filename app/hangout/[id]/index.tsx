@@ -15,6 +15,7 @@ import {
   MessageCircle,
   Images,
   Receipt,
+  Route,
 } from 'lucide-react-native';
 import { UnreadBadge } from '@/features/messaging';
 import { usePhotosSummary } from '@/features/photos/hooks/usePhotosSummary';
@@ -443,6 +444,27 @@ export default function HangoutDetailScreen(): React.ReactElement {
               : formatCents(myBalance.data.net_cents)}
           </Text>
         )}
+      </Pressable>
+
+      {/* Day Plan entry */}
+      <SectionHeader title="Day Plan" />
+      <Pressable
+        onPress={() => router.push(`/hangout/${hangoutId}/dayplan` as any)}
+        style={({ pressed }) => [
+          styles.chatRow,
+          {
+            backgroundColor: theme.colors.bg.surface,
+            borderColor: theme.colors.border.default,
+          },
+          pressed && { opacity: 0.7 },
+        ]}
+      >
+        <Route size={20} color={theme.colors.accent} strokeWidth={1.5} />
+        <Text
+          style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, flex: 1 }]}
+        >
+          Itinerary
+        </Text>
       </Pressable>
 
       {/* Host: cancel hangout */}

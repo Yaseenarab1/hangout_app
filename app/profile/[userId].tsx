@@ -65,7 +65,7 @@ export default function ProfileScreen(): React.ReactElement {
   if (profile.isLoading || !profile.data) {
     if (profile.isLoading) {
       return (
-        <Screen header={{ title: '', showBack: !isMe }}>
+        <Screen header={{ title: '', showBack: true }}>
           <View style={styles.hero}>
             <Skeleton width={80} height={80} radius={40} />
             <Skeleton width={160} height={24} style={{ marginTop: 16 }} />
@@ -75,7 +75,7 @@ export default function ProfileScreen(): React.ReactElement {
       );
     }
     return (
-      <Screen header={{ title: 'Profile', showBack: !isMe }}>
+      <Screen header={{ title: 'Profile', showBack: true }}>
         <EmptyState
           title="Profile not found"
           body="This user may have deleted their account or blocked you."
@@ -94,7 +94,7 @@ export default function ProfileScreen(): React.ReactElement {
   // Non-author visibility check
   if (!isMe && visibility === 'nobody') {
     return (
-      <Screen header={{ title: '', showBack: true }} scroll>
+      <Screen header={{ title: '', showBack: true, right: undefined }} scroll>
         <View style={styles.hero}>
           <Avatar id={p.id} displayName={p.display_name} size="xl" />
           <Text
@@ -154,7 +154,8 @@ export default function ProfileScreen(): React.ReactElement {
       scroll
       header={{
         title: '',
-        showBack: !isMe,
+        showBack: true,
+        // Settings only visible to the profile owner — never to other users
         right: isMe ? (
           <Pressable
             onPress={() => router.push('/profile/settings')}
