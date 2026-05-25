@@ -8,9 +8,11 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Share,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { X, CalendarCheck, ChevronRight, UtensilsCrossed, Package } from 'lucide-react-native';
+import { X, CalendarCheck, ChevronRight, UtensilsCrossed, Package, Share2 } from 'lucide-react-native';
+import { supabase } from '@/services/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
@@ -42,6 +44,45 @@ export function BillDetailSheet({
   const settle = useSettleShare(hangoutId ?? '');
   const voidBillMut = useVoidBill(hangoutId ?? '');
   const [showReceipt, setShowReceipt] = useState(false);
+  const [sharingBill, setSharingBill] = useState(false);
+
+  async function handleShareBill() {
+    if (!b) return;
+    setSharingBill(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error('Not authenticated');
+
+      let token: string;
+      const { data: existing } = await (supabase as any)
+        .from('bill_share_tokens')
+        .select('token')
+        .eq('bill_id', b.id)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existing) {
+        token = existing.token;
+      } else {
+        const { data: created, error } = await (supabase as any)
+          .from('bill_share_tokens')
+          .insert({ bill_id: b.id, created_by: auth.user.id })
+          .select('token')
+          .single();
+        if (error) throw error;
+        token = created.token;
+      }
+
+      const url = `https://cruosjnuhcuewjnzhlja.supabase.co/functions/v1/bill-page?token=${token}`;
+      await Share.share({ url, message: `Here's the bill breakdown: ${url}` });
+    } catch (err: any) {
+      Alert.alert('Error', err.message ?? 'Could not share bill.');
+    } finally {
+      setSharingBill(false);
+    }
+  }
 
   function invalidateStandaloneCache() {
     if (!hangoutId) {
@@ -272,6 +313,20 @@ export function BillDetailSheet({
               })}
             </View>
 
+            {/* Share bill */}
+            {!b.voided_at && (
+              <Pressable
+                onPress={handleShareBill}
+                disabled={sharingBill}
+                style={[styles.shareBtn, { borderColor: theme.colors.accent, opacity: sharingBill ? 0.6 : 1 }]}
+              >
+                <Share2 size={15} color={theme.colors.accent} />
+                <Text style={{ color: theme.colors.accent, fontSize: 14, fontWeight: '600' }}>
+                  {sharingBill ? 'Creating link…' : 'Share bill'}
+                </Text>
+              </Pressable>
+            )}
+
             {/* Void */}
             {canVoid && (
               <Pressable onPress={handleVoid} style={[styles.voidBtn, { borderColor: theme.colors.danger }]}>
@@ -391,12 +446,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
+  shareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 14,
+    marginTop: 20,
+  },
   voidBtn: {
     borderWidth: 1,
     borderRadius: 10,
     padding: 14,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 10,
     marginBottom: 8,
   },
   receiptOverlay: {

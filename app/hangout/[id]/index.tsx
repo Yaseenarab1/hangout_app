@@ -6,6 +6,7 @@ import { View, Text, StyleSheet, Alert, Pressable, TouchableOpacity } from 'reac
 import { useLocalSearchParams, router } from 'expo-router';
 import {
   Calendar,
+  Clock,
   MapPin,
   Users,
   Settings as SettingsIcon,
@@ -36,6 +37,8 @@ import {
 } from '@/components/ui';
 import { useTheme } from '@/hooks/useTheme';
 import { useSession } from '@/features/auth';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/services/supabase/client';
 import {
   useHangout,
   useUpdateParticipant,
@@ -43,6 +46,24 @@ import {
   ParticipantRow,
 } from '@/features/hangouts';
 import type { ParticipantStatus } from '@/features/hangouts';
+
+type WebRsvp = { id: string; name: string; status: 'going' | 'maybe' | 'not_going' };
+
+function useWebRsvps(hangoutId: string) {
+  return useQuery({
+    queryKey: ['hangout_web_rsvps', hangoutId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('hangout_web_rsvps')
+        .select('id, name, status')
+        .eq('hangout_id', hangoutId)
+        .order('created_at');
+      if (error) throw error;
+      return (data ?? []) as WebRsvp[];
+    },
+    staleTime: 30 * 1000,
+  });
+}
 
 
 
@@ -84,6 +105,7 @@ export default function HangoutDetailScreen(): React.ReactElement {
   const photosSummary = usePhotosSummary(hangoutId);
   const previewPhotos = photosSummary.photos;
   const myBalance = useUserBalance(hangoutId);
+  const webRsvps = useWebRsvps(hangoutId);
   const searchLocation = useSearchLocation();
   const saveSearchLocation = useSaveSearchLocation();
   const [showAddPoll, setShowAddPoll] = useState(false);
@@ -318,6 +340,30 @@ export default function HangoutDetailScreen(): React.ReactElement {
           </View>
         ))}
       </Card>
+      {/* Web RSVPs */}
+      {(webRsvps.data ?? []).length > 0 && (
+        <Card padding="none" style={{ overflow: 'hidden', marginTop: 6 }}>
+          {(webRsvps.data ?? []).map((r, idx) => (
+            <View key={r.id}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.bg.subtle, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 16 }}>🌐</Text>
+                </View>
+                <Text style={[theme.typography.bodyMedium, { flex: 1, color: theme.colors.text.primary }]}>
+                  {r.name}
+                </Text>
+                <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>
+                  {r.status === 'going' ? 'Going' : r.status === 'maybe' ? 'Maybe' : "Can't"}
+                </Text>
+              </View>
+              {idx < (webRsvps.data ?? []).length - 1 && (
+                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border.default, marginLeft: 62 }} />
+              )}
+            </View>
+          ))}
+        </Card>
+      )}
+
       {/* Polls */}
       {((polls.data && polls.data.length > 0) || canManage) ? (
         <SectionHeader
@@ -464,6 +510,27 @@ export default function HangoutDetailScreen(): React.ReactElement {
           style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, flex: 1 }]}
         >
           Itinerary
+        </Text>
+      </Pressable>
+
+      {/* Find a time entry */}
+      <SectionHeader title="Find a time" />
+      <Pressable
+        onPress={() => router.push(`/hangout/${hangoutId}/time-poll` as any)}
+        style={({ pressed }) => [
+          styles.chatRow,
+          {
+            backgroundColor: theme.colors.bg.surface,
+            borderColor: theme.colors.border.default,
+          },
+          pressed && { opacity: 0.7 },
+        ]}
+      >
+        <Clock size={20} color={theme.colors.accent} strokeWidth={1.5} />
+        <Text
+          style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, flex: 1 }]}
+        >
+          Schedule vote
         </Text>
       </Pressable>
 

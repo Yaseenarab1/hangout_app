@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Pressable,
   FlatList,
+  ScrollView,
   Alert,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -27,9 +28,12 @@ function centsToDisplay(cents: number): string {
   return (cents / 100).toFixed(2);
 }
 
+type ViewMode = 'item' | 'person';
+
 export default function AssignScreen() {
   const theme = useTheme();
   const { draft, setItemAssignees } = useBillDraft();
+  const [viewMode, setViewMode] = useState<ViewMode>('item');
 
   function toggleAssignee(itemKey: string, pKey: string) {
     const current = draft.assignments[itemKey] ?? {};
@@ -51,7 +55,6 @@ export default function AssignScreen() {
   }
 
   function handleNext() {
-    // Validate: every item must have at least one assignee
     const unassigned = draft.items.filter((_, i) => {
       const assignees = draft.assignments[String(i)] ?? {};
       return Object.keys(assignees).length === 0;
@@ -66,24 +69,94 @@ export default function AssignScreen() {
     router.push('/bill/totals');
   }
 
+  const tabs: Array<{ id: ViewMode; label: string }> = [
+    { id: 'item', label: 'By item' },
+    { id: 'person', label: 'By person' },
+  ];
+
   return (
     <Screen header={{ title: 'Assign items', showBack: true }} contentPadding={0}>
-      <FlatList
-        data={draft.items}
-        keyExtractor={(_, i) => String(i)}
-        contentContainerStyle={{ padding: 16, paddingBottom: 100, gap: 12 }}
-        renderItem={({ item, index }) => (
-          <ItemAssignCard
-            item={item}
-            itemKey={String(index)}
-            participants={draft.participants}
-            assigned={draft.assignments[String(index)] ?? {}}
-            onToggle={(pKey) => toggleAssignee(String(index), pKey)}
-            onAssignAll={() => assignAll(String(index))}
-            theme={theme}
-          />
-        )}
-        ListFooterComponent={
+      {/* Tab toggle */}
+      <View style={[styles.tabBar, { borderBottomColor: theme.colors.border.default }]}>
+        {tabs.map((tab) => (
+          <Pressable
+            key={tab.id}
+            onPress={() => setViewMode(tab.id)}
+            style={[
+              styles.tab,
+              {
+                borderBottomColor:
+                  viewMode === tab.id ? theme.colors.accent : 'transparent',
+              },
+            ]}
+          >
+            <Text
+              style={[
+                theme.typography.bodyMedium,
+                {
+                  color:
+                    viewMode === tab.id
+                      ? theme.colors.accent
+                      : theme.colors.text.secondary,
+                },
+              ]}
+            >
+              {tab.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {viewMode === 'item' ? (
+        <FlatList
+          data={draft.items}
+          keyExtractor={(_, i) => String(i)}
+          contentContainerStyle={{ padding: 16, paddingBottom: 100, gap: 12 }}
+          renderItem={({ item, index }) => (
+            <ItemAssignCard
+              item={item}
+              itemKey={String(index)}
+              participants={draft.participants}
+              assigned={draft.assignments[String(index)] ?? {}}
+              onToggle={(pKey) => toggleAssignee(String(index), pKey)}
+              onAssignAll={() => assignAll(String(index))}
+              theme={theme}
+            />
+          )}
+          ListFooterComponent={
+            <Button
+              label="Next: review totals"
+              variant="primary"
+              onPress={handleNext}
+              trailingIcon={<ChevronRight size={16} color="#fff" />}
+              style={{ marginTop: 8 }}
+            />
+          }
+        />
+      ) : (
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100, gap: 12 }}>
+          {draft.participants.map((participant) => {
+            const pKey = participantKey(participant);
+            const myItemCount = draft.items.filter(
+              (_, i) => !!draft.assignments[String(i)]?.[pKey],
+            ).length;
+            const myTotal = draft.items.reduce((sum, item, i) => {
+              return draft.assignments[String(i)]?.[pKey] ? sum + item.amount_cents : sum;
+            }, 0);
+            return (
+              <PersonAssignCard
+                key={pKey}
+                participant={participant}
+                pKey={pKey}
+                items={draft.items}
+                assignments={draft.assignments}
+                onToggle={(itemKey) => toggleAssignee(itemKey, pKey)}
+                myItemCount={myItemCount}
+                myTotal={myTotal}
+                theme={theme}
+              />
+            );
+          })}
           <Button
             label="Next: review totals"
             variant="primary"
@@ -91,8 +164,8 @@ export default function AssignScreen() {
             trailingIcon={<ChevronRight size={16} color="#fff" />}
             style={{ marginTop: 8 }}
           />
-        }
-      />
+        </ScrollView>
+      )}
     </Screen>
   );
 }
@@ -184,7 +257,111 @@ function ItemAssignCard({
   );
 }
 
+function PersonAssignCard({
+  participant,
+  pKey,
+  items,
+  assignments,
+  onToggle,
+  myItemCount,
+  myTotal,
+  theme,
+}: {
+  participant: BillParticipant;
+  pKey: string;
+  items: BillItem[];
+  assignments: Record<string, Record<string, number>>;
+  onToggle: (itemKey: string) => void;
+  myItemCount: number;
+  myTotal: number;
+  theme: ReturnType<typeof useTheme>;
+}) {
+  const name = participantName(participant);
+  return (
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: theme.colors.bg.surface,
+          borderColor: theme.colors.border.default,
+        },
+      ]}
+    >
+      {/* Person header */}
+      <View style={styles.personHeader}>
+        {participant.type === 'user' && (
+          <Avatar
+            id={participant.id}
+            displayName={participant.display_name}
+            uri={participant.avatar_url}
+            size="sm"
+          />
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
+            {name}
+          </Text>
+          <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>
+            {myItemCount} item{myItemCount === 1 ? '' : 's'} · ${centsToDisplay(myTotal)}
+          </Text>
+        </View>
+      </View>
+
+      {/* Item list with checkboxes */}
+      {items.map((item, index) => {
+        const iKey = String(index);
+        const isChecked = !!assignments[iKey]?.[pKey];
+        return (
+          <Pressable
+            key={iKey}
+            onPress={() => onToggle(iKey)}
+            style={[
+              styles.itemRow,
+              { borderTopColor: theme.colors.border.default },
+            ]}
+          >
+            <View
+              style={[
+                styles.checkbox,
+                {
+                  backgroundColor: isChecked ? theme.colors.accent : 'transparent',
+                  borderColor: isChecked ? theme.colors.accent : theme.colors.border.default,
+                },
+              ]}
+            >
+              {isChecked && <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>✓</Text>}
+            </View>
+            <Text
+              style={[
+                theme.typography.body,
+                { flex: 1, color: isChecked ? theme.colors.text.primary : theme.colors.text.secondary },
+              ]}
+              numberOfLines={1}
+            >
+              {item.quantity > 1 ? `${item.quantity}× ` : ''}
+              {item.description || 'Item'}
+            </Text>
+            <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>
+              ${centsToDisplay(item.amount_cents)}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  tabBar: {
+    flexDirection: 'row',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+  },
   card: {
     borderWidth: 1,
     borderRadius: 14,
@@ -214,5 +391,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+  },
+  personHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

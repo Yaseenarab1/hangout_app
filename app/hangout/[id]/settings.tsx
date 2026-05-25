@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Alert, Platform, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Alert, Platform, Pressable, Share } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Calendar as CalIcon, MapPin, Trash2 } from 'lucide-react-native';
+import { Calendar as CalIcon, MapPin, Trash2, Share2 } from 'lucide-react-native';
+import { supabase } from '@/services/supabase/client';
 import { Screen } from '@/components/layout/Screen';
 import { Input, Textarea, Button, Card, SectionHeader } from '@/components/ui';
 import { useTheme } from '@/hooks/useTheme';
@@ -34,7 +35,47 @@ export default function HangoutSettingsScreen(): React.ReactElement {
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [addressText, setAddressText] = useState('');
+  const [sharingHangout, setSharingHangout] = useState(false);
   const saveSearchLocation = useSaveSearchLocation();
+
+  async function handleShareHangout() {
+    setSharingHangout(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error('Not authenticated');
+
+      let token: string;
+      const { data: existing } = await (supabase as any)
+        .from('hangout_share_tokens')
+        .select('token')
+        .eq('hangout_id', hangoutId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existing) {
+        token = existing.token;
+      } else {
+        const { data: created, error } = await (supabase as any)
+          .from('hangout_share_tokens')
+          .insert({ hangout_id: hangoutId, created_by: auth.user.id })
+          .select('token')
+          .single();
+        if (error) throw error;
+        token = created.token;
+      }
+
+      const url = `https://cruosjnuhcuewjnzhlja.supabase.co/functions/v1/hangout-page?token=${token}`;
+      await Share.share({
+        url,
+        message: `Join ${hangout.data?.title ?? 'our hangout'}: ${url}`,
+      });
+    } catch (err: any) {
+      Alert.alert('Error', err.message ?? 'Could not share hangout.');
+    } finally {
+      setSharingHangout(false);
+    }
+  }
 
   const isHost = hangout.data?.host_id === user?.id;
   const myParticipationRole = hangout.data?.participants.find(
@@ -298,6 +339,23 @@ export default function HangoutSettingsScreen(): React.ReactElement {
           size="lg"
         />
       </View>
+     {canManage ? (
+      <>
+      <SectionHeader title="Share" />
+      <Card padding="md" variant="subtle">
+        <Button
+          label={sharingHangout ? 'Creating link…' : 'Share hangout page'}
+          variant="secondary"
+          leadingIcon={<Share2 size={16} color={theme.colors.accent} />}
+          onPress={handleShareHangout}
+          loading={sharingHangout}
+          fullWidth
+        />
+        <Text style={[{ fontSize: 12, color: theme.colors.text.tertiary, marginTop: 8 }]}>
+          Anyone with the link can RSVP — no app needed.
+        </Text>
+      </Card>
+      </>) : null}
      {isHost ? (
       <>
       <SectionHeader title="Danger zone" />
