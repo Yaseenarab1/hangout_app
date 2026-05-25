@@ -20,7 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useNavigation } from 'expo-router';
-import { Compass, UtensilsCrossed, MapPinned, ChevronRight, Camera } from 'lucide-react-native';
+import { Compass, UtensilsCrossed, MapPinned, ChevronRight, Map } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useMyProfile } from '@/features/profile';
 import { useMyHangouts } from '@/features/hangouts';
@@ -111,12 +111,12 @@ export default function HomeTab(): React.ReactElement {
           Hangout
         </Text>
         <Pressable
-          onPress={() => router.push('/post/new')}
+          onPress={() => router.push('/(tabs)/explore')}
           hitSlop={12}
           style={[styles.navIconBtn, { backgroundColor: theme.colors.bg.subtle }]}
-          accessibilityLabel="New post"
+          accessibilityLabel="Explore places"
         >
-          <Camera size={20} color={theme.colors.text.primary} strokeWidth={1.5} />
+          <Map size={20} color={theme.colors.text.primary} strokeWidth={1.5} />
         </Pressable>
       </View>
 

@@ -15,4 +15,5 @@ export { useVoteOnSlot } from './hooks/useVoteOnSlot';
 export { useCloseTimePoll } from './hooks/useCloseTimePoll';
 
 export { TimePollSlotRow } from './components/TimePollSlotRow';
+export { SlotCard } from './components/SlotCard';
 export { CreateTimePollSheet } from './components/CreateTimePollSheet';
