@@ -1,16 +1,31 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Animated, {
-  FadeInDown,
+  FadeInRight,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
-import { ChevronUp, ChevronDown, X, Star, Clock } from 'lucide-react-native';
+import { ChevronUp, ChevronDown, Trash2, Star, Clock } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { getPlacePhotoUrl } from '@/features/places';
 import type { DayPlanItem, DayPlanItemType } from '../types';
+
+const ACCENT = '#8B5CF6';
+
+// Type accent colors
+const TYPE_COLOR: Record<DayPlanItemType, string> = {
+  restaurant: '#F97316', // warm orange
+  activity: '#06B6D4',   // cyan
+  custom: ACCENT,         // violet
+};
+
+const TYPE_EMOJI: Record<DayPlanItemType, string> = {
+  restaurant: '🍽️',
+  activity: '🎯',
+  custom: '📍',
+};
 
 interface Props {
   item: DayPlanItem;
@@ -20,22 +35,6 @@ interface Props {
   onMoveUp: () => void;
   onMoveDown: () => void;
   onRemove: () => void;
-}
-
-function typeEmoji(type: DayPlanItemType): string {
-  switch (type) {
-    case 'restaurant': return '🍽️';
-    case 'activity':   return '🎯';
-    case 'custom':     return '📍';
-  }
-}
-
-function typeLabel(type: DayPlanItemType): string {
-  switch (type) {
-    case 'restaurant': return 'Restaurant';
-    case 'activity':   return 'Activity';
-    case 'custom':     return 'Custom';
-  }
 }
 
 function format24hTo12h(time: string): string {
@@ -56,27 +55,6 @@ function formatDuration(minutes: number): string {
   return `${h}h ${m}m`;
 }
 
-const ACCENT = '#8B5CF6';
-
-function AnimatedCard({ children, index }: { children: React.ReactNode; index: number }) {
-  const scale = useSharedValue(1);
-  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  return (
-    <Animated.View
-      entering={FadeInDown.delay(index * 70).springify().damping(18).stiffness(280)}
-      style={animStyle}
-    >
-      <Pressable
-        onPressIn={() => { scale.value = withSpring(0.97, { damping: 15, stiffness: 400 }); }}
-        onPressOut={() => { scale.value = withSpring(1, { damping: 12, stiffness: 300 }); }}
-        style={{ flex: 1 }}
-      >
-        {children}
-      </Pressable>
-    </Animated.View>
-  );
-}
-
 export function DayPlanItemRow({
   item,
   index,
@@ -87,168 +65,152 @@ export function DayPlanItemRow({
   onRemove,
 }: Props): React.ReactElement {
   const theme = useTheme();
+  const scale = useSharedValue(1);
+  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
   const photoRef = item.place_data?.photoReference ?? null;
   const rating = item.place_data?.rating ?? null;
   const timeLabel = item.start_time ? format24hTo12h(item.start_time) : null;
   const durationLabel = item.duration_minutes ? formatDuration(item.duration_minutes) : null;
+  const accent = TYPE_COLOR[item.item_type];
 
   return (
-    <View style={styles.wrapper}>
-      {/* Timeline track */}
+    <Animated.View
+      entering={FadeInRight.delay(index * 60).springify().damping(18).stiffness(260)}
+      style={styles.wrapper}
+    >
+      {/* ── Left timeline track ───────────────────────────────────── */}
       <View style={styles.track}>
-        {/* Connector line above the node (skip for first) */}
-        {!isFirst ? (
-          <View style={[styles.lineSegment, { backgroundColor: ACCENT + '40' }]} />
-        ) : (
-          <View style={styles.lineSegment} />
-        )}
+        {!isFirst && <View style={[styles.lineTop, { backgroundColor: accent + '50' }]} />}
 
-        {/* Step node */}
-        <View style={[styles.stepNode, { backgroundColor: ACCENT, shadowColor: ACCENT }]}>
+        {/* Step bubble */}
+        <View style={[styles.stepBubble, { backgroundColor: accent, shadowColor: accent }]}>
           <Text style={styles.stepNum}>{index + 1}</Text>
         </View>
 
-        {/* Connector line below the node (skip for last) */}
-        {!isLast ? (
-          <View style={[styles.lineSegmentBottom, { backgroundColor: ACCENT + '40' }]} />
-        ) : (
-          <View style={styles.lineSegmentBottom} />
-        )}
+        {!isLast && <View style={[styles.lineBottom, { backgroundColor: accent + '50' }]} />}
       </View>
 
-      {/* Card */}
-      <View style={styles.cardWrap}>
-        <AnimatedCard index={index}>
-          <View
-            style={[
-              styles.card,
-              {
-                backgroundColor: theme.colors.bg.surface,
-                borderColor: theme.colors.border.default,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: theme.mode === 'light' ? 0.08 : 0,
-                shadowRadius: 12,
-                elevation: 3,
-              },
-            ]}
-          >
-            {/* Photo section */}
-            <View style={styles.photoWrap}>
-              {photoRef ? (
-                <Image
-                  source={{ uri: getPlacePhotoUrl(photoRef, 400) }}
-                  style={styles.photo}
-                  contentFit="cover"
-                />
-              ) : (
-                <View style={[styles.photo, styles.photoFallback, { backgroundColor: ACCENT + '12' }]}>
-                  <Text style={styles.fallbackEmoji}>{typeEmoji(item.item_type)}</Text>
-                </View>
-              )}
+      {/* ── Card ─────────────────────────────────────────────────── */}
+      <Animated.View style={[{ flex: 1 }, animStyle]}>
+        <Pressable
+          onPressIn={() => { scale.value = withSpring(0.97, { damping: 15, stiffness: 400 }); }}
+          onPressOut={() => { scale.value = withSpring(1, { damping: 12, stiffness: 300 }); }}
+          style={[
+            styles.card,
+            {
+              backgroundColor: theme.colors.bg.surface,
+              borderColor: theme.colors.border.default,
+              shadowColor: accent,
+              shadowOffset: { width: 0, height: 3 },
+              shadowOpacity: theme.mode === 'light' ? 0.08 : 0,
+              shadowRadius: 10,
+              elevation: 2,
+            },
+          ]}
+        >
+          {/* Left accent bar */}
+          <View style={[styles.accentBar, { backgroundColor: accent }]} />
 
-              {/* Gradient overlay at bottom of photo for text contrast */}
-              {photoRef ? (
-                <View style={styles.photoOverlay} />
-              ) : null}
+          {/* Thumbnail */}
+          <View style={[styles.thumb, { backgroundColor: accent + '12' }]}>
+            {photoRef ? (
+              <Image
+                source={{ uri: getPlacePhotoUrl(photoRef, 160) }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+              />
+            ) : (
+              <Text style={styles.thumbEmoji}>{TYPE_EMOJI[item.item_type]}</Text>
+            )}
+          </View>
 
-              {/* Type chip over photo */}
-              <View style={[styles.typeChip, { backgroundColor: 'rgba(0,0,0,0.55)' }]}>
-                <Text style={styles.typeChipText}>{typeLabel(item.item_type)}</Text>
-              </View>
+          {/* Info */}
+          <View style={styles.info}>
+            <Text
+              style={[styles.title, { color: theme.colors.text.primary }]}
+              numberOfLines={1}
+            >
+              {item.title}
+            </Text>
 
-              {/* Delete button */}
-              <Pressable
-                onPress={onRemove}
-                hitSlop={10}
-                style={({ pressed }) => [
-                  styles.deleteBtn,
-                  { backgroundColor: 'rgba(0,0,0,0.55)', opacity: pressed ? 0.6 : 1 },
-                ]}
-                accessibilityLabel="Remove stop"
-              >
-                <X size={14} color="#FFFFFF" strokeWidth={2.5} />
-              </Pressable>
-            </View>
-
-            {/* Info section */}
-            <View style={styles.info}>
+            {item.subtitle ? (
               <Text
-                style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontSize: 16, fontWeight: '700' }]}
-                numberOfLines={2}
+                style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 2 }]}
+                numberOfLines={1}
               >
-                {item.title}
+                {item.subtitle}
               </Text>
+            ) : null}
 
-              {item.subtitle ? (
-                <Text
-                  style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 4 }]}
-                  numberOfLines={1}
-                >
-                  {item.subtitle}
-                </Text>
+            {/* Meta pills */}
+            <View style={styles.metaRow}>
+              {rating ? (
+                <View style={styles.ratingRow}>
+                  <Star size={10} color="#F59E0B" fill="#F59E0B" />
+                  <Text style={[styles.metaText, { color: theme.colors.text.secondary }]}>
+                    {rating.toFixed(1)}
+                  </Text>
+                </View>
               ) : null}
 
-              {/* Meta row */}
-              <View style={styles.metaRow}>
-                {rating ? (
-                  <View style={styles.metaChip}>
-                    <Star size={11} color="#F59E0B" fill="#F59E0B" />
-                    <Text style={[styles.metaText, { color: theme.colors.text.secondary }]}>
-                      {rating.toFixed(1)}
-                    </Text>
-                  </View>
-                ) : null}
-
-                {timeLabel ? (
-                  <View style={[styles.metaChip, { backgroundColor: ACCENT + '14' }]}>
-                    <Clock size={11} color={ACCENT} />
-                    <Text style={[styles.metaText, { color: ACCENT, fontWeight: '600' }]}>
-                      {timeLabel}{durationLabel ? ` · ${durationLabel}` : ''}
-                    </Text>
-                  </View>
-                ) : null}
-
-                <View style={{ flex: 1 }} />
-
-                {/* Reorder controls */}
-                <View style={styles.reorderRow}>
-                  <Pressable
-                    onPress={onMoveUp}
-                    disabled={isFirst}
-                    hitSlop={8}
-                    style={({ pressed }) => [
-                      styles.reorderBtn,
-                      { borderColor: theme.colors.border.default, opacity: isFirst ? 0.2 : pressed ? 0.5 : 1 },
-                    ]}
-                    accessibilityLabel="Move up"
-                  >
-                    <ChevronUp size={13} color={theme.colors.text.tertiary} />
-                  </Pressable>
-                  <Pressable
-                    onPress={onMoveDown}
-                    disabled={isLast}
-                    hitSlop={8}
-                    style={({ pressed }) => [
-                      styles.reorderBtn,
-                      { borderColor: theme.colors.border.default, opacity: isLast ? 0.2 : pressed ? 0.5 : 1 },
-                    ]}
-                    accessibilityLabel="Move down"
-                  >
-                    <ChevronDown size={13} color={theme.colors.text.tertiary} />
-                  </Pressable>
+              {timeLabel ? (
+                <View style={[styles.timePill, { backgroundColor: accent + '15' }]}>
+                  <Clock size={10} color={accent} />
+                  <Text style={[styles.metaText, { color: accent, fontWeight: '600' }]}>
+                    {timeLabel}{durationLabel ? ` · ${durationLabel}` : ''}
+                  </Text>
                 </View>
-              </View>
+              ) : null}
             </View>
           </View>
-        </AnimatedCard>
-      </View>
-    </View>
+
+          {/* Controls */}
+          <View style={styles.controls}>
+            <Pressable
+              onPress={onMoveUp}
+              disabled={isFirst}
+              hitSlop={6}
+              style={({ pressed }) => [
+                styles.controlBtn,
+                { borderColor: theme.colors.border.default, opacity: isFirst ? 0.18 : pressed ? 0.5 : 1 },
+              ]}
+              accessibilityLabel="Move up"
+            >
+              <ChevronUp size={13} color={theme.colors.text.tertiary} />
+            </Pressable>
+            <Pressable
+              onPress={onMoveDown}
+              disabled={isLast}
+              hitSlop={6}
+              style={({ pressed }) => [
+                styles.controlBtn,
+                { borderColor: theme.colors.border.default, opacity: isLast ? 0.18 : pressed ? 0.5 : 1 },
+              ]}
+              accessibilityLabel="Move down"
+            >
+              <ChevronDown size={13} color={theme.colors.text.tertiary} />
+            </Pressable>
+            <Pressable
+              onPress={onRemove}
+              hitSlop={6}
+              style={({ pressed }) => [
+                styles.controlBtn,
+                { borderColor: '#EF444430', backgroundColor: '#EF444408', opacity: pressed ? 0.6 : 1 },
+              ]}
+              accessibilityLabel="Remove stop"
+            >
+              <Trash2 size={12} color="#EF4444" />
+            </Pressable>
+          </View>
+        </Pressable>
+      </Animated.View>
+    </Animated.View>
   );
 }
 
 const NODE_SIZE = 28;
-const TRACK_W = 40;
+const TRACK_W = 38;
 
 const styles = StyleSheet.create({
   wrapper: {
@@ -261,117 +223,101 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexShrink: 0,
   },
-  lineSegment: {
+  lineTop: {
     width: 2,
     flex: 1,
     minHeight: 16,
+    borderRadius: 1,
   },
-  lineSegmentBottom: {
+  lineBottom: {
     width: 2,
     flex: 1,
     minHeight: 20,
+    borderRadius: 1,
   },
-  stepNode: {
+  stepBubble: {
     width: NODE_SIZE,
     height: NODE_SIZE,
     borderRadius: NODE_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.55,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 5,
   },
   stepNum: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '800',
   },
-  cardWrap: {
-    flex: 1,
-    paddingBottom: 12,
-  },
   card: {
-    borderRadius: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
     borderWidth: 1,
     overflow: 'hidden',
+    marginBottom: 12,
+    minHeight: 80,
   },
-  photoWrap: {
-    position: 'relative',
-    height: 148,
+  accentBar: {
+    width: 3,
+    alignSelf: 'stretch',
+    flexShrink: 0,
   },
-  photo: {
-    width: '100%',
-    height: '100%',
-  },
-  photoFallback: {
+  thumb: {
+    width: 72,
+    height: 72,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
+    overflow: 'hidden',
   },
-  fallbackEmoji: {
-    fontSize: 44,
-  },
-  photoOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  typeChip: {
-    position: 'absolute',
-    bottom: 10,
-    left: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  typeChipText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  deleteBtn: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+  thumbEmoji: {
+    fontSize: 30,
   },
   info: {
-    padding: 14,
-    paddingBottom: 12,
+    flex: 1,
+    paddingVertical: 10,
+    paddingLeft: 10,
+    paddingRight: 6,
+  },
+  title: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 10,
+    marginTop: 6,
     flexWrap: 'wrap',
   },
-  metaChip: {
+  ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    gap: 3,
+  },
+  timePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
     borderRadius: 20,
-    backgroundColor: 'transparent',
   },
   metaText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
   },
-  reorderRow: {
-    flexDirection: 'row',
-    gap: 4,
+  controls: {
+    gap: 5,
+    paddingRight: 10,
+    paddingVertical: 10,
+    flexShrink: 0,
   },
-  reorderBtn: {
+  controlBtn: {
     width: 26,
     height: 26,
     borderRadius: 8,
