@@ -492,47 +492,55 @@ export default function HangoutDetailScreen(): React.ReactElement {
         )}
       </Pressable>
 
-      {/* Day Plan entry */}
-      <SectionHeader title="Day Plan" />
-      <Pressable
-        onPress={() => router.push(`/hangout/${hangoutId}/dayplan` as any)}
-        style={({ pressed }) => [
-          styles.chatRow,
-          {
-            backgroundColor: theme.colors.bg.surface,
-            borderColor: theme.colors.border.default,
-          },
-          pressed && { opacity: 0.7 },
-        ]}
-      >
-        <Route size={20} color={theme.colors.accent} strokeWidth={1.5} />
-        <Text
-          style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, flex: 1 }]}
+      {/* Day Plan + Find a time — two-up visual cards */}
+      <SectionHeader title="Plan" />
+      <View style={styles.planCards}>
+        {/* Itinerary card */}
+        <Pressable
+          onPress={() => router.push(`/hangout/${hangoutId}/dayplan` as any)}
+          style={({ pressed }) => [
+            styles.planCard,
+            {
+              backgroundColor: '#8B5CF6' + '12',
+              borderColor: '#8B5CF6' + '30',
+              opacity: pressed ? 0.8 : 1,
+            },
+          ]}
         >
-          Itinerary
-        </Text>
-      </Pressable>
+          <View style={[styles.planCardIcon, { backgroundColor: '#8B5CF6' + '20' }]}>
+            <Route size={22} color="#8B5CF6" strokeWidth={1.8} />
+          </View>
+          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, marginTop: 10, fontWeight: '700' }]}>
+            Itinerary
+          </Text>
+          <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 2 }]}>
+            Map out your day
+          </Text>
+        </Pressable>
 
-      {/* Find a time entry */}
-      <SectionHeader title="Find a time" />
-      <Pressable
-        onPress={() => router.push(`/hangout/${hangoutId}/time-poll` as any)}
-        style={({ pressed }) => [
-          styles.chatRow,
-          {
-            backgroundColor: theme.colors.bg.surface,
-            borderColor: theme.colors.border.default,
-          },
-          pressed && { opacity: 0.7 },
-        ]}
-      >
-        <Clock size={20} color={theme.colors.accent} strokeWidth={1.5} />
-        <Text
-          style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, flex: 1 }]}
+        {/* Find time card */}
+        <Pressable
+          onPress={() => router.push(`/hangout/${hangoutId}/time-poll` as any)}
+          style={({ pressed }) => [
+            styles.planCard,
+            {
+              backgroundColor: theme.colors.bg.surface,
+              borderColor: theme.colors.border.default,
+              opacity: pressed ? 0.8 : 1,
+            },
+          ]}
         >
-          Schedule vote
-        </Text>
-      </Pressable>
+          <View style={[styles.planCardIcon, { backgroundColor: theme.colors.bg.subtle }]}>
+            <Clock size={22} color={theme.colors.text.secondary} strokeWidth={1.8} />
+          </View>
+          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, marginTop: 10, fontWeight: '700' }]}>
+            Find a time
+          </Text>
+          <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 2 }]}>
+            Vote on date & time
+          </Text>
+        </Pressable>
+      </View>
 
       {/* Host: cancel hangout */}
       {isHost && !isCancelled ? (
@@ -637,6 +645,24 @@ function formatDateTime(iso: string): string {
 }
 
 const styles = StyleSheet.create({
+  planCards: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  planCard: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    minHeight: 110,
+  },
+  planCardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   chatRow: {
     flexDirection: 'row',
     alignItems: 'center',
