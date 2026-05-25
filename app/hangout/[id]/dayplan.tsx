@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { MapPin } from 'lucide-react-native';
+import { MapPin, AlertCircle } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';
 import { Button, EmptyState, SectionHeader } from '@/components/ui';
 import { useTheme } from '@/hooks/useTheme';
@@ -52,6 +52,29 @@ export default function DayPlanScreen(): React.ReactElement {
       <Screen header={{ title: 'Day Plan', showBack: true }}>
         <View style={styles.center}>
           <ActivityIndicator color={theme.colors.accent} />
+        </View>
+      </Screen>
+    );
+  }
+
+  // Error state (e.g. table not yet created in DB)
+  if (plans.isError) {
+    return (
+      <Screen header={{ title: 'Day Plan', showBack: true }}>
+        <View style={styles.center}>
+          <AlertCircle size={40} color={theme.colors.danger} strokeWidth={1.5} />
+          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, marginTop: 12 }]}>
+            Could not load day plan
+          </Text>
+          <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 4, textAlign: 'center' }]}>
+            {(plans.error as Error)?.message ?? 'Unknown error'}
+          </Text>
+          <Button
+            label="Retry"
+            variant="secondary"
+            onPress={() => plans.refetch()}
+            style={{ marginTop: 16 }}
+          />
         </View>
       </Screen>
     );

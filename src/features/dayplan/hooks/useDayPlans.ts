@@ -13,5 +13,6 @@ export function useDayPlans(hangoutId: string | undefined) {
     queryFn: () => (hangoutId ? getDayPlans(hangoutId) : Promise.resolve([])),
     enabled: Boolean(hangoutId),
     staleTime: 30 * 1000,
+    retry: 1,
   });
 }
