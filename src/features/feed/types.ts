@@ -1,10 +1,27 @@
 export type PostVisibility = 'hangout' | 'friends' | 'public';
 
+export type ReactionType = 'heart' | 'fire' | 'laugh' | 'wow' | 'sad' | 'clap';
+
+export interface ReactionDef {
+  type: ReactionType;
+  emoji: string;
+}
+
+export const REACTIONS: ReactionDef[] = [
+  { type: 'heart', emoji: '❤️' },
+  { type: 'fire', emoji: '🔥' },
+  { type: 'laugh', emoji: '😂' },
+  { type: 'wow', emoji: '😮' },
+  { type: 'sad', emoji: '😢' },
+  { type: 'clap', emoji: '👏' },
+];
+
 export interface FeedPost {
   id: string;
   author_id: string;
   storage_path: string;
   thumbnail_path: string | null;
+  media_paths: string[] | null; // all photo paths (1-4); null = single (use storage_path)
   width: number;
   height: number;
   caption: string | null;
@@ -25,10 +42,14 @@ export interface FeedPost {
   like_count?: number;
   comment_count?: number;
   viewer_has_liked?: boolean;
+  viewer_reaction?: ReactionType | null;
+  // top reactions with counts for the reaction display strip
+  top_reactions?: { type: ReactionType; count: number }[];
 }
 
 export interface FeedPostWithUrl extends FeedPost {
-  image_url: string; // signed URL, valid for 1h
+  image_url: string;    // first/primary signed URL (backward compat)
+  image_urls: string[]; // all signed URLs (1-4)
 }
 
 export interface FeedPostComment {
@@ -45,10 +66,12 @@ export interface FeedPostComment {
     username: string;
     avatar_url: string | null;
   };
+  viewer_reaction?: ReactionType | null;
+  reactions?: { type: ReactionType; count: number }[];
 }
 
 export interface CreatePostParams {
-  localUri: string;
+  localUris: string[];  // 1–4 photos
   caption?: string;
   visibility: PostVisibility;
   hangoutId?: string;

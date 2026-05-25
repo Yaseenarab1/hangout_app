@@ -33,6 +33,7 @@ import {
 } from '../hooks/usePolls';
 import { RankedVoteSheet } from './RankedVoteSheet';
 import { ManagePollOptionsSheet } from './ManagePollOptionsSheet';
+import { SuggestOptionSheet } from './SuggestOptionSheet';
 import type { PollWithOptions, PollOption } from '../types';
 
 export type PollCardProps = {
@@ -179,6 +180,7 @@ function SimpleVotingCard({
   const addBatch = useAddOptionsBatch();
   const removeOption = useRemoveOption();
   const [showManage, setShowManage] = useState(false);
+  const [showSuggest, setShowSuggest] = useState(false);
   const [isApplyingChanges, setIsApplyingChanges] = useState(false);
   const [sheetOption, setSheetOption] = useState<{
     placeId: string;
@@ -295,114 +297,155 @@ function SimpleVotingCard({
             : ''}
         </Text>
 
-        <View style={{ marginTop: 12, gap: 6 }}>
-          {sortedOptions.map((opt) => {
-            const isMyVote = opt.isMyVote;
-            const pct =
-              poll.totalVotes > 0
-                ? Math.round((opt.voteCount / poll.totalVotes) * 100)
-                : 0;
-            const meta = (opt.metadata as { emoji?: string | null; placeId?: string | null }) ?? {};
-            return (
-              <Pressable
-                key={opt.id}
-                onPress={() => handleVote(opt.id)}
-                onLongPress={
-                  meta.placeId
-                    ? () =>
-                        setSheetOption({
-                          placeId: meta.placeId!,
-                          placeName: opt.label,
-                          optionId: opt.id,
-                          isMyVote: opt.isMyVote,
-                        })
-                    : undefined
-                }
-                delayLongPress={350}
-                style={({ pressed }) => [
-                  styles.optionRow,
-                  {
-                    backgroundColor: isMyVote
-                      ? theme.colors.accent + '15'
-                      : theme.colors.bg.subtle,
-                    borderColor: isMyVote
-                      ? theme.colors.accent
-                      : theme.colors.border.default,
-                  },
-                  pressed && { opacity: 0.7 },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.progressFill,
-                    {
-                      width: `${pct}%`,
-                      backgroundColor: isMyVote
-                        ? theme.colors.accent + '25'
-                        : theme.colors.border.default + '60',
-                    },
-                  ]}
+        {poll.options.length === 0 ? (
+          <View style={[styles.emptyOptions, { borderColor: theme.colors.border.default, backgroundColor: theme.colors.bg.subtle }]}>
+            {canManage ? (
+              <>
+                <Text style={[theme.typography.bodySmall, { color: theme.colors.text.secondary, textAlign: 'center', marginBottom: 12 }]}>
+                  No options yet — add some so everyone can vote.
+                </Text>
+                <Button
+                  label="Add options"
+                  size="md"
+                  leadingIcon={<Settings2 size={14} color="#FFFFFF" />}
+                  onPress={() => setShowManage(true)}
+                  fullWidth
                 />
-                <View style={styles.optionContent}>
-                  {isMyVote ? (
-                    <View
+              </>
+            ) : (
+              <Text style={[theme.typography.bodySmall, { color: theme.colors.text.tertiary, textAlign: 'center' }]}>
+                No options yet — the host is still setting this up.
+              </Text>
+            )}
+          </View>
+        ) : (
+          <View style={{ marginTop: 12, gap: 6 }}>
+            {sortedOptions.map((opt) => {
+              const isMyVote = opt.isMyVote;
+              const pct =
+                poll.totalVotes > 0
+                  ? Math.round((opt.voteCount / poll.totalVotes) * 100)
+                  : 0;
+              const meta = (opt.metadata as { emoji?: string | null; placeId?: string | null }) ?? {};
+              return (
+                <Pressable
+                  key={opt.id}
+                  onPress={() => handleVote(opt.id)}
+                  onLongPress={
+                    meta.placeId
+                      ? () =>
+                          setSheetOption({
+                            placeId: meta.placeId!,
+                            placeName: opt.label,
+                            optionId: opt.id,
+                            isMyVote: opt.isMyVote,
+                          })
+                      : undefined
+                  }
+                  delayLongPress={350}
+                  style={({ pressed }) => [
+                    styles.optionRow,
+                    {
+                      backgroundColor: isMyVote
+                        ? theme.colors.accent + '15'
+                        : theme.colors.bg.subtle,
+                      borderColor: isMyVote
+                        ? theme.colors.accent
+                        : theme.colors.border.default,
+                    },
+                    pressed && { opacity: 0.7 },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        width: `${pct}%`,
+                        backgroundColor: isMyVote
+                          ? theme.colors.accent + '25'
+                          : theme.colors.border.default + '60',
+                      },
+                    ]}
+                  />
+                  <View style={styles.optionContent}>
+                    {isMyVote ? (
+                      <View
+                        style={[
+                          styles.myVoteBadge,
+                          { backgroundColor: theme.colors.accent },
+                        ]}
+                      >
+                        <Text
+                          style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '700' }}
+                        >
+                          YOUR PICK
+                        </Text>
+                      </View>
+                    ) : null}
+                    {meta.emoji ? (
+                      <Text style={{ fontSize: 18, marginRight: 8 }}>{meta.emoji}</Text>
+                    ) : null}
+                    <Text
                       style={[
-                        styles.myVoteBadge,
-                        { backgroundColor: theme.colors.accent },
+                        theme.typography.body,
+                        {
+                          color: theme.colors.text.primary,
+                          flex: 1,
+                          fontWeight: isMyVote ? '600' : '400',
+                        },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {opt.label}
+                    </Text>
+                    <Text
+                      style={[
+                        theme.typography.bodySmall,
+                        {
+                          color: theme.colors.text.secondary,
+                          marginLeft: 8,
+                          minWidth: 40,
+                          textAlign: 'right',
+                        },
                       ]}
                     >
-                      <Text
-                        style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '700' }}
-                      >
-                        YOUR PICK
-                      </Text>
-                    </View>
-                  ) : null}
-                  {meta.emoji ? (
-                    <Text style={{ fontSize: 18, marginRight: 8 }}>{meta.emoji}</Text>
-                  ) : null}
-                  <Text
-                    style={[
-                      theme.typography.body,
-                      {
-                        color: theme.colors.text.primary,
-                        flex: 1,
-                        fontWeight: isMyVote ? '600' : '400',
-                      },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {opt.label}
-                  </Text>
-                  <Text
-                    style={[
-                      theme.typography.bodySmall,
-                      {
-                        color: theme.colors.text.secondary,
-                        marginLeft: 8,
-                        minWidth: 40,
-                        textAlign: 'right',
-                      },
-                    ]}
-                  >
-                    {opt.voteCount}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
+                      {opt.voteCount}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
 
-        {canManage ? (
-          <View style={{ marginTop: 12, gap: 8 }}>
-            <Button
-              label="Manage options"
-              variant="ghost"
-              size="sm"
-              leadingIcon={<Settings2 size={14} color={theme.colors.accent} />}
-              onPress={() => setShowManage(true)}
-              fullWidth
-            />
+        <View style={{ marginTop: 12, gap: 8 }}>
+          <Button
+            label="+ Add a choice"
+            variant="ghost"
+            size="sm"
+            onPress={() => setShowSuggest(true)}
+            fullWidth
+          />
+          {canManage && poll.options.length > 0 ? (
+            <>
+              <Button
+                label="Manage options"
+                variant="ghost"
+                size="sm"
+                leadingIcon={<Settings2 size={14} color={theme.colors.accent} />}
+                onPress={() => setShowManage(true)}
+                fullWidth
+              />
+              <Button
+                label="Close poll"
+                variant="ghost"
+                size="sm"
+                onPress={handleClose}
+                loading={closePoll.isPending}
+                fullWidth
+              />
+            </>
+          ) : canManage ? (
             <Button
               label="Close poll"
               variant="ghost"
@@ -411,8 +454,8 @@ function SimpleVotingCard({
               loading={closePoll.isPending}
               fullWidth
             />
-          </View>
-        ) : null}
+          ) : null}
+        </View>
       </Card>
 
       <ManagePollOptionsSheet
@@ -427,6 +470,19 @@ function SimpleVotingCard({
         }))}
         onSave={handleApplyChanges}
         isSubmitting={isApplyingChanges}
+      />
+
+      <SuggestOptionSheet
+        visible={showSuggest}
+        onClose={() => setShowSuggest(false)}
+        pollId={poll.id}
+        pollKind={poll.kind}
+        existing={poll.options.map((o) => ({
+          id: o.id,
+          label: o.label,
+          voteCount: o.voteCount,
+          metadata: o.metadata,
+        }))}
       />
 
       <PlaceDetailSheet
@@ -466,6 +522,7 @@ function RankedVotingCard({
   const removeOption = useRemoveOption();
   const [showVoteSheet, setShowVoteSheet] = useState(false);
   const [showManage, setShowManage] = useState(false);
+  const [showSuggest, setShowSuggest] = useState(false);
   const [isApplyingChanges, setIsApplyingChanges] = useState(false);
   const [sheetOption, setSheetOption] = useState<{
     placeId: string;
@@ -568,115 +625,147 @@ function RankedVotingCard({
             : 'Tap below to rank your top picks.'}
         </Text>
 
-        <View style={{ marginTop: 12, gap: 4 }}>
-          {sortedOptions.slice(0, 6).map((opt) => {
-            const meta = (opt.metadata as { emoji?: string | null; placeId?: string | null }) ?? {};
-            const myRank = opt.myRank;
-            return (
-              <Pressable
-                key={opt.id}
-                onLongPress={
-                  meta.placeId
-                    ? () =>
-                        setSheetOption({
-                          placeId: meta.placeId!,
-                          placeName: opt.label,
-                        })
-                    : undefined
-                }
-                delayLongPress={350}
-                style={[
-                  styles.previewRow,
-                  {
-                    backgroundColor:
-                      myRank !== null
-                        ? theme.colors.accent + '15'
-                        : theme.colors.bg.subtle,
-                    borderColor:
-                      myRank !== null
-                        ? theme.colors.accent
-                        : theme.colors.border.default,
-                  },
-                ]}
-              >
-                {myRank !== null ? (
-                  <View
+        {poll.options.length === 0 ? (
+          <View style={[styles.emptyOptions, { borderColor: theme.colors.border.default, backgroundColor: theme.colors.bg.subtle }]}>
+            {canManage ? (
+              <>
+                <Text style={[theme.typography.bodySmall, { color: theme.colors.text.secondary, textAlign: 'center', marginBottom: 12 }]}>
+                  No options yet — add some so everyone can rank.
+                </Text>
+                <Button
+                  label="Add options"
+                  size="md"
+                  leadingIcon={<Settings2 size={14} color="#FFFFFF" />}
+                  onPress={() => setShowManage(true)}
+                  fullWidth
+                />
+              </>
+            ) : (
+              <Text style={[theme.typography.bodySmall, { color: theme.colors.text.tertiary, textAlign: 'center' }]}>
+                No options yet — the host is still setting this up.
+              </Text>
+            )}
+          </View>
+        ) : (
+          <>
+            <View style={{ marginTop: 12, gap: 4 }}>
+              {sortedOptions.slice(0, 6).map((opt) => {
+                const meta = (opt.metadata as { emoji?: string | null; placeId?: string | null }) ?? {};
+                const myRank = opt.myRank;
+                return (
+                  <Pressable
+                    key={opt.id}
+                    onLongPress={
+                      meta.placeId
+                        ? () =>
+                            setSheetOption({
+                              placeId: meta.placeId!,
+                              placeName: opt.label,
+                            })
+                        : undefined
+                    }
+                    delayLongPress={350}
                     style={[
-                      styles.miniRankBadge,
-                      { backgroundColor: theme.colors.accent },
+                      styles.previewRow,
+                      {
+                        backgroundColor:
+                          myRank !== null
+                            ? theme.colors.accent + '15'
+                            : theme.colors.bg.subtle,
+                        borderColor:
+                          myRank !== null
+                            ? theme.colors.accent
+                            : theme.colors.border.default,
+                      },
                     ]}
                   >
+                    {myRank !== null ? (
+                      <View
+                        style={[
+                          styles.miniRankBadge,
+                          { backgroundColor: theme.colors.accent },
+                        ]}
+                      >
+                        <Text
+                          style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '600' }}
+                        >
+                          {myRank}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {meta.emoji ? (
+                      <Text style={{ fontSize: 14, marginRight: 6 }}>{meta.emoji}</Text>
+                    ) : null}
                     <Text
-                      style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '600' }}
+                      style={[
+                        theme.typography.bodySmall,
+                        {
+                          color: theme.colors.text.primary,
+                          flex: 1,
+                          fontWeight: myRank !== null ? '600' : '400',
+                        },
+                      ]}
+                      numberOfLines={1}
                     >
-                      {myRank}
+                      {opt.label}
                     </Text>
-                  </View>
-                ) : null}
-                {meta.emoji ? (
-                  <Text style={{ fontSize: 14, marginRight: 6 }}>{meta.emoji}</Text>
-                ) : null}
+                  </Pressable>
+                );
+              })}
+              {sortedOptions.length > 6 ? (
                 <Text
                   style={[
-                    theme.typography.bodySmall,
-                    {
-                      color: theme.colors.text.primary,
-                      flex: 1,
-                      fontWeight: myRank !== null ? '600' : '400',
-                    },
+                    theme.typography.caption,
+                    { color: theme.colors.text.tertiary, paddingLeft: 8 },
                   ]}
-                  numberOfLines={1}
                 >
-                  {opt.label}
+                  + {sortedOptions.length - 6} more
                 </Text>
-              </Pressable>
-            );
-          })}
-          {sortedOptions.length > 6 ? (
-            <Text
-              style={[
-                theme.typography.caption,
-                { color: theme.colors.text.tertiary, paddingLeft: 8 },
-              ]}
-            >
-              + {sortedOptions.length - 6} more
-            </Text>
-          ) : null}
-        </View>
+              ) : null}
+            </View>
 
-        <View style={{ marginTop: 12, gap: 8 }}>
-          <Button
-            label={
-              myRankCount === 0
-                ? 'Rank your picks'
-                : `Edit your ranking (${myRankCount} ranked)`
-            }
-            onPress={() => setShowVoteSheet(true)}
-            fullWidth
-            size="md"
-            trailingIcon={<ChevronRight size={16} color="#FFFFFF" />}
-          />
-          {canManage ? (
-            <Button
-              label="Manage options"
-              variant="ghost"
-              size="sm"
-              leadingIcon={<Settings2 size={14} color={theme.colors.accent} />}
-              onPress={() => setShowManage(true)}
-              fullWidth
-            />
-          ) : null}
-          {canManage ? (
-            <Button
-              label="Close poll"
-              variant="ghost"
-              size="sm"
-              onPress={handleClose}
-              loading={closePoll.isPending}
-              fullWidth
-            />
-          ) : null}
-        </View>
+            <View style={{ marginTop: 12, gap: 8 }}>
+              <Button
+                label={
+                  myRankCount === 0
+                    ? 'Rank your picks'
+                    : `Edit your ranking (${myRankCount} ranked)`
+                }
+                onPress={() => setShowVoteSheet(true)}
+                fullWidth
+                size="md"
+                trailingIcon={<ChevronRight size={16} color="#FFFFFF" />}
+              />
+              <Button
+                label="+ Add a choice"
+                variant="ghost"
+                size="sm"
+                onPress={() => setShowSuggest(true)}
+                fullWidth
+              />
+              {canManage ? (
+                <Button
+                  label="Manage options"
+                  variant="ghost"
+                  size="sm"
+                  leadingIcon={<Settings2 size={14} color={theme.colors.accent} />}
+                  onPress={() => setShowManage(true)}
+                  fullWidth
+                />
+              ) : null}
+              {canManage ? (
+                <Button
+                  label="Close poll"
+                  variant="ghost"
+                  size="sm"
+                  onPress={handleClose}
+                  loading={closePoll.isPending}
+                  fullWidth
+                />
+              ) : null}
+            </View>
+          </>
+        )}
       </Card>
 
       <Modal
@@ -730,6 +819,19 @@ function RankedVotingCard({
         }))}
         onSave={handleApplyChanges}
         isSubmitting={isApplyingChanges}
+      />
+
+      <SuggestOptionSheet
+        visible={showSuggest}
+        onClose={() => setShowSuggest(false)}
+        pollId={poll.id}
+        pollKind={poll.kind}
+        existing={poll.options.map((o) => ({
+          id: o.id,
+          label: o.label,
+          voteCount: o.voteCount,
+          metadata: o.metadata,
+        }))}
       />
 
       <PlaceDetailSheet
@@ -948,5 +1050,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
+  },
+  emptyOptions: {
+    marginTop: 16,
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
   },
 });

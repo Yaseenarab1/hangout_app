@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  FadeInDown,
+  SlideInDown,
   FadeOutUp,
   LinearTransition,
 } from 'react-native-reanimated';
@@ -66,8 +66,8 @@ function ToastItem({ toast }: { toast: ToastType }): React.ReactElement {
 
   return (
     <Animated.View
-      entering={FadeInDown.duration(220)}
-      exiting={FadeOutUp.duration(180)}
+      entering={SlideInDown.springify().damping(18).stiffness(220)}
+      exiting={FadeOutUp.duration(160)}
       layout={LinearTransition.duration(200)}
       style={[
         styles.toast,

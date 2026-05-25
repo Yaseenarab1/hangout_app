@@ -7,6 +7,13 @@ import {
   StyleSheet,
   Image,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  Easing,
+} from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { Plus } from 'lucide-react-native';
 import { Avatar } from '@/components/ui';
@@ -91,7 +98,7 @@ export function StoryRail(): React.ReactElement | null {
         style={styles.railScroll}
       >
         {/* Your story — always first */}
-        <Pressable onPress={openMyStory} style={styles.storyItem}>
+        <StoryBubble onPress={openMyStory}>
           <View style={styles.avatarWrap}>
             {hasMyStory ? (
               <View style={[styles.ring, { borderColor: theme.colors.accent }]}>
@@ -136,7 +143,7 @@ export function StoryRail(): React.ReactElement | null {
           >
             Your story
           </Text>
-        </Pressable>
+        </StoryBubble>
 
         {/* Friends' stories */}
         {groups
@@ -145,10 +152,9 @@ export function StoryRail(): React.ReactElement | null {
             // Original index in groups array (accounting for own story)
             const groupIndex = groups.indexOf(group);
             return (
-              <Pressable
+              <StoryBubble
                 key={group.author.id}
                 onPress={() => openViewer(groupIndex)}
-                style={styles.storyItem}
               >
                 <View style={[styles.ring, { borderColor: theme.colors.accent }]}>
                   <Avatar
@@ -164,7 +170,7 @@ export function StoryRail(): React.ReactElement | null {
                 >
                   {group.author.display_name.split(' ')[0]}
                 </Text>
-              </Pressable>
+              </StoryBubble>
             );
           })}
       </ScrollView>
@@ -185,6 +191,27 @@ export function StoryRail(): React.ReactElement | null {
         />
       )}
     </>
+  );
+}
+
+function StoryBubble({ children, onPress }: { children: React.ReactNode; onPress: () => void }) {
+  const scale = useSharedValue(1);
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => {
+        scale.value = withTiming(0.92, { duration: 100, easing: Easing.out(Easing.cubic) });
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1, { damping: 12, stiffness: 350 });
+      }}
+    >
+      <Animated.View style={[styles.storyItem, animStyle]}>{children}</Animated.View>
+    </Pressable>
   );
 }
 

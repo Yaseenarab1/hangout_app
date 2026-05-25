@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, CalendarCheck, MessageCircle, User } from 'lucide-react-native';
-import { Platform } from 'react-native';
+import { Home, CalendarCheck, MessageCircle, User, Compass } from 'lucide-react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 
 export default function TabsLayout(): React.ReactElement {
@@ -15,14 +15,18 @@ export default function TabsLayout(): React.ReactElement {
         tabBarInactiveTintColor: theme.colors.text.tertiary,
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '500',
+          fontWeight: '600',
+          letterSpacing: 0.2,
         },
         tabBarStyle: {
           backgroundColor: theme.colors.bg.canvas,
           borderTopColor: theme.colors.border.default,
-          borderTopWidth: 0.5,
+          borderTopWidth: StyleSheet.hairlineWidth,
           height: Platform.OS === 'ios' ? 84 : 60,
           paddingTop: 6,
+          // prevent system-applied gray overlays on both platforms
+          elevation: 0,
+          shadowOpacity: 0,
         },
       }}
     >
@@ -39,6 +43,15 @@ export default function TabsLayout(): React.ReactElement {
           title: 'Hangouts',
           tabBarIcon: ({ color, size }) => (
             <CalendarCheck color={color} size={size} strokeWidth={1.5} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="explore"
+        options={{
+          title: 'Explore',
+          tabBarIcon: ({ color, size }) => (
+            <Compass color={color} size={size} strokeWidth={1.5} />
           ),
         }}
       />

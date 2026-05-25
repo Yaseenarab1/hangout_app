@@ -5,6 +5,7 @@ import { hangoutKeys } from '@/features/hangouts';
 import {
   createActivityHangout,
   createActivityPoll,
+  createPollOnHangout,
   listPollsByHangout,
   getPollWithDetails,
   castVote,
@@ -274,6 +275,27 @@ export function useClearRankedVote() {
     },
     onSettled: (_data, _err, pollId) => {
       qc.invalidateQueries({ queryKey: pollKeys.detail(pollId) });
+    },
+  });
+}
+
+export function useCreatePollOnHangout(hangoutId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      kind: 'activity' | 'cuisine' | 'restaurant';
+      votingMethod: 'simple' | 'ranked';
+      voteDeadline: string;
+      options: Array<{ label: string; metadata?: Record<string, unknown> }>;
+      title?: string;
+    }) => createPollOnHangout({ ...input, hangoutId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: pollKeys.byHangout(hangoutId) });
+      toast.success('Vote started!');
+    },
+    onError: (error) => {
+      logError(error, { where: 'createPollOnHangout' });
+      toast.error(friendlyErrorMessage(error));
     },
   });
 }

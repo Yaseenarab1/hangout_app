@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { supabase } from '@/services/supabase/client';
 import { QUERY_KEYS } from '@/services/supabase/tables';
 import { useSession } from '@/features/auth';
-import { getFeedPosts, getStoryPosts, getAuthorPosts } from '../services/feed.service';
+import { getFeedPosts, getStoryPosts, getAuthorPosts, getAuthorAllPosts } from '../services/feed.service';
 import type { FeedPostWithUrl } from '../types';
 
 export function useFeedPosts() {
@@ -54,11 +54,23 @@ export function useStoryPosts() {
   });
 }
 
+/** Permanent posts only (profile gallery). */
 export function useAuthorPosts(authorId: string | undefined) {
   return useQuery({
     queryKey: authorId ? QUERY_KEYS.feedPosts(authorId) : ['feed', 'posts', 'noop'],
     queryFn: () => (authorId ? getAuthorPosts(authorId) : Promise.resolve<FeedPostWithUrl[]>([])),
     enabled: Boolean(authorId),
     staleTime: 60 * 1000,
+  });
+}
+
+/** Permanent + active ephemeral posts (own profile — shows everything). */
+export function useAuthorAllPosts(authorId: string | undefined) {
+  return useQuery({
+    queryKey: authorId ? [...QUERY_KEYS.feedPosts(authorId), 'all'] : ['feed', 'posts', 'noop'],
+    queryFn: () => (authorId ? getAuthorAllPosts(authorId) : Promise.resolve<FeedPostWithUrl[]>([])),
+    enabled: Boolean(authorId),
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000, // ephemeral posts expire, keep fresh
   });
 }

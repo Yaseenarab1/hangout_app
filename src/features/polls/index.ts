@@ -24,6 +24,7 @@ export {
   type ActivityVenuePickerProps,
 } from './components/ActivityVenuePicker';
 export { PollCard, type PollCardProps } from './components/PollCard';
+export { AddPollSheet, type AddPollSheetProps } from './components/AddPollSheet';
 export {
   PollFollowUpCard,
   type PollFollowUpCardProps,
@@ -33,6 +34,10 @@ export {
   type ManagePollOptionsSheetProps,
   type ExistingOption,
 } from './components/ManagePollOptionsSheet';
+export {
+  SuggestOptionSheet,
+  type SuggestOptionSheetProps,
+} from './components/SuggestOptionSheet';
 export {
   RankedVoteSheet,
   type RankedVoteSheetProps,

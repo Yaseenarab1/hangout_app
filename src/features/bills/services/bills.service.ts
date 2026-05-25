@@ -22,7 +22,7 @@ const BILL_SELECT = `
 `;
 
 const SHARE_SELECT = `
-  id, bill_id, user_id, amount_cents, split_method, weight,
+  id, bill_id, user_id, guest_participant_id, amount_cents, split_method, weight,
   settled_at, settled_by, settle_note, created_at,
   user:profiles!bill_shares_user_id_fkey(id, display_name, avatar_url)
 `;
@@ -63,6 +63,42 @@ export async function fetchBill(billId: string): Promise<Bill> {
       .from(BILL_RECEIPT_BUCKET)
       .createSignedUrl(b.receipt_storage_path, 3600);
     if (signed?.signedUrl) b.receiptSignedUrl = signed.signedUrl;
+  }
+
+  // Fetch items for itemized bills
+  if (b.mode === 'itemized') {
+    const { data: items } = await db()
+      .from('bill_items')
+      .select('id, description, amount_cents, quantity, position')
+      .eq('bill_id', billId)
+      .order('position', { ascending: true });
+    b.items = (items ?? []) as Bill['items'];
+  }
+
+  // Fetch guest participants and attach names to shares
+  const { data: guests } = await db()
+    .from('bill_guest_participants')
+    .select('id, name')
+    .eq('bill_id', billId);
+  if (guests && guests.length > 0) {
+    const guestMap = new Map<string, string>(
+      (guests as { id: string; name: string }[]).map((g) => [g.id, g.name]),
+    );
+    for (const share of b.shares ?? []) {
+      if (share.guest_participant_id) {
+        share.guest_name = guestMap.get(share.guest_participant_id) ?? 'Guest';
+      }
+    }
+  }
+
+  // Fetch hangout title if linked
+  if (b.hangout_id) {
+    const { data: hangout } = await db()
+      .from('hangouts')
+      .select('id, title')
+      .eq('id', b.hangout_id)
+      .maybeSingle();
+    if (hangout) b.hangout = { id: hangout.id, title: hangout.title };
   }
 
   return b;
@@ -207,21 +243,63 @@ export async function scanReceiptImage(imageBase64: string): Promise<ParsedRecei
   return data as ParsedReceiptResult;
 }
 
+export interface CrossHangoutBalance {
+  other_user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  username: string;
+  net_cents: number; // positive = they owe you, negative = you owe them
+}
+
+export async function fetchCrossHangoutBalances(): Promise<CrossHangoutBalance[]> {
+  const { data, error } = await (supabase as any).rpc('get_cross_hangout_balances');
+  if (error) throw error;
+  return (data ?? []) as CrossHangoutBalance[];
+}
+
 export async function fetchMyBills(): Promise<Bill[]> {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error('Not authenticated');
 
-  const { data, error } = await db()
+  // All bills where I'm the payer or creator (hangout + standalone)
+  const { data: payerBills, error: e1 } = await db()
     .from('bills')
-    .select(BILL_SELECT)
+    .select(BILL_SELECT + ', hangout:hangouts!bills_hangout_id_fkey(id, title)')
     .or(`payer_id.eq.${auth.user.id},created_by.eq.${auth.user.id}`)
-    .is('hangout_id', null)
     .is('voided_at', null)
     .order('paid_at', { ascending: false })
     .limit(50);
+  if (e1) throw e1;
 
-  if (error) throw error;
-  return (data ?? []) as Bill[];
+  // Bills where I have a share but I'm not the payer/creator
+  const { data: shareRows, error: e2 } = await db()
+    .from('bill_shares')
+    .select('bill_id')
+    .eq('user_id', auth.user.id);
+  if (e2) throw e2;
+
+  const sharedBillIds = (shareRows ?? [])
+    .map((r: { bill_id: string }) => r.bill_id)
+    .filter(
+      (id: string) =>
+        !(payerBills ?? []).some((b: { id: string }) => b.id === id),
+    );
+
+  let sharedBills: Bill[] = [];
+  if (sharedBillIds.length > 0) {
+    const { data: shared, error: e3 } = await db()
+      .from('bills')
+      .select(BILL_SELECT + ', hangout:hangouts!bills_hangout_id_fkey(id, title)')
+      .in('id', sharedBillIds)
+      .is('voided_at', null)
+      .order('paid_at', { ascending: false });
+    if (e3) throw e3;
+    sharedBills = (shared ?? []) as Bill[];
+  }
+
+  const all = [...(payerBills ?? []), ...sharedBills] as Bill[];
+  all.sort((a, b) => new Date(b.paid_at).getTime() - new Date(a.paid_at).getTime());
+  return all.slice(0, 80);
 }
 
 export async function createItemizedBill(params: CreateItemizedBillParams): Promise<Bill> {

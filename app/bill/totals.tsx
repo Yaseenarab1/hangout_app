@@ -9,6 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { router } from 'expo-router';
+import { Check } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';
 import { Button, Avatar } from '@/components/ui';
 import { useTheme } from '@/hooks/useTheme';
@@ -111,6 +112,47 @@ export default function TotalsScreen() {
   return (
     <Screen header={{ title: 'Review & save', showBack: true }}>
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Who paid? */}
+        <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.secondary, marginBottom: 8 }]}>
+          Who paid?
+        </Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 8, paddingBottom: 16 }}
+        >
+          {draft.participants
+            .filter((p) => p.type === 'user')
+            .map((p) => {
+              if (p.type !== 'user') return null;
+              const isSelected = draft.payerId === p.id;
+              return (
+                <Pressable
+                  key={p.id}
+                  onPress={() => setField('payerId', p.id)}
+                  style={[
+                    styles.payerChip,
+                    {
+                      borderColor: isSelected ? theme.colors.accent : theme.colors.border.default,
+                      backgroundColor: isSelected ? theme.colors.accentSubtle : theme.colors.bg.surface,
+                    },
+                  ]}
+                >
+                  <Avatar id={p.id} displayName={p.display_name} uri={p.avatar_url} size="xs" />
+                  <Text
+                    style={[
+                      theme.typography.bodySmall,
+                      { color: isSelected ? theme.colors.accent : theme.colors.text.primary, marginLeft: 6 },
+                    ]}
+                  >
+                    {p.display_name}
+                  </Text>
+                  {isSelected && <Check size={14} color={theme.colors.accent} style={{ marginLeft: 4 }} />}
+                </Pressable>
+              );
+            })}
+        </ScrollView>
+
         {/* Description */}
         <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.secondary, marginBottom: 6 }]}>
           Bill description
@@ -212,6 +254,14 @@ function SummaryLine({ label, cents, theme }: { label: string; cents: number; th
 }
 
 const styles = StyleSheet.create({
+  payerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
   descInput: {
     borderWidth: 1,
     borderRadius: 12,

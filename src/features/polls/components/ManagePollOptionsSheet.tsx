@@ -4,12 +4,10 @@ import { X } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/ui';
 import { ActivityOptionPicker, type ActivityOption } from './ActivityOptionPicker';
-import {
-  CuisineOptionPicker,
-  RestaurantSearchPicker,
-  type CuisineOption,
-  type RestaurantOption,
-} from '@/features/food';
+import { CuisineOptionPicker } from '@/features/food/components/CuisineOptionPicker';
+import { RestaurantSearchPicker } from '@/features/food/components/RestaurantSearchPicker';
+import type { CuisineOption } from '@/features/food/types';
+import type { RestaurantOption } from '@/features/food/types';
 import type { PollKind } from '../types';
 
 export type ExistingOption = {

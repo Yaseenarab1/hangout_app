@@ -10,17 +10,22 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { X, Receipt } from 'lucide-react-native';
+import { X, CalendarCheck, ChevronRight, UtensilsCrossed, Package } from 'lucide-react-native';
+import { useQueryClient } from '@tanstack/react-query';
+import { router } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
 import { useBill } from '../hooks/useBill';
 import { useSettleShare } from '../hooks/useSettleShare';
 import { useVoidBill } from '../hooks/useVoidBill';
 import { formatCents } from '../utils/split';
+import { billsKey } from '../hooks/useBills';
+import { myBillsKey } from '../hooks/useMyBills';
+import { crossBalancesKey } from '../hooks/useCrossHangoutBalances';
 import type { BillShare } from '../types';
 
 type Props = {
   billId: string | null;
-  hangoutId: string;
+  hangoutId?: string | null;
   myUserId: string;
   onClose: () => void;
 };
@@ -32,10 +37,18 @@ export function BillDetailSheet({
   onClose,
 }: Props): React.ReactElement | null {
   const theme = useTheme();
+  const qc = useQueryClient();
   const bill = useBill(billId);
-  const settle = useSettleShare(hangoutId);
-  const voidBillMut = useVoidBill(hangoutId);
+  const settle = useSettleShare(hangoutId ?? '');
+  const voidBillMut = useVoidBill(hangoutId ?? '');
   const [showReceipt, setShowReceipt] = useState(false);
+
+  function invalidateStandaloneCache() {
+    if (!hangoutId) {
+      qc.invalidateQueries({ queryKey: myBillsKey() });
+      qc.invalidateQueries({ queryKey: crossBalancesKey() });
+    }
+  }
 
   if (!billId) return null;
 
@@ -47,24 +60,34 @@ export function BillDetailSheet({
   const handleSettle = (share: BillShare) => {
     Alert.alert(
       'Mark as paid?',
-      `Mark your $${formatCents(share.amount_cents).replace('$', '')} share as settled?`,
+      `Mark your ${formatCents(share.amount_cents)} share as settled?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Mark paid',
-          onPress: () => settle.mutate({ shareId: share.id }),
+          onPress: () =>
+            settle.mutate({ shareId: share.id }, { onSuccess: invalidateStandaloneCache }),
         },
       ],
     );
   };
 
   const handleVoid = () => {
-    Alert.alert('Void bill?', 'This will remove the bill from everyone\'s balances.', [
+    Alert.alert('Void bill?', "This will remove the bill from everyone's balances.", [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Void',
         style: 'destructive',
-        onPress: () => voidBillMut.mutate({ billId: b!.id }, { onSuccess: onClose }),
+        onPress: () =>
+          voidBillMut.mutate(
+            { billId: b!.id },
+            {
+              onSuccess: () => {
+                invalidateStandaloneCache();
+                onClose();
+              },
+            },
+          ),
       },
     ]);
   };
@@ -91,24 +114,72 @@ export function BillDetailSheet({
         {bill.isLoading ? (
           <ActivityIndicator color={theme.colors.accent} style={{ marginTop: 40 }} />
         ) : !b ? null : (
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
             {/* Bill summary */}
             <View style={[styles.summaryCard, { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default }]}>
               <Text style={[theme.typography.h1, { color: theme.colors.text.primary }]}>
                 {formatCents(b.amount_cents)}
               </Text>
-              <Text style={[theme.typography.body, { color: theme.colors.text.primary, marginTop: 4 }]}>
+              <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, marginTop: 4 }]}>
                 {b.description}
               </Text>
-              <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 8 }]}>
-                Paid by {b.payer?.display_name ?? 'Unknown'} • {new Date(b.paid_at).toLocaleDateString()}
+              <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 6 }]}>
+                Paid by {b.payer?.display_name ?? 'Unknown'} · {new Date(b.paid_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
               </Text>
+              {b.mode === 'itemized' && (b.subtotal_cents != null || b.tax_cents != null || b.tip_cents != null) && (
+                <View style={{ marginTop: 10, gap: 3 }}>
+                  {b.subtotal_cents != null && (
+                    <View style={styles.breakdownRow}>
+                      <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>Subtotal</Text>
+                      <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>{formatCents(b.subtotal_cents)}</Text>
+                    </View>
+                  )}
+                  {(b.tax_cents ?? 0) > 0 && (
+                    <View style={styles.breakdownRow}>
+                      <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>Tax</Text>
+                      <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>{formatCents(b.tax_cents!)}</Text>
+                    </View>
+                  )}
+                  {(b.tip_cents ?? 0) > 0 && (
+                    <View style={styles.breakdownRow}>
+                      <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>Tip</Text>
+                      <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>{formatCents(b.tip_cents!)}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
               {b.voided_at && (
-                <Text style={[theme.typography.caption, { color: theme.colors.danger, marginTop: 4 }]}>
+                <Text style={[theme.typography.caption, { color: theme.colors.danger, marginTop: 6, fontWeight: '600' }]}>
                   Voided
                 </Text>
               )}
             </View>
+
+            {/* Hangout link */}
+            {b.hangout && (
+              <Pressable
+                onPress={() => {
+                  onClose();
+                  setTimeout(() => router.push(`/hangout/${b.hangout!.id}`), 300);
+                }}
+                style={({ pressed }) => [
+                  styles.hangoutRow,
+                  { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default },
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <View style={[styles.hangoutIcon, { backgroundColor: theme.colors.accent + '14' }]}>
+                  <CalendarCheck size={18} color={theme.colors.accent} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary }]}>From hangout</Text>
+                  <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]} numberOfLines={1}>
+                    {b.hangout.title}
+                  </Text>
+                </View>
+                <ChevronRight size={16} color={theme.colors.text.tertiary} />
+              </Pressable>
+            )}
 
             {/* Receipt */}
             {b.receiptSignedUrl && (
@@ -121,50 +192,85 @@ export function BillDetailSheet({
               </Pressable>
             )}
 
-            {/* Shares */}
-            <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, marginTop: 20, marginBottom: 8 }]}>
-              Split
-            </Text>
-            {(b.shares ?? []).map((share) => {
-              const isMe = share.user_id === myUserId;
-              const name = share.user?.display_name ?? 'Unknown';
-              return (
-                <View
-                  key={share.id}
-                  style={[
-                    styles.shareRow,
-                    {
-                      backgroundColor: theme.colors.bg.surface,
-                      borderColor: theme.colors.border.default,
-                    },
-                  ]}
-                >
-                  <View style={styles.shareLeft}>
-                    <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
-                      {isMe ? 'You' : name}
-                    </Text>
-                    <Text style={[theme.typography.caption, { color: share.settled_at ? '#22C55E' : theme.colors.text.secondary }]}>
-                      {share.settled_at ? 'Settled' : 'Outstanding'}
-                    </Text>
-                  </View>
-                  <View style={styles.shareRight}>
-                    <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
-                      {formatCents(share.amount_cents)}
-                    </Text>
-                    {isMe && !share.settled_at && !b.voided_at && (
-                      <Pressable
-                        onPress={() => handleSettle(share)}
-                        style={[styles.settleBtn, { borderColor: theme.colors.accent }]}
-                      >
-                        <Text style={{ color: theme.colors.accent, fontSize: 12, fontWeight: '600' }}>
-                          Mark paid
-                        </Text>
-                      </Pressable>
-                    )}
-                  </View>
+            {/* Items (itemized bills) */}
+            {b.mode === 'itemized' && (b.items ?? []).length > 0 && (
+              <View style={{ marginTop: 20 }}>
+                <View style={styles.sectionHeader}>
+                  <UtensilsCrossed size={14} color={theme.colors.text.tertiary} />
+                  <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>Items</Text>
                 </View>
-              );
-            })}
+                <View style={[styles.itemsCard, { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default }]}>
+                  {(b.items ?? []).map((item, idx) => (
+                    <View key={item.id ?? idx}>
+                      <View style={styles.itemRow}>
+                        <Text style={[theme.typography.bodySmall, { color: theme.colors.text.primary, flex: 1 }]} numberOfLines={1}>
+                          {item.quantity > 1 ? `${item.quantity}× ` : ''}{item.description}
+                        </Text>
+                        <Text style={[theme.typography.bodySmall, { color: theme.colors.text.secondary }]}>
+                          {formatCents(item.amount_cents * item.quantity)}
+                        </Text>
+                      </View>
+                      {idx < (b.items ?? []).length - 1 && (
+                        <View style={[styles.itemDivider, { backgroundColor: theme.colors.border.default }]} />
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Shares */}
+            <View style={{ marginTop: 20 }}>
+              <View style={styles.sectionHeader}>
+                <Package size={14} color={theme.colors.text.tertiary} />
+                <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>Split</Text>
+              </View>
+              {(b.shares ?? []).map((share) => {
+                const isMe = share.user_id === myUserId;
+                const displayName = isMe
+                  ? 'You'
+                  : share.guest_name ?? share.user?.display_name ?? 'Unknown';
+                const isGuest = !share.user_id;
+                return (
+                  <View
+                    key={share.id}
+                    style={[
+                      styles.shareRow,
+                      {
+                        backgroundColor: theme.colors.bg.surface,
+                        borderColor: theme.colors.border.default,
+                      },
+                    ]}
+                  >
+                    <View style={styles.shareLeft}>
+                      <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
+                        {displayName}
+                      </Text>
+                      <Text style={[theme.typography.caption, {
+                        color: share.settled_at ? theme.colors.success : isGuest ? theme.colors.text.tertiary : theme.colors.text.secondary,
+                      }]}>
+                        {share.settled_at ? '✓ Settled' : isGuest ? 'Guest · cash' : 'Outstanding'}
+                      </Text>
+                    </View>
+                    <View style={styles.shareRight}>
+                      <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
+                        {formatCents(share.amount_cents)}
+                      </Text>
+                      {isMe && !share.settled_at && !b.voided_at && (
+                        <Pressable
+                          onPress={() => handleSettle(share)}
+                          style={[styles.settleBtn, { borderColor: theme.colors.accent }]}
+                        >
+                          <Text style={{ color: theme.colors.accent, fontSize: 12, fontWeight: '600' }}>
+                            Mark paid
+                          </Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
 
             {/* Void */}
             {canVoid && (
@@ -205,7 +311,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 40,
-    maxHeight: '85%',
+    maxHeight: '90%',
   },
   header: {
     flexDirection: 'row',
@@ -214,21 +320,65 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   summaryCard: {
-    borderRadius: 12,
-    borderWidth: 1,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
     padding: 16,
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  hangoutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 10,
+  },
+  hangoutIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  itemsCard: {
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  itemDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 14,
   },
   receiptThumb: {
     width: '100%',
     height: 160,
     borderRadius: 12,
+    marginTop: 10,
   },
   shareRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderRadius: 10,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginBottom: 6,

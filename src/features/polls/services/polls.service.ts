@@ -88,6 +88,57 @@ export async function createActivityPoll(
   return poll as Poll;
 }
 
+export async function createPollOnHangout(input: {
+  hangoutId: string;
+  kind: 'activity' | 'cuisine' | 'restaurant';
+  votingMethod: 'simple' | 'ranked';
+  voteDeadline: string;
+  options: Array<{ label: string; metadata?: Record<string, unknown> }>;
+  title?: string;
+}): Promise<Poll> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error('Not authenticated');
+
+  const titles = {
+    activity: 'What should we do?',
+    cuisine: 'What kind of food?',
+    restaurant: 'Which restaurant?',
+  };
+
+  const { data: poll, error } = await supabase
+    .from(TABLES.polls)
+    .insert({
+      hangout_id: input.hangoutId,
+      created_by: auth.user.id,
+      kind: input.kind,
+      mode: 'simple_vote',
+      voting_method: input.votingMethod,
+      phase: 'voting',
+      title: input.title ?? titles[input.kind],
+      vote_deadline: input.voteDeadline,
+    } as any)
+    .select()
+    .single();
+
+  if (error) throw error;
+  if (!poll) throw new Error('Poll creation returned no row');
+
+  if (input.options.length > 0) {
+    const rows = input.options.map((o) => ({
+      poll_id: (poll as Poll).id,
+      added_by: auth.user!.id,
+      label: o.label,
+      metadata: o.metadata ?? {},
+    }));
+    const { error: optErr } = await supabase
+      .from(TABLES.poll_options)
+      .insert(rows as any);
+    if (optErr) throw optErr;
+  }
+
+  return poll as Poll;
+}
+
 export async function listPollsByHangout(hangoutId: string): Promise<Poll[]> {
   const { data, error } = await supabase
     .from(TABLES.polls)

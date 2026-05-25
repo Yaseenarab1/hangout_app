@@ -3,10 +3,13 @@ import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ChevronRight, Calendar as CalIcon, MapPin } from 'lucide-react-native';
+import { ChevronRight, Calendar as CalIcon, MapPin, Navigation } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';
 import { Input, Textarea, Button } from '@/components/ui';
 import { useTheme } from '@/hooks/useTheme';
+import { AddressAutocomplete } from '@/features/places';
+import { useSaveSearchLocation } from '@/features/places/hooks/useSearchLocation';
+import type { PlaceDetails } from '@/features/places';
 import {
   createHangoutSchema,
   type CreateHangoutInput,
@@ -40,6 +43,38 @@ export default function NewHangoutScreen(): React.ReactElement {
   });
 
   const inviteUserIds = watch('inviteUserIds');
+  const [addressText, setAddressText] = useState('');
+  const [locatingMe, setLocatingMe] = useState(false);
+  const saveSearchLocation = useSaveSearchLocation();
+
+  function handlePlaceSelected(place: PlaceDetails) {
+    setAddressText(place.address);
+    setValue('locationAddress', place.address, { shouldDirty: true });
+    if (!watch('locationName')?.trim()) {
+      setValue('locationName', place.name, { shouldDirty: true });
+    }
+    if (place.location) {
+      saveSearchLocation.mutate({ name: place.name, lat: place.location.lat, lng: place.location.lng });
+    }
+  }
+
+  function useMyLocation() {
+    setLocatingMe(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        saveSearchLocation.mutate({ name: 'Current location', lat, lng });
+        setValue('locationName', 'Current location', { shouldDirty: true });
+        setValue('locationAddress', '', { shouldDirty: true });
+        setAddressText('');
+        setLocatingMe(false);
+      },
+      () => {
+        setLocatingMe(false);
+      },
+      { enableHighAccuracy: false, timeout: 10000 },
+    );
+  }
 
   const onSubmit = (input: CreateHangoutInput): void => {
     createHangout.mutate(input, {
@@ -89,22 +124,48 @@ export default function NewHangoutScreen(): React.ReactElement {
             )}
           />
 
-          <Controller
-            control={control}
-            name="locationName"
-            render={({ field: { value, onChange, onBlur } }) => (
-              <Input
-                label="Where? (optional)"
-                placeholder="Sara's apartment, downtown, etc."
-                value={value ?? ''}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                error={errors.locationName?.message}
-                maxLength={100}
-                trailing={<MapPin size={18} color={theme.colors.text.tertiary} />}
-              />
-            )}
-          />
+          <View>
+            <AddressAutocomplete
+              label="Where? (optional)"
+              placeholder="Search an address, neighborhood, …"
+              value={addressText}
+              onChangeText={(t) => {
+                setAddressText(t);
+                setValue('locationAddress', t, { shouldDirty: true });
+              }}
+              onSelectPlace={handlePlaceSelected}
+              error={errors.locationAddress?.message}
+            />
+            <Pressable
+              onPress={useMyLocation}
+              disabled={locatingMe}
+              style={styles.useLocationBtn}
+            >
+              <Navigation size={13} color={theme.colors.accent} />
+              <Text style={[theme.typography.caption, { color: theme.colors.accent, marginLeft: 4 }]}>
+                {locatingMe ? 'Getting location…' : 'Use my current location'}
+              </Text>
+            </Pressable>
+          </View>
+
+          {watch('locationName') ? (
+            <Controller
+              control={control}
+              name="locationName"
+              render={({ field: { value, onChange, onBlur } }) => (
+                <Input
+                  label="Display name (optional)"
+                  placeholder="e.g. Mike's place, Rooftop bar"
+                  value={value ?? ''}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  error={errors.locationName?.message}
+                  maxLength={100}
+                  trailing={<MapPin size={18} color={theme.colors.text.tertiary} />}
+                />
+              )}
+            />
+          ) : null}
 
           <Text
             style={[
@@ -189,5 +250,11 @@ const styles = StyleSheet.create({
   footer: {
     paddingTop: 12,
     paddingBottom: Platform.OS === 'ios' ? 8 : 16,
+  },
+  useLocationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 6,
+    paddingHorizontal: 4,
   },
 });

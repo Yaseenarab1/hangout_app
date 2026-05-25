@@ -4,7 +4,8 @@ export type BillMode = 'whole' | 'itemized';
 export type BillShare = {
   id: string;
   bill_id: string;
-  user_id: string;
+  user_id: string | null;
+  guest_participant_id: string | null;
   amount_cents: number;
   split_method: SplitMethod;
   weight: number | null;
@@ -14,6 +15,15 @@ export type BillShare = {
   created_at: string;
   // hydrated
   user?: { id: string; display_name: string; avatar_url: string | null };
+  guest_name?: string;
+};
+
+export type StoredBillItem = {
+  id: string;
+  description: string;
+  amount_cents: number;
+  quantity: number;
+  position: number;
 };
 
 export type Bill = {
@@ -40,6 +50,8 @@ export type Bill = {
   creator?: { id: string; display_name: string; avatar_url: string | null };
   shares?: BillShare[];
   receiptSignedUrl?: string;
+  hangout?: { id: string; title: string };
+  items?: StoredBillItem[];
 };
 
 export type UserBalance = {

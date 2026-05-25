@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,12 @@ import {
   Modal,
   TouchableWithoutFeedback,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { Plus, X, Receipt, Compass, UtensilsCrossed, CalendarPlus, Camera } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,10 +25,26 @@ type FabAction = {
   onPress: () => void;
 };
 
-export function HomeFab() {
+export function HomeFab({ visible = true }: { visible?: boolean }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
+
+  const scale = useSharedValue(1);
+  const fabAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: scale.value,
+  }));
+
+  useEffect(() => {
+    if (open) {
+      scale.value = withSpring(1, { damping: 15, stiffness: 350 });
+      return;
+    }
+    scale.value = visible
+      ? withSpring(1, { damping: 15, stiffness: 350 })
+      : withTiming(0, { duration: 180 });
+  }, [visible, open]);
 
   const actions: FabAction[] = [
     {
@@ -105,26 +127,27 @@ export function HomeFab() {
       </Modal>
 
       {/* FAB button */}
-      <Pressable
-        onPress={() => setOpen((v) => !v)}
-        style={({ pressed }) => [
-          styles.fab,
-          {
-            backgroundColor: theme.colors.accent,
-            bottom: insets.bottom + 24,
-            shadowColor: '#000',
-            opacity: pressed ? 0.85 : 1,
-          },
-        ]}
-        accessibilityLabel={open ? 'Close menu' : 'Quick actions'}
-        accessibilityRole="button"
-      >
-        {open ? (
-          <X size={24} color="#fff" />
-        ) : (
-          <Plus size={24} color="#fff" />
-        )}
-      </Pressable>
+      <Animated.View style={[styles.fabWrap, { bottom: insets.bottom + 24 }, fabAnimStyle]}>
+        <Pressable
+          onPress={() => setOpen((v) => !v)}
+          style={({ pressed }) => [
+            styles.fab,
+            {
+              backgroundColor: theme.colors.accent,
+              shadowColor: '#000',
+              opacity: pressed ? 0.85 : 1,
+            },
+          ]}
+          accessibilityLabel={open ? 'Close menu' : 'Quick actions'}
+          accessibilityRole="button"
+        >
+          {open ? (
+            <X size={24} color="#fff" />
+          ) : (
+            <Plus size={24} color="#fff" />
+          )}
+        </Pressable>
+      </Animated.View>
     </>
   );
 }
@@ -160,9 +183,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fab: {
+  fabWrap: {
     position: 'absolute',
     right: 20,
+  },
+  fab: {
     width: 56,
     height: 56,
     borderRadius: 28,

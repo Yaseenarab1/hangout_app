@@ -12,11 +12,15 @@ import {
   Calendar as CalIcon,
   Clock,
   Search as SearchIcon,
+  Navigation,
 } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';
 import { Input, Textarea, Button } from '@/components/ui';
 import { SummaryRow } from '@/components/ui/SummaryRow';
 import { useTheme } from '@/hooks/useTheme';
+import { AddressAutocomplete } from '@/features/places';
+import { useSaveSearchLocation } from '@/features/places/hooks/useSearchLocation';
+import type { PlaceDetails } from '@/features/places';
 import { ParticipantPicker } from '@/features/hangouts';
 import {
   ActivityOptionPicker,
@@ -41,6 +45,7 @@ type FormState = {
   title: string;
   description: string;
   locationName: string;
+  locationAddress: string;
   inviteUserIds: string[];
   options: ActivityOption[];
   /** Single activity selected for know_what_find_where path. */
@@ -66,6 +71,7 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
       title: '',
       description: '',
       locationName: '',
+      locationAddress: '',
       inviteUserIds: [],
       options: [],
       pickedActivity: null,
@@ -74,6 +80,35 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
       votingMethod: 'simple',
     },
   });
+
+  const [addressText, setAddressText] = useState('');
+  const [locatingMe, setLocatingMe] = useState(false);
+  const saveSearchLocation = useSaveSearchLocation();
+
+  function handlePlaceSelected(place: PlaceDetails) {
+    setAddressText(place.address);
+    setValue('locationAddress', place.address);
+    if (!watch('locationName')?.trim()) setValue('locationName', place.name);
+    if (place.location) {
+      saveSearchLocation.mutate({ name: place.name, lat: place.location.lat, lng: place.location.lng });
+    }
+  }
+
+  function useMyLocation() {
+    setLocatingMe(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        saveSearchLocation.mutate({ name: 'Current location', lat, lng });
+        setValue('locationName', 'Current location');
+        setValue('locationAddress', '');
+        setAddressText('');
+        setLocatingMe(false);
+      },
+      () => setLocatingMe(false),
+      { enableHighAccuracy: false, timeout: 10000 },
+    );
+  }
 
   const options = watch('options');
   const pickedActivity = watch('pickedActivity');
@@ -102,6 +137,7 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
             description: v.description.trim() || undefined,
             startTime: v.startTime ? v.startTime.toISOString() : undefined,
             locationName: v.locationName.trim() || undefined,
+            locationAddress: v.locationAddress.trim() || undefined,
             inviteUserIds: v.inviteUserIds,
           },
           poll: null, // no activity poll
@@ -132,6 +168,7 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
             description: v.description.trim() || undefined,
             startTime: v.startTime ? v.startTime.toISOString() : undefined,
             locationName: v.locationName.trim() || undefined,
+            locationAddress: v.locationAddress.trim() || undefined,
             inviteUserIds: v.inviteUserIds,
           },
           poll: null,
@@ -617,20 +654,28 @@ export default function NewActivityHangoutScreen(): React.ReactElement {
               />
             )}
           />
-          <Controller
-            control={control}
-            name="locationName"
-            render={({ field: { value, onChange, onBlur } }) => (
-              <Input
-                label="Where? (optional)"
-                placeholder="A neighborhood, address, etc."
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                maxLength={100}
-              />
-            )}
-          />
+          <View>
+            <AddressAutocomplete
+              label="Where? (optional)"
+              placeholder="Search an address, neighborhood, …"
+              value={addressText}
+              onChangeText={(t) => {
+                setAddressText(t);
+                setValue('locationAddress', t);
+              }}
+              onSelectPlace={handlePlaceSelected}
+            />
+            <Pressable
+              onPress={useMyLocation}
+              disabled={locatingMe}
+              style={styles.useLocationBtn}
+            >
+              <Navigation size={13} color={theme.colors.accent} />
+              <Text style={[theme.typography.caption, { color: theme.colors.accent, marginLeft: 4 }]}>
+                {locatingMe ? 'Getting location…' : 'Use my current location'}
+              </Text>
+            </Pressable>
+          </View>
           <SummaryRow
             label="When?"
             icon={<CalIcon size={18} color={theme.colors.text.tertiary} />}
@@ -779,6 +824,12 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  useLocationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 6,
+    paddingHorizontal: 4,
   },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   catalogChip: {

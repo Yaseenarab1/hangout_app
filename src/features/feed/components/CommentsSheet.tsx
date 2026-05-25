@@ -15,7 +15,9 @@ import { useTheme } from '@/hooks/useTheme';
 import { useSession } from '@/features/auth';
 import { useMyProfile } from '@/features/profile';
 import { useComments, useCreateComment, useDeleteComment } from '../hooks/useComments';
-import type { FeedPostComment } from '../types';
+import { useReactToComment } from '../hooks/useReactToPost';
+import { ReactionPicker } from './ReactionPicker';
+import { REACTIONS, type FeedPostComment, type ReactionType } from '../types';
 
 interface Props {
   postId: string;
@@ -27,11 +29,12 @@ export function CommentsSheet({ postId, postAuthorId }: Props): React.ReactEleme
   const { user } = useSession();
   const myProfile = useMyProfile();
   const [body, setBody] = useState('');
-  const inputRef = useRef<TextInput>(null);
+  const [pickerForComment, setPickerForComment] = useState<string | null>(null);
 
   const { data: comments = [], isLoading } = useComments(postId);
   const createComment = useCreateComment(postId);
   const deleteComment = useDeleteComment(postId);
+  const reactToComment = useReactToComment(postId);
 
   async function handleSend() {
     const trimmed = body.trim();
@@ -44,17 +47,27 @@ export function CommentsSheet({ postId, postAuthorId }: Props): React.ReactEleme
     return comment.user_id === user?.id || postAuthorId === user?.id;
   }
 
+  function handleCommentReact(commentId: string, type: ReactionType, current: ReactionType | null) {
+    setPickerForComment(null);
+    reactToComment.mutate({ commentId, reactionType: type, currentReaction: current });
+  }
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      <View style={{ flex: 1, paddingHorizontal: 16 }}>
-        {/* Handle */}
-        <View
-          style={[styles.handle, { backgroundColor: theme.colors.border.strong }]}
+      {/* Dismiss picker on tap outside */}
+      {pickerForComment && (
+        <Pressable
+          style={StyleSheet.absoluteFillObject}
+          onPress={() => setPickerForComment(null)}
         />
+      )}
+
+      <View style={{ flex: 1, paddingHorizontal: 16 }}>
+        <View style={[styles.handle, { backgroundColor: theme.colors.border.strong }]} />
         <Text
           style={[
             theme.typography.bodyMedium,
@@ -72,6 +85,9 @@ export function CommentsSheet({ postId, postAuthorId }: Props): React.ReactEleme
               comment={item}
               canDelete={canDelete(item)}
               onDelete={() => deleteComment.mutate(item.id)}
+              onLongPress={() => setPickerForComment(item.id)}
+              isPickerOpen={pickerForComment === item.id}
+              onReact={(type) => handleCommentReact(item.id, type, item.viewer_reaction ?? null)}
               theme={theme}
             />
           )}
@@ -91,7 +107,6 @@ export function CommentsSheet({ postId, postAuthorId }: Props): React.ReactEleme
         />
       </View>
 
-      {/* Input bar */}
       <View
         style={[
           styles.inputBar,
@@ -108,7 +123,6 @@ export function CommentsSheet({ postId, postAuthorId }: Props): React.ReactEleme
           size="xs"
         />
         <TextInput
-          ref={inputRef}
           value={body}
           onChangeText={setBody}
           placeholder="Add a comment…"
@@ -144,36 +158,82 @@ function CommentRow({
   comment,
   canDelete,
   onDelete,
+  onLongPress,
+  isPickerOpen,
+  onReact,
   theme,
 }: {
   comment: FeedPostComment;
   canDelete: boolean;
   onDelete: () => void;
+  onLongPress: () => void;
+  isPickerOpen: boolean;
+  onReact: (type: ReactionType) => void;
   theme: ReturnType<typeof useTheme>;
 }) {
   const author = comment.author;
+  const myReaction = comment.viewer_reaction ?? null;
+  const reactions = comment.reactions ?? [];
+
   return (
-    <View style={styles.commentRow}>
-      <Avatar
-        id={comment.user_id}
-        displayName={author?.display_name}
-        uri={author?.avatar_url}
-        size="xs"
-      />
-      <View style={{ flex: 1, marginLeft: 8 }}>
-        <Text style={[theme.typography.bodySmallMedium, { color: theme.colors.text.primary }]}>
-          {author?.display_name ?? 'Unknown'}
-        </Text>
-        <Text style={[theme.typography.bodySmall, { color: theme.colors.text.primary }]}>
-          {comment.body}
-        </Text>
-      </View>
-      {canDelete && (
-        <Pressable onPress={onDelete} hitSlop={12}>
-          <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary }]}>
-            Delete
+    <View>
+      <Pressable
+        onLongPress={onLongPress}
+        delayLongPress={300}
+        style={styles.commentRow}
+      >
+        <Avatar
+          id={comment.user_id}
+          displayName={author?.display_name}
+          uri={author?.avatar_url}
+          size="xs"
+        />
+        <View style={{ flex: 1, marginLeft: 8 }}>
+          <Text style={[theme.typography.bodySmallMedium, { color: theme.colors.text.primary }]}>
+            {author?.display_name ?? 'Unknown'}
           </Text>
-        </Pressable>
+          <Text style={[theme.typography.bodySmall, { color: theme.colors.text.primary }]}>
+            {comment.body}
+          </Text>
+
+          {/* Reaction counts on comment */}
+          {reactions.length > 0 && (
+            <View style={styles.commentReactions}>
+              {reactions.slice(0, 4).map((r) => {
+                const def = REACTIONS.find((x) => x.type === r.type);
+                return (
+                  <Pressable
+                    key={r.type}
+                    onPress={() => onReact(r.type)}
+                    style={[
+                      styles.reactionChip,
+                      myReaction === r.type && { backgroundColor: 'rgba(139,92,246,0.15)' },
+                    ]}
+                  >
+                    <Text style={styles.chipEmoji}>{def?.emoji}</Text>
+                    <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginLeft: 2 }]}>
+                      {r.count}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
+        {canDelete && (
+          <Pressable onPress={onDelete} hitSlop={12}>
+            <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary }]}>
+              Delete
+            </Text>
+          </Pressable>
+        )}
+      </Pressable>
+
+      {isPickerOpen && (
+        <View style={styles.commentPickerRow}>
+          <ReactionPicker currentReaction={myReaction} onSelect={onReact} />
+        </View>
       )}
     </View>
   );
@@ -192,7 +252,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     paddingVertical: 8,
-    gap: 0,
+  },
+  commentReactions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 4,
+  },
+  reactionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    borderRadius: 12,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  chipEmoji: {
+    fontSize: 13,
+  },
+  commentPickerRow: {
+    paddingLeft: 44,
+    paddingBottom: 8,
   },
   inputBar: {
     flexDirection: 'row',

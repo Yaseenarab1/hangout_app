@@ -24,6 +24,7 @@ import { SelectionReviewSheet } from '@/components/ui/SelectionReviewSheet';
 import { useDebounce } from '@/hooks/useDebounce';
 import { searchPlaces, PlaceDetailSheet } from '@/features/places';
 import { useSearchLocation } from '@/features/places/hooks/useSearchLocation';
+import { filterByRadius } from '@/features/places/utils/distance';
 import { useQuery } from '@tanstack/react-query';
 import type { Place } from '@/features/places';
 
@@ -58,9 +59,10 @@ const PRICE_LEVELS = [
 ];
 
 const RADIUS_OPTIONS = [
-  { value: 1500, label: '<1mi' },
-  { value: 5000, label: '<3mi' },
-  { value: 16000, label: '<10mi' },
+  { value: 1609, label: '1 mi' },
+  { value: 4828, label: '3 mi' },
+  { value: 8047, label: '5 mi' },
+  { value: 16093, label: '10 mi' },
 ];
 
 const RATING_OPTIONS = [
@@ -90,7 +92,7 @@ export function ActivityVenuePicker({
   const [showFilters, setShowFilters] = useState(false);
   const [minPrice, setMinPrice] = useState<number | undefined>(undefined);
   const [maxPrice, setMaxPrice] = useState<number | undefined>(undefined);
-  const [radius, setRadius] = useState<number>(5000);
+  const [radius, setRadius] = useState<number>(4828);
   const [minRating, setMinRating] = useState<number>(0);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customName, setCustomName] = useState('');
@@ -124,6 +126,7 @@ export function ActivityVenuePicker({
       }),
     enabled: searchEnabled,
     staleTime: 5 * 60 * 1000,
+    select: (data) => filterByRadius(data, searchLoc.data, radius),
   });
 
   const selectedPlaceIds = useMemo(
@@ -280,6 +283,20 @@ export function ActivityVenuePicker({
           containerStyle={{ marginBottom: 6 }}
         />
 
+        {/* Always-visible manual add link — before results so it's never buried */}
+        {!showCustomInput && (
+          <Pressable
+            onPress={() => setShowCustomInput(true)}
+            disabled={isAtMax}
+            style={[styles.addCustomInline, { opacity: isAtMax ? 0.4 : 1 }]}
+          >
+            <Plus size={13} color={theme.colors.accent} />
+            <Text style={[theme.typography.caption, { color: theme.colors.accent, marginLeft: 4 }]}>
+              Add a place manually
+            </Text>
+          </Pressable>
+        )}
+
         <Pressable
           onPress={() => setShowFilters(!showFilters)}
           style={styles.filtersToggle}
@@ -376,66 +393,41 @@ export function ActivityVenuePicker({
           )}
         />
 
-        <View style={{ marginTop: 16 }}>
-          {showCustomInput ? (
-            <View style={{ gap: 8 }}>
-              <Input
-                placeholder="Place name"
-                value={customName}
-                onChangeText={setCustomName}
-                autoFocus
-                maxLength={200}
+        {showCustomInput ? (
+          <View style={[styles.customForm, { borderColor: theme.colors.border.default, backgroundColor: theme.colors.bg.subtle }]}>
+            <Input
+              placeholder="Place name"
+              value={customName}
+              onChangeText={setCustomName}
+              autoFocus
+              maxLength={200}
+            />
+            <Input
+              placeholder="Address (optional)"
+              value={customAddress}
+              onChangeText={setCustomAddress}
+              maxLength={300}
+            />
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Button
+                label="Add"
+                onPress={addCustom}
+                disabled={!customName.trim() || isAtMax}
+                size="sm"
               />
-              <Input
-                placeholder="Address (optional)"
-                value={customAddress}
-                onChangeText={setCustomAddress}
-                maxLength={300}
+              <Button
+                label="Cancel"
+                variant="ghost"
+                onPress={() => {
+                  setShowCustomInput(false);
+                  setCustomName('');
+                  setCustomAddress('');
+                }}
+                size="sm"
               />
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Button
-                  label="Add"
-                  onPress={addCustom}
-                  disabled={!customName.trim() || isAtMax}
-                  size="sm"
-                />
-                <Button
-                  label="Cancel"
-                  variant="ghost"
-                  onPress={() => {
-                    setShowCustomInput(false);
-                    setCustomName('');
-                    setCustomAddress('');
-                  }}
-                  size="sm"
-                />
-              </View>
             </View>
-          ) : (
-            <Pressable
-              onPress={() => setShowCustomInput(true)}
-              disabled={isAtMax}
-              style={({ pressed }) => [
-                styles.addCustomButton,
-                {
-                  borderColor: theme.colors.border.default,
-                  opacity: isAtMax ? 0.4 : 1,
-                },
-                pressed && { backgroundColor: theme.colors.bg.subtle },
-              ]}
-            >
-              <Plus size={16} color={theme.colors.text.secondary} />
-              <Text
-                style={[
-                  theme.typography.bodySmall,
-                  { color: theme.colors.text.secondary, marginLeft: 6 },
-                ]}
-              >
-                Add a place not on Google
-              </Text>
-            </Pressable>
-          )}
-        </View>
+          </View>
+        ) : null}
       </ScrollView>
 
       <SelectionReviewSheet
@@ -771,5 +763,18 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderStyle: 'dashed',
+  },
+  addCustomInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    marginBottom: 8,
+  },
+  customForm: {
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 8,
   },
 });

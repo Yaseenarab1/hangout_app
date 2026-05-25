@@ -28,8 +28,8 @@ export type ParsedReceipt = {
 // Matches prices like: $12.50  12.50  12,50  1,234.56
 const PRICE_RE = /\$?\d{1,3}(?:[,\.]\d{3})*(?:[,\.]\d{2})/;
 
-// Keywords that mark lines to exclude from items (tax, tip, total, subtotal, etc.)
-const SUMMARY_KEYWORDS = /\b(tax|tip|gratuity|service\s+charge|total|subtotal|sub\s*total|amount\s+due|balance\s+due|change|cash|card|visa|master|amex|debit|credit|thank\s+you)\b/i;
+// Keywords that mark lines to exclude from items (tax, tip, total, subtotal, fees, etc.)
+const SUMMARY_KEYWORDS = /\b(tax|tip|gratuity|service\s+(fee|charge)|delivery\s+fee|bag\s+fee|convenience\s+fee|surcharge|other\s+(fee|charge)|fees?\s*&?\s*charges?|total|subtotal|sub\s*total|amount\s+due|balance\s+due|change|cash|card|visa|master|amex|debit|credit|thank\s+you)\b/i;
 
 function parseCents(raw: string): number | null {
   const s = raw
@@ -147,8 +147,18 @@ export function parseReceiptText(annotations: VisionEntityAnnotation[]): ParsedR
     const lower = combinedText.toLowerCase();
 
     // Route to summary fields
-    if (/\btax\b/.test(lower) && !/gratuity|tip/.test(lower)) {
-      if (taxCents === null) taxCents = cents;
+    // Tax + any extra fees (service fee, delivery fee, bag fee, surcharge, etc.)
+    const isTaxLike =
+      /\btax\b/.test(lower) ||
+      /\bservice\s+(?:fee|charge)\b/.test(lower) ||
+      /\bdelivery\s+fee\b/.test(lower) ||
+      /\bbag\s+fee\b/.test(lower) ||
+      /\bconvenience\s+fee\b/.test(lower) ||
+      /\bsurcharge\b/.test(lower) ||
+      /\bother\s+(?:fee|charge)\b/.test(lower) ||
+      /\bfees?\s*&?\s*charges?\b/.test(lower);
+    if (isTaxLike && !/gratuity|tip/.test(lower)) {
+      taxCents = (taxCents ?? 0) + cents; // accumulate multiple fees
       continue;
     }
     if (/\btip\b|\bgratuity\b/.test(lower)) {

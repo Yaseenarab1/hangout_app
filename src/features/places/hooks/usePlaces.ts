@@ -6,6 +6,7 @@ import {
   getPlaceDetails,
 } from '../services/places.service';
 import { useSearchLocation } from './useSearchLocation';
+import { filterByRadius } from '../utils/distance';
 import type { RestaurantSearchFilters } from '../types';
 
 const placesKeys = {
@@ -29,6 +30,8 @@ export function useRestaurantSearch(
     queryFn: () => searchRestaurants(filtersWithLoc),
     enabled: enabled && Boolean(filters.query || filters.cuisine),
     staleTime: 5 * 60 * 1000,
+    // Hard client-side enforcement: cut anything outside the radius regardless of what Google returned
+    select: (data) => filterByRadius(data, searchLoc.data, filtersWithLoc.radius),
   });
 }
 

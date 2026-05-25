@@ -10,15 +10,20 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Dimensions,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, Image as ImageIcon, Globe, Users, Lock } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, Globe, Users, Lock, Plus, X, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';
 import { Button, Switch } from '@/components/ui';
 import { useTheme } from '@/hooks/useTheme';
 import { useCreatePost } from '@/features/feed';
 import type { PostVisibility } from '@/features/feed';
+
+const { width: SCREEN_W } = Dimensions.get('window');
+const THUMB_SIZE = 80;
+const MAX_PHOTOS = 4;
 
 type Step = 'pick' | 'compose';
 
@@ -28,34 +33,77 @@ export default function NewPostScreen(): React.ReactElement {
   const createPost = useCreatePost();
 
   const [step, setStep] = useState<Step>('pick');
-  const [localUri, setLocalUri] = useState<string | null>(null);
+  const [localUris, setLocalUris] = useState<string[]>([]);
+  const [previewIndex, setPreviewIndex] = useState(0);
   const [caption, setCaption] = useState('');
   const [visibility, setVisibility] = useState<PostVisibility>('friends');
   const [keepForever, setKeepForever] = useState(false);
 
-  async function pick(source: 'camera' | 'library') {
+  async function pickFrom(source: 'camera' | 'library') {
     const result =
       source === 'camera'
         ? await ImagePicker.launchCameraAsync({ quality: 0.9, mediaTypes: 'images' })
-        : await ImagePicker.launchImageLibraryAsync({ quality: 0.9, mediaTypes: 'images' });
+        : await ImagePicker.launchImageLibraryAsync({
+            quality: 0.9,
+            mediaTypes: 'images',
+            allowsMultipleSelection: true,
+            selectionLimit: MAX_PHOTOS,
+          });
 
-    if (result.canceled || !result.assets?.[0]) return;
-    setLocalUri(result.assets[0]!.uri);
+    if (result.canceled || !result.assets?.length) return;
+    const uris = result.assets.map((a) => a.uri).slice(0, MAX_PHOTOS);
+    setLocalUris(uris);
+    setPreviewIndex(0);
     if (params.hangoutId) setVisibility('hangout');
     setStep('compose');
   }
 
+  async function addMore() {
+    const remaining = MAX_PHOTOS - localUris.length;
+    if (remaining <= 0) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      quality: 0.9,
+      mediaTypes: 'images',
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
+    });
+    if (result.canceled || !result.assets?.length) return;
+    const newUris = result.assets.map((a) => a.uri);
+    setLocalUris((prev) => [...prev, ...newUris].slice(0, MAX_PHOTOS));
+  }
+
+  function removePhoto(index: number) {
+    const next = localUris.filter((_, i) => i !== index);
+    if (next.length === 0) {
+      setStep('pick');
+    } else {
+      setLocalUris(next);
+      setPreviewIndex(Math.min(previewIndex, next.length - 1));
+    }
+  }
+
+  function movePhoto(from: number, dir: -1 | 1) {
+    const to = from + dir;
+    if (to < 0 || to >= localUris.length) return;
+    const next = [...localUris];
+    [next[from], next[to]] = [next[to]!, next[from]!];
+    setLocalUris(next);
+    setPreviewIndex(to);
+  }
+
   async function share() {
-    if (!localUri) return;
+    if (!localUris.length) return;
     await createPost.mutateAsync({
-      localUri,
+      localUris,
       caption: caption.trim() || undefined,
       visibility,
       hangoutId: params.hangoutId,
-      expiresAt: keepForever ? null : undefined, // undefined = default 24h
+      expiresAt: keepForever ? null : undefined,
     });
     router.back();
   }
+
+  // ── Pick step ──────────────────────────────────────────────────────────────
 
   if (step === 'pick') {
     return (
@@ -66,27 +114,29 @@ export default function NewPostScreen(): React.ReactElement {
             { color: theme.colors.text.secondary, marginBottom: 32 },
           ]}
         >
-          Choose a photo to share
+          Share a photo (up to {MAX_PHOTOS})
         </Text>
         <View style={styles.options}>
           <OptionCard
             icon={<Camera size={28} color={theme.colors.accent} />}
             title="Take a photo"
             subtitle="Use your camera"
-            onPress={() => pick('camera')}
+            onPress={() => pickFrom('camera')}
             theme={theme}
           />
           <OptionCard
             icon={<ImageIcon size={28} color={theme.colors.accent} />}
             title="Choose from library"
-            subtitle="Pick an existing photo"
-            onPress={() => pick('library')}
+            subtitle={`Pick up to ${MAX_PHOTOS} photos`}
+            onPress={() => pickFrom('library')}
             theme={theme}
           />
         </View>
       </Screen>
     );
   }
+
+  // ── Compose step ───────────────────────────────────────────────────────────
 
   return (
     <KeyboardAvoidingView
@@ -107,9 +157,7 @@ export default function NewPostScreen(): React.ReactElement {
               {createPost.isPending ? (
                 <ActivityIndicator size="small" color={theme.colors.accent} />
               ) : (
-                <Text
-                  style={[theme.typography.bodyMedium, { color: theme.colors.accent }]}
-                >
+                <Text style={[theme.typography.bodyMedium, { color: theme.colors.accent }]}>
                   Share
                 </Text>
               )}
@@ -118,14 +166,84 @@ export default function NewPostScreen(): React.ReactElement {
         }}
         scroll
       >
-        {/* Preview */}
+        {/* ── Photo preview ── */}
         <Image
-          source={{ uri: localUri! }}
+          source={{ uri: localUris[previewIndex]! }}
           style={[styles.preview, { borderRadius: theme.radii.md }]}
           resizeMode="cover"
         />
 
-        {/* Caption */}
+        {/* ── Thumbnail strip ── */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginBottom: 16 }}
+          contentContainerStyle={styles.thumbStrip}
+        >
+          {localUris.map((uri, i) => (
+            <View key={i} style={styles.thumbWrapper}>
+              <Pressable onPress={() => setPreviewIndex(i)}>
+                <Image
+                  source={{ uri }}
+                  style={[
+                    styles.thumb,
+                    i === previewIndex && {
+                      borderWidth: 2,
+                      borderColor: theme.colors.accent,
+                    },
+                  ]}
+                  resizeMode="cover"
+                />
+              </Pressable>
+              <Pressable
+                onPress={() => removePhoto(i)}
+                style={[styles.removeBtn, { backgroundColor: theme.colors.bg.canvas }]}
+              >
+                <X size={10} color={theme.colors.text.primary} />
+              </Pressable>
+              {/* Reorder arrows — only on selected thumb, only when multiple photos */}
+              {i === previewIndex && localUris.length > 1 && (
+                <View style={styles.reorderRow}>
+                  <Pressable
+                    onPress={() => movePhoto(i, -1)}
+                    disabled={i === 0}
+                    style={[styles.reorderBtn, { opacity: i === 0 ? 0.3 : 1 }]}
+                  >
+                    <ChevronLeft size={12} color="#FFFFFF" />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => movePhoto(i, 1)}
+                    disabled={i === localUris.length - 1}
+                    style={[styles.reorderBtn, { opacity: i === localUris.length - 1 ? 0.3 : 1 }]}
+                  >
+                    <ChevronRight size={12} color="#FFFFFF" />
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          ))}
+
+          {/* Add more button */}
+          {localUris.length < MAX_PHOTOS && (
+            <Pressable
+              onPress={addMore}
+              style={[
+                styles.addMoreBtn,
+                {
+                  backgroundColor: theme.colors.bg.surface,
+                  borderColor: theme.colors.border.default,
+                },
+              ]}
+            >
+              <Plus size={20} color={theme.colors.accent} />
+              <Text style={[theme.typography.caption, { color: theme.colors.accent, marginTop: 2 }]}>
+                Add
+              </Text>
+            </Pressable>
+          )}
+        </ScrollView>
+
+        {/* ── Caption ── */}
         <TextInput
           value={caption}
           onChangeText={setCaption}
@@ -145,11 +263,11 @@ export default function NewPostScreen(): React.ReactElement {
           ]}
         />
 
-        {/* Visibility */}
+        {/* ── Visibility ── */}
         <Text
           style={[
             theme.typography.caption,
-            { color: theme.colors.text.secondary, marginTop: 24, marginBottom: 8 },
+            { color: theme.colors.text.secondary, marginTop: 20, marginBottom: 8 },
           ]}
         >
           Who can see this?
@@ -165,13 +283,9 @@ export default function NewPostScreen(): React.ReactElement {
                 styles.visChip,
                 {
                   backgroundColor:
-                    visibility === opt.value
-                      ? theme.colors.accent
-                      : theme.colors.bg.surface,
+                    visibility === opt.value ? theme.colors.accent : theme.colors.bg.surface,
                   borderColor:
-                    visibility === opt.value
-                      ? theme.colors.accent
-                      : theme.colors.border.default,
+                    visibility === opt.value ? theme.colors.accent : theme.colors.border.default,
                   opacity: pressed ? 0.8 : 1,
                 },
               ]}
@@ -192,8 +306,8 @@ export default function NewPostScreen(): React.ReactElement {
           ))}
         </View>
 
-        {/* Expiry */}
-        <View style={styles.expiryRow}>
+        {/* ── Keep forever toggle ── */}
+        <View style={[styles.expiryRow, { borderTopColor: theme.colors.border.default }]}>
           <View style={{ flex: 1 }}>
             <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
               Keep on profile
@@ -213,23 +327,17 @@ const VISIBILITY_OPTIONS = [
   {
     value: 'friends',
     label: 'Friends',
-    icon: (active: boolean) => (
-      <Users size={13} color={active ? '#FFFFFF' : '#8B5CF6'} />
-    ),
+    icon: (active: boolean) => <Users size={13} color={active ? '#FFFFFF' : '#8B5CF6'} />,
   },
   {
     value: 'public',
     label: 'Everyone',
-    icon: (active: boolean) => (
-      <Globe size={13} color={active ? '#FFFFFF' : '#8B5CF6'} />
-    ),
+    icon: (active: boolean) => <Globe size={13} color={active ? '#FFFFFF' : '#8B5CF6'} />,
   },
   {
     value: 'hangout',
     label: 'Hangout only',
-    icon: (active: boolean) => (
-      <Lock size={13} color={active ? '#FFFFFF' : '#8B5CF6'} />
-    ),
+    icon: (active: boolean) => <Lock size={13} color={active ? '#FFFFFF' : '#8B5CF6'} />,
   },
 ];
 
@@ -286,7 +394,57 @@ const styles = StyleSheet.create({
   preview: {
     width: '100%',
     aspectRatio: 1,
-    marginBottom: 16,
+    marginBottom: 12,
+  },
+  thumbStrip: {
+    gap: 8,
+    paddingRight: 4,
+  },
+  thumbWrapper: {
+    position: 'relative',
+  },
+  thumb: {
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: 8,
+  },
+  removeBtn: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.15)',
+  },
+  reorderRow: {
+    position: 'absolute',
+    bottom: 4,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
+  reorderBtn: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addMoreBtn: {
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   captionInput: {
     borderWidth: 1,
@@ -298,7 +456,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     flexWrap: 'wrap',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   visChip: {
     flexDirection: 'row',

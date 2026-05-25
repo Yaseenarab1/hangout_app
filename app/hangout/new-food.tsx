@@ -17,12 +17,17 @@ import {
   Clock,
   Vote as VoteIcon,
   ListOrdered,
+  MapPin,
+  Navigation,
 } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';
 import { Input, Textarea, Button } from '@/components/ui';
 import { SummaryRow } from '@/components/ui/SummaryRow';
 import { useTheme } from '@/hooks/useTheme';
 import { ParticipantPicker } from '@/features/hangouts';
+import { AddressAutocomplete } from '@/features/places';
+import { useSaveSearchLocation } from '@/features/places/hooks/useSearchLocation';
+import type { PlaceDetails } from '@/features/places';
 import {
   CuisineOptionPicker,
   RestaurantSearchPicker,
@@ -48,6 +53,7 @@ type FormState = {
   title: string;
   description: string;
   locationName: string;
+  locationAddress: string;
   inviteUserIds: string[];
   cuisineOptions: CuisineOption[];
   restaurantOptions: RestaurantOption[];
@@ -72,6 +78,7 @@ export default function NewFoodHangoutScreen(): React.ReactElement {
       title: '',
       description: '',
       locationName: '',
+      locationAddress: '',
       inviteUserIds: [],
       cuisineOptions: [],
       restaurantOptions: [],
@@ -80,6 +87,37 @@ export default function NewFoodHangoutScreen(): React.ReactElement {
       votingMethod: 'simple',
     },
   });
+
+  const [addressText, setAddressText] = useState('');
+  const [locatingMe, setLocatingMe] = useState(false);
+  const saveSearchLocation = useSaveSearchLocation();
+
+  function handlePlaceSelected(place: PlaceDetails) {
+    setAddressText(place.address);
+    setValue('locationAddress', place.address, { shouldDirty: true });
+    if (!watch('locationName')?.trim()) {
+      setValue('locationName', place.name, { shouldDirty: true });
+    }
+    if (place.location) {
+      saveSearchLocation.mutate({ name: place.name, lat: place.location.lat, lng: place.location.lng });
+    }
+  }
+
+  function useMyLocation() {
+    setLocatingMe(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        saveSearchLocation.mutate({ name: 'Current location', lat, lng });
+        setValue('locationName', 'Current location', { shouldDirty: true });
+        setValue('locationAddress', '', { shouldDirty: true });
+        setAddressText('');
+        setLocatingMe(false);
+      },
+      () => { setLocatingMe(false); },
+      { enableHighAccuracy: false, timeout: 10000 },
+    );
+  }
 
   const cuisineOptions = watch('cuisineOptions');
   const restaurantOptions = watch('restaurantOptions');
@@ -122,6 +160,7 @@ export default function NewFoodHangoutScreen(): React.ReactElement {
           description: v.description.trim() || undefined,
           startTime: v.startTime ? v.startTime.toISOString() : undefined,
           locationName: v.locationName.trim() || undefined,
+          locationAddress: v.locationAddress.trim() || undefined,
           inviteUserIds: v.inviteUserIds,
         },
         flow: flow as 'cuisine_only' | 'cuisine_then_restaurant' | 'restaurant_only',
@@ -434,20 +473,46 @@ export default function NewFoodHangoutScreen(): React.ReactElement {
               />
             )}
           />
-          <Controller
-            control={control}
-            name="locationName"
-            render={({ field: { value, onChange, onBlur } }) => (
-              <Input
-                label="Where? (optional)"
-                placeholder="A neighborhood, address, etc."
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                maxLength={100}
-              />
-            )}
-          />
+          <View>
+            <AddressAutocomplete
+              label="Where? (optional)"
+              placeholder="Search an address, neighborhood, …"
+              value={addressText}
+              onChangeText={(t) => {
+                setAddressText(t);
+                setValue('locationAddress', t, { shouldDirty: true });
+              }}
+              onSelectPlace={handlePlaceSelected}
+            />
+            <Pressable
+              onPress={useMyLocation}
+              disabled={locatingMe}
+              style={styles.useLocationBtn}
+            >
+              <Navigation size={13} color={theme.colors.accent} />
+              <Text style={[theme.typography.caption, { color: theme.colors.accent, marginLeft: 4 }]}>
+                {locatingMe ? 'Getting location…' : 'Use my current location'}
+              </Text>
+            </Pressable>
+          </View>
+
+          {watch('locationName') ? (
+            <Controller
+              control={control}
+              name="locationName"
+              render={({ field: { value, onChange, onBlur } }) => (
+                <Input
+                  label="Display name (optional)"
+                  placeholder="e.g. Mike's place, Rooftop bar"
+                  value={value ?? ''}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  maxLength={100}
+                  trailing={<MapPin size={18} color={theme.colors.text.tertiary} />}
+                />
+              )}
+            />
+          ) : null}
           <SummaryRow
             label="When?"
             icon={<CalIcon size={18} color={theme.colors.text.tertiary} />}
@@ -573,5 +638,11 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  useLocationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 6,
+    paddingHorizontal: 4,
   },
 });

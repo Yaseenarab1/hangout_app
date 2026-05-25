@@ -29,11 +29,20 @@ export function EmptyState({
   const theme = useTheme();
   return (
     <View style={styles.container}>
-      {icon ? <View style={{ marginBottom: 12 }}>{icon}</View> : null}
+      {icon ? (
+        <View
+          style={[
+            styles.iconWrap,
+            { backgroundColor: theme.colors.accent + '12' },
+          ]}
+        >
+          {icon}
+        </View>
+      ) : null}
       <Text
         style={[
-          theme.typography.bodyMedium,
-          { color: theme.colors.text.primary, textAlign: 'center' },
+          theme.typography.h3,
+          { color: theme.colors.text.primary, textAlign: 'center', marginTop: icon ? 16 : 0 },
         ]}
       >
         {title}
@@ -41,22 +50,23 @@ export function EmptyState({
       {body ? (
         <Text
           style={[
-            theme.typography.bodySmall,
+            theme.typography.body,
             {
               color: theme.colors.text.secondary,
               textAlign: 'center',
-              marginTop: 6,
-              maxWidth: 320,
+              marginTop: 8,
+              maxWidth: 300,
+              lineHeight: 22,
             },
           ]}
         >
           {body}
         </Text>
       ) : null}
-      {action ? <View style={{ marginTop: 16 }}>{action}</View> : null}
+      {action ? <View style={{ marginTop: 20 }}>{action}</View> : null}
       {actionLabel && onAction ? (
-        <View style={{ marginTop: 16 }}>
-          <Button label={actionLabel} onPress={onAction} size="sm" />
+        <View style={{ marginTop: 20 }}>
+          <Button label={actionLabel} onPress={onAction} size="md" />
         </View>
       ) : null}
     </View>
@@ -68,6 +78,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    paddingTop: 48,
+    paddingTop: 56,
+    paddingBottom: 32,
+  },
+  iconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

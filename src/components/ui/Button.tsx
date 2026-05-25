@@ -9,6 +9,13 @@ import {
   type ViewStyle,
   type TextStyle,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  Easing,
+} from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -55,52 +62,68 @@ export function Button({
   const base = stylesByVariant(theme, variant, isDisabled);
   const sizeStyles = stylesBySize(theme, size);
 
+  const scale = useSharedValue(1);
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled: isDisabled, busy: loading }}
-      accessibilityLabel={accessibilityLabel ?? label}
-      hitSlop={8}
-      onPress={(event) => {
-        if (isDisabled) return;
-        if (shouldHaptic) {
-          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        }
-        onPress?.(event);
-      }}
-      style={({ pressed }) => [
-        styles.base,
-        sizeStyles.container,
-        base.container,
-        fullWidth && styles.fullWidth,
-        pressed && !isDisabled && base.pressed,
-        style,
-      ]}
-      disabled={isDisabled}
-      {...rest}
-    >
-      {loading ? (
-        <ActivityIndicator color={base.label.color as string} />
-      ) : (
-        <View style={styles.content}>
-          {leadingIcon ? <View style={styles.iconLead}>{leadingIcon}</View> : null}
-          <Text
-            style={[styles.label, sizeStyles.label, base.label] as TextStyle[]}
-            numberOfLines={1}
-          >
-            {label}
-          </Text>
-          {trailingIcon ? <View style={styles.iconTrail}>{trailingIcon}</View> : null}
-        </View>
-      )}
-    </Pressable>
+    <Animated.View style={[animStyle, fullWidth && styles.fullWidth, style]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isDisabled, busy: loading }}
+        accessibilityLabel={accessibilityLabel ?? label}
+        hitSlop={8}
+        onPressIn={() => {
+          if (!isDisabled) {
+            scale.value = withTiming(0.97, {
+              duration: 100,
+              easing: Easing.out(Easing.cubic),
+            });
+          }
+        }}
+        onPressOut={() => {
+          scale.value = withSpring(1, { damping: 15, stiffness: 400 });
+        }}
+        onPress={(event) => {
+          if (isDisabled) return;
+          if (shouldHaptic) {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }
+          onPress?.(event);
+        }}
+        style={({ pressed }) => [
+          styles.base,
+          sizeStyles.container,
+          base.container,
+          pressed && !isDisabled && base.pressed,
+        ]}
+        disabled={isDisabled}
+        {...rest}
+      >
+        {loading ? (
+          <ActivityIndicator color={base.label.color as string} />
+        ) : (
+          <View style={styles.content}>
+            {leadingIcon ? <View style={styles.iconLead}>{leadingIcon}</View> : null}
+            <Text
+              style={[styles.label, sizeStyles.label, base.label] as TextStyle[]}
+              numberOfLines={1}
+            >
+              {label}
+            </Text>
+            {trailingIcon ? <View style={styles.iconTrail}>{trailingIcon}</View> : null}
+          </View>
+        )}
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   base: {
     minHeight: 44, // Apple HIG hit target
-    borderRadius: 10,
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -134,6 +157,11 @@ function stylesByVariant(
         container: {
           backgroundColor: c.accent,
           opacity: dimmed,
+          shadowColor: c.accent,
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: disabled ? 0 : 0.28,
+          shadowRadius: 8,
+          elevation: disabled ? 0 : 4,
         },
         pressed: { backgroundColor: c.accentHover },
         label: { color: c.text.inverse, fontWeight: '600' },

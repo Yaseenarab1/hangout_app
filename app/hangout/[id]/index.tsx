@@ -1,8 +1,8 @@
 import { usePollsByHangout } from '@/features/polls';
-import React, { useMemo } from 'react';
-import { PollCard, PollFollowUpCard } from '@/features/polls';
+import React, { useMemo, useState } from 'react';
+import { PollCard, PollFollowUpCard, AddPollSheet } from '@/features/polls';
 import { usePoll} from '@/features/polls';
-import { View, Text, StyleSheet, Alert, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Alert, Pressable, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import {
   Calendar,
@@ -20,6 +20,9 @@ import { UnreadBadge } from '@/features/messaging';
 import { usePhotosSummary } from '@/features/photos/hooks/usePhotosSummary';
 import { useUserBalance } from '@/features/bills/hooks/useUserBalance';
 import { formatCents } from '@/features/bills/utils/split';
+import { autocompleteAddress, getPlaceDetails } from '@/features/places';
+import { useSaveSearchLocation, useSearchLocation } from '@/features/places/hooks/useSearchLocation';
+import { toast } from '@/stores/ui.store';
 import { Image } from 'expo-image';
 import { Screen } from '@/components/layout/Screen';
 import {
@@ -80,6 +83,31 @@ export default function HangoutDetailScreen(): React.ReactElement {
   const photosSummary = usePhotosSummary(hangoutId);
   const previewPhotos = photosSummary.photos;
   const myBalance = useUserBalance(hangoutId);
+  const searchLocation = useSearchLocation();
+  const saveSearchLocation = useSaveSearchLocation();
+  const [showAddPoll, setShowAddPoll] = useState(false);
+
+  async function handleUseHangoutLocation(): Promise<void> {
+    const addr = hangout.data?.primary_location_address ?? hangout.data?.primary_location_name;
+    if (!addr) return;
+    try {
+      const predictions = await autocompleteAddress(addr);
+      if (!predictions.length) {
+        toast.error('Could not find this location');
+        return;
+      }
+      const place = await getPlaceDetails(predictions[0]!.placeId);
+      if (!place?.location) {
+        toast.error('Could not get coordinates for this location');
+        return;
+      }
+      const name = hangout.data?.primary_location_name ?? place.name;
+      saveSearchLocation.mutate({ name, lat: place.location.lat, lng: place.location.lng });
+      toast.success(`Search set to ${name}`);
+    } catch {
+      toast.error('Could not set location');
+    }
+  }
 
   const isHost = hangout.data?.host_id === user?.id;
   const myParticipationRole = hangout.data?.participants.find(
@@ -211,6 +239,14 @@ export default function HangoutDetailScreen(): React.ReactElement {
           icon={<MapPin size={20} color={theme.colors.accent} />}
           label="Where"
           value={h.primary_location_name ?? 'Not set'}
+          onPress={h.primary_location_name ? handleUseHangoutLocation : undefined}
+          actionLabel={
+            h.primary_location_name
+              ? searchLocation.data?.name === h.primary_location_name
+                ? '📍 Set'
+                : 'Use for search'
+              : undefined
+          }
         />
         <Fact
           icon={<Users size={20} color={theme.colors.accent} />}
@@ -282,27 +318,40 @@ export default function HangoutDetailScreen(): React.ReactElement {
         ))}
       </Card>
       {/* Polls */}
-
-{polls.data?.map((poll) => {
-  const hasFollowUp = polls.data?.some(
-    (p) =>
-      p.created_at > poll.created_at &&
-      ((poll.kind === 'cuisine' && p.kind === 'restaurant') ||
-        (poll.kind === 'activity' && p.kind === 'restaurant')),
-  );
-  return (
-    <View key={poll.id}>
-      <PollCard pollId={poll.id} canManage={canManage} />
-      {poll.phase === 'closed' && canManage ? (
-        <PollFollowUpCardWrapper
-          pollId={poll.id}
-          hangoutId={hangoutId}
-          alreadyHasFollowUp={Boolean(hasFollowUp)}
+      {((polls.data && polls.data.length > 0) || canManage) ? (
+        <SectionHeader
+          title="Votes"
+          actionLabel={canManage && !isCancelled ? '+ Add vote' : undefined}
+          onAction={canManage && !isCancelled ? () => setShowAddPoll(true) : undefined}
         />
       ) : null}
-    </View>
-  );
-})}
+
+      {polls.data?.map((poll) => {
+        const hasFollowUp = polls.data?.some(
+          (p) =>
+            p.created_at > poll.created_at &&
+            ((poll.kind === 'cuisine' && p.kind === 'restaurant') ||
+              (poll.kind === 'activity' && p.kind === 'restaurant')),
+        );
+        return (
+          <View key={poll.id}>
+            <PollCard pollId={poll.id} canManage={canManage} />
+            {poll.phase === 'closed' && canManage ? (
+              <PollFollowUpCardWrapper
+                pollId={poll.id}
+                hangoutId={hangoutId}
+                alreadyHasFollowUp={Boolean(hasFollowUp)}
+              />
+            ) : null}
+          </View>
+        );
+      })}
+
+      <AddPollSheet
+        visible={showAddPoll}
+        onClose={() => setShowAddPoll(false)}
+        hangoutId={hangoutId}
+      />
 
       {/* Chat entry */}
       <SectionHeader title="Group chat" />
@@ -416,10 +465,14 @@ function Fact({
   icon,
   label,
   value,
+  onPress,
+  actionLabel,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
+  onPress?: () => void;
+  actionLabel?: string;
 }): React.ReactElement {
   const theme = useTheme();
   return (
@@ -433,9 +486,7 @@ function Fact({
       ]}
     >
       <View style={{ marginBottom: 8 }}>{icon}</View>
-      <Text
-        style={[theme.typography.caption, { color: theme.colors.text.tertiary }]}
-      >
+      <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary }]}>
         {label}
       </Text>
       <Text
@@ -447,6 +498,13 @@ function Fact({
       >
         {value}
       </Text>
+      {onPress && actionLabel && (
+        <Pressable onPress={onPress} hitSlop={4} style={{ marginTop: 6 }}>
+          <Text style={[theme.typography.caption, { color: theme.colors.accent, fontWeight: '600' }]}>
+            {actionLabel}
+          </Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -496,8 +554,8 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   header: {
     paddingTop: 8,
@@ -509,8 +567,8 @@ const styles = StyleSheet.create({
   },
   fact: {
     flex: 1,
-    borderWidth: 1,
-    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 14,
     padding: 12,
     alignItems: 'flex-start',
   },

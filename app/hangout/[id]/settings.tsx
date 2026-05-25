@@ -9,6 +9,9 @@ import { Screen } from '@/components/layout/Screen';
 import { Input, Textarea, Button, Card, SectionHeader } from '@/components/ui';
 import { useTheme } from '@/hooks/useTheme';
 import { useSession } from '@/features/auth';
+import { AddressAutocomplete } from '@/features/places';
+import { useSaveSearchLocation } from '@/features/places/hooks/useSearchLocation';
+import type { PlaceDetails } from '@/features/places';
 import {
   useHangout,
   useUpdateHangout,
@@ -30,6 +33,8 @@ export default function HangoutSettingsScreen(): React.ReactElement {
   const deleteHangout = useDeleteHangout();
 
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [addressText, setAddressText] = useState('');
+  const saveSearchLocation = useSaveSearchLocation();
 
   const isHost = hangout.data?.host_id === user?.id;
   const myParticipationRole = hangout.data?.participants.find(
@@ -69,8 +74,23 @@ export default function HangoutSettingsScreen(): React.ReactElement {
         startTime: hangout.data.start_time ?? undefined,
         endTime: hangout.data.end_time ?? undefined,
       });
+      setAddressText(hangout.data.primary_location_address ?? '');
     }
   }, [hangout.data, reset]);
+
+  function handlePlaceSelected(place: PlaceDetails): void {
+    setAddressText(place.address);
+    setValue('locationAddress', place.address, { shouldDirty: true });
+    // Auto-fill name only if it's currently empty
+    const currentName = watch('locationName');
+    if (!currentName?.trim()) {
+      setValue('locationName', place.name, { shouldDirty: true });
+    }
+    // Save as search location so pickers use it immediately
+    if (place.location) {
+      saveSearchLocation.mutate({ name: place.name, lat: place.location.lat, lng: place.location.lng });
+    }
+  }
 
   const startTimeValue = watch('startTime');
 
@@ -241,33 +261,30 @@ export default function HangoutSettingsScreen(): React.ReactElement {
           ) : null}
         </View>
 
+        <AddressAutocomplete
+          label="Address / neighborhood"
+          placeholder="e.g. Williamsburg, Brooklyn"
+          value={addressText}
+          onChangeText={(t) => {
+            setAddressText(t);
+            setValue('locationAddress', t, { shouldDirty: true });
+          }}
+          onSelectPlace={handlePlaceSelected}
+        />
+
         <Controller
           control={control}
           name="locationName"
           render={({ field: { value, onChange, onBlur } }) => (
             <Input
-              label="Location name"
+              label="Display name (optional)"
+              placeholder="e.g. Mike's place, Rooftop bar"
               value={value ?? ''}
               onChangeText={onChange}
               onBlur={onBlur}
               error={errors.locationName?.message}
               maxLength={100}
               trailing={<MapPin size={18} color={theme.colors.text.tertiary} />}
-            />
-          )}
-        />
-
-        <Controller
-          control={control}
-          name="locationAddress"
-          render={({ field: { value, onChange, onBlur } }) => (
-            <Input
-              label="Address"
-              value={value ?? ''}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              error={errors.locationAddress?.message}
-              maxLength={200}
             />
           )}
         />

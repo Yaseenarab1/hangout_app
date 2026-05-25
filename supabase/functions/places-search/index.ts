@@ -56,11 +56,14 @@ serve(async (req: Request) => {
 
     // Use the new "Places API (New)" Text Search endpoint.
     // Docs: https://developers.google.com/maps/documentation/places/web-service/text-search
+    // locationRestriction is a hard radius cap — results strictly within the circle.
+    // locationBias is only a hint and lets Google return far-away places.
+    // We always have a radius (default 5000m), so always restrict strictly.
     const requestBody: Record<string, unknown> = {
       textQuery: body.query ?? 'restaurants',
       languageCode: body.languageCode ?? 'en',
       maxResultCount: 20,
-      locationBias: {
+      locationRestriction: {
         circle: {
           center: { latitude: center.lat, longitude: center.lng },
           radius,
@@ -116,7 +119,7 @@ serve(async (req: Request) => {
 
     const googleJson = await googleRes.json();
 
-    const results = (googleJson.places ?? []).map((p: any) => ({
+    const mapped = (googleJson.places ?? []).map((p: any) => ({
       placeId: p.id,
       name: p.displayName?.text ?? '',
       address: p.formattedAddress ?? '',
@@ -132,6 +135,13 @@ serve(async (req: Request) => {
       types: p.types ?? [],
     }));
 
+    // Hard distance filter: cut anything Google returned outside our radius.
+    // locationRestriction is advisory in some edge cases; this is the guarantee.
+    const results = mapped.filter((p: any) => {
+      if (!p.location) return true;
+      return haversineMeters(center.lat, center.lng, p.location.lat, p.location.lng) <= radius;
+    });
+
     return new Response(JSON.stringify({ results }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -146,6 +156,16 @@ serve(async (req: Request) => {
     );
   }
 });
+
+function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6_371_000;
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lng2 - lng1) * Math.PI) / 180;
+  const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 function priceLevelEnumList(min: number, max: number): string[] {
   const enumMap: Record<number, string> = {

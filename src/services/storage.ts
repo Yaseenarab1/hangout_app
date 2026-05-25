@@ -66,21 +66,21 @@ export interface FeedPostUploadResult {
   height: number;
 }
 
-/** Upload a local image as a feed post. Returns storage path + dimensions. */
+/** Upload one photo for a feed post (index 0 = primary). Returns storage path + dimensions. */
 export async function uploadFeedPost(
   localUri: string,
   userId: string,
   postId: string,
+  index = 0,
 ): Promise<FeedPostUploadResult> {
-  // Resize to max 1600px on the long edge, strip EXIF via re-encode, JPEG 80%
   const processed = await ImageManipulator.manipulateAsync(
     localUri,
     [{ resize: { width: 1600 } }],
     { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
   );
 
-  const path = `${userId}/${postId}.jpg`;
-  await uploadProcessedFile(processed.uri, STORAGE_BUCKETS.feedPosts, path, 'image/jpeg');
+  const path = `${userId}/${postId}_${index}.jpg`;
+  await uploadProcessedFile(processed.uri, STORAGE_BUCKETS.feedPosts, path, 'image/jpeg', true);
 
   return {
     storagePath: path,
@@ -94,6 +94,7 @@ async function uploadProcessedFile(
   bucket: Bucket,
   path: string,
   contentType: string,
+  upsert = true,
 ): Promise<UploadResult> {
   try {
     // 1. Read the file as base64 from the device filesystem.
@@ -113,7 +114,7 @@ async function uploadProcessedFile(
     // 3. Upload to Supabase Storage.
     const { error: uploadError } = await supabase.storage
       .from(bucket)
-      .upload(path, arrayBuffer, { contentType, upsert: true });
+      .upload(path, arrayBuffer, { contentType, upsert });
 
     if (uploadError) {
       console.log('[uploadProcessedFile] upload error:', JSON.stringify(uploadError));

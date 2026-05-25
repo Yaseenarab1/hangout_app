@@ -42,7 +42,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
         style={[
           styles.fieldWrap,
           {
-            backgroundColor: theme.colors.bg.subtle,
+            backgroundColor: theme.colors.bg.surface,
             borderColor: hasError ? theme.colors.danger : theme.colors.border.default,
           },
         ]}
@@ -91,8 +91,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 10,
-    minHeight: 48,
+    borderRadius: 12,
+    minHeight: 50,
     paddingHorizontal: 14,
   },
   input: {
