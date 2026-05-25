@@ -4,7 +4,9 @@ import {
   Text,
   StyleSheet,
   Pressable,
+  Alert,
 } from 'react-native';
+import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import {
@@ -103,20 +105,26 @@ export default function NewFoodHangoutScreen(): React.ReactElement {
     }
   }
 
-  function useMyLocation() {
+  async function useMyLocation() {
     setLocatingMe(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude: lat, longitude: lng } = pos.coords;
-        saveSearchLocation.mutate({ name: 'Current location', lat, lng });
-        setValue('locationName', 'Current location', { shouldDirty: true });
-        setValue('locationAddress', '', { shouldDirty: true });
-        setAddressText('');
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Location access denied', 'Enable location in Settings to use this feature.');
         setLocatingMe(false);
-      },
-      () => { setLocatingMe(false); },
-      { enableHighAccuracy: false, timeout: 10000 },
-    );
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const { latitude: lat, longitude: lng } = pos.coords;
+      saveSearchLocation.mutate({ name: 'Current location', lat, lng });
+      setValue('locationName', 'Current location', { shouldDirty: true });
+      setValue('locationAddress', '', { shouldDirty: true });
+      setAddressText('');
+    } catch {
+      // silently fail
+    } finally {
+      setLocatingMe(false);
+    }
   }
 
   const cuisineOptions = watch('cuisineOptions');
