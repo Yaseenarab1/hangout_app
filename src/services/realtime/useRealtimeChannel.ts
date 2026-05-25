@@ -60,8 +60,13 @@ export function useRealtimeChannel<T>(config: Config<T>): void {
 
   const unsubscribe = () => {
     if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
+      const ch = channelRef.current;
       channelRef.current = null;
+      // Synchronously evict from the channels array before the async removeChannel
+      // resolves, preventing supabase.channel() from returning a stale subscribed
+      // channel on the next subscribe() call.
+      supabase.realtime.channels = supabase.realtime.channels.filter((c) => c !== ch);
+      supabase.removeChannel(ch);
     }
   };
 

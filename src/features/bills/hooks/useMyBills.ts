@@ -27,7 +27,10 @@ export function useMyBills() {
         () => { qc.invalidateQueries({ queryKey: myBillsKey() }); },
       )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.realtime.channels = supabase.realtime.channels.filter((c) => c !== channel);
+      supabase.removeChannel(channel);
+    };
   }, [user, qc]);
 
   return query;

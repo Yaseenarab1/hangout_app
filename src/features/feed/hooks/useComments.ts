@@ -41,6 +41,7 @@ export function useComments(postId: string | undefined) {
       .subscribe();
 
     return () => {
+      supabase.realtime.channels = supabase.realtime.channels.filter((c) => c !== channel);
       supabase.removeChannel(channel);
     };
   }, [postId, qc]);

@@ -36,6 +36,12 @@ export function useFeedPosts() {
       .subscribe();
 
     return () => {
+      // Synchronously evict from the channels array so the next effect invocation
+      // doesn't receive this channel back from supabase.channel() while it's still
+      // in JOINING/JOINED state (which would throw "on() after subscribe()").
+      // removeChannel() is async so the channel stays in the array until the server
+      // responds — this filter prevents that race.
+      supabase.realtime.channels = supabase.realtime.channels.filter((c) => c !== channel);
       supabase.removeChannel(channel);
     };
   }, [user, qc]);
