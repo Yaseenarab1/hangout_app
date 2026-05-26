@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -19,32 +19,36 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Clock, ChevronRight, Calendar } from 'lucide-react-native';
+import { CalendarDays, ChevronRight, Plus, Users } from 'lucide-react-native';
+import { useQuery } from '@tanstack/react-query';
 import { useTheme } from '@/hooks/useTheme';
-import { useOpenTimePolls } from '@/features/timepolls';
-import type { OpenTimePollSummary } from '@/features/timepolls';
+import { useSession } from '@/features/auth';
+import { CreateSessionSheet } from '@/features/availability';
+import { getUserSessions } from '@/features/availability/services/availability.service';
+import type { AvailabilitySession } from '@/features/availability';
 
 const ACCENT = '#8B5CF6';
 
-function deadlineInfo(iso: string): { label: string; color: string } {
-  const d = new Date(iso);
-  const now = new Date();
-  const diffH = Math.round((d.getTime() - now.getTime()) / 3_600_000);
-  if (diffH < 0)  return { label: 'Deadline passed', color: '#EF4444' };
-  if (diffH < 24) return { label: `${diffH}h left`, color: '#F59E0B' };
-  return { label: `${Math.floor(diffH / 24)}d left`, color: '#22C55E' };
+function fmtDates(dates: string[]): string {
+  if (dates.length === 0) return 'No dates';
+  const first = new Date(dates[0]! + 'T12:00:00');
+  const last = new Date(dates[dates.length - 1]! + 'T12:00:00');
+  const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+  if (dates.length === 1) return first.toLocaleDateString('en-US', opts);
+  return `${first.toLocaleDateString('en-US', opts)} – ${last.toLocaleDateString('en-US', opts)}`;
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-}
-
-function PollCard({ item, index }: { item: OpenTimePollSummary; index: number }) {
+function SessionCard({ item, index }: { item: AvailabilitySession; index: number }) {
   const theme = useTheme();
   const router = useRouter();
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  const dl = deadlineInfo(item.vote_deadline);
+
+  function handlePress() {
+    if (item.hangout_id) {
+      router.push(`/hangout/${item.hangout_id}/when-to-meet` as any);
+    }
+  }
 
   return (
     <Animated.View
@@ -52,7 +56,7 @@ function PollCard({ item, index }: { item: OpenTimePollSummary; index: number })
       style={animStyle}
     >
       <Pressable
-        onPress={() => router.push(`/hangout/${item.hangout_id}/time-poll` as any)}
+        onPress={handlePress}
         onPressIn={() => { scale.value = withTiming(0.97, { duration: 100, easing: Easing.out(Easing.cubic) }); }}
         onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 400 }); }}
         style={[
@@ -68,37 +72,17 @@ function PollCard({ item, index }: { item: OpenTimePollSummary; index: number })
           },
         ]}
       >
-        {/* Left icon */}
         <View style={[styles.cardIcon, { backgroundColor: ACCENT + '15' }]}>
-          <Clock size={22} color={ACCENT} strokeWidth={1.5} />
+          <CalendarDays size={22} color={ACCENT} strokeWidth={1.5} />
         </View>
 
-        {/* Info */}
-        <View style={{ flex: 1, gap: 4 }}>
-          <Text
-            style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700' }]}
-            numberOfLines={1}
-          >
-            {item.hangout?.title ?? 'Hangout'}
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700' }]} numberOfLines={1}>
+            {item.title}
           </Text>
-
-          {/* Poll pill */}
-          <View style={styles.pillRow}>
-            <View style={[styles.pill, { backgroundColor: ACCENT + '12' }]}>
-              <Calendar size={10} color={ACCENT} strokeWidth={2.5} />
-              <Text style={[styles.pillText, { color: ACCENT }]}>Time poll open</Text>
-            </View>
-          </View>
-
-          {/* Deadline */}
-          <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary }]}>
-            Ends {formatDate(item.vote_deadline)}
+          <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>
+            {fmtDates(item.dates)} · {item.dates.length} date{item.dates.length === 1 ? '' : 's'}
           </Text>
-        </View>
-
-        {/* Deadline badge */}
-        <View style={[styles.deadlineBadge, { backgroundColor: dl.color + '18' }]}>
-          <Text style={[styles.deadlineText, { color: dl.color }]}>{dl.label}</Text>
         </View>
 
         <ChevronRight size={16} color={theme.colors.text.tertiary} strokeWidth={2} />
@@ -110,10 +94,17 @@ function PollCard({ item, index }: { item: OpenTimePollSummary; index: number })
 export default function FindTimeScreen(): React.ReactElement {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
-  const polls = useOpenTimePolls();
+  const { user } = useSession();
+  const [showCreate, setShowCreate] = useState(false);
 
-  const pollCount = polls.data?.length ?? 0;
+  const sessions = useQuery({
+    queryKey: ['availability_sessions', 'mine', user?.id],
+    queryFn: () => getUserSessions(user!.id),
+    enabled: !!user?.id,
+    staleTime: 30_000,
+  });
+
+  const data = sessions.data ?? [];
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.bg.canvas }]}>
@@ -128,56 +119,62 @@ export default function FindTimeScreen(): React.ReactElement {
           },
         ]}
       >
-        <Text style={[styles.headerTitle, { color: theme.colors.text.primary }]}>Find Time</Text>
-        {pollCount > 0 && (
-          <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary }]}>
-            {pollCount} open {pollCount === 1 ? 'poll' : 'polls'}
-          </Text>
-        )}
+        <View>
+          <Text style={[styles.headerTitle, { color: theme.colors.text.primary }]}>Find Time</Text>
+          {data.length > 0 && (
+            <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary }]}>
+              {data.length} session{data.length === 1 ? '' : 's'}
+            </Text>
+          )}
+        </View>
+
+        <Pressable
+          onPress={() => setShowCreate(true)}
+          style={[styles.newBtn, { backgroundColor: ACCENT }]}
+          accessibilityLabel="Create new session"
+        >
+          <Plus size={18} color="#FFFFFF" strokeWidth={2.5} />
+          <Text style={styles.newBtnText}>New</Text>
+        </Pressable>
       </View>
 
       {/* Loading */}
-      {polls.isLoading && (
+      {sessions.isLoading && (
         <View style={styles.center}>
           <ActivityIndicator color={ACCENT} size="large" />
         </View>
       )}
 
       {/* Empty state */}
-      {!polls.isLoading && pollCount === 0 && (
+      {!sessions.isLoading && data.length === 0 && (
         <Animated.View entering={FadeIn.duration(400)} style={styles.emptyWrap}>
-          {/* Hero */}
           <View style={[styles.emptyHero, { backgroundColor: ACCENT + '10' }]}>
-            <Clock size={42} color={ACCENT} strokeWidth={1.5} />
+            <CalendarDays size={42} color={ACCENT} strokeWidth={1.5} />
             <View style={[styles.heroDot, { top: 18, right: 22, width: 8, height: 8, backgroundColor: ACCENT + '40' }]} />
             <View style={[styles.heroDot, { bottom: 20, left: 26, width: 5, height: 5, backgroundColor: ACCENT + '30' }]} />
-            <View style={[styles.heroDot, { top: 32, left: 18, width: 6, height: 6, backgroundColor: ACCENT + '25' }]} />
           </View>
 
           <Text style={[styles.emptyTitle, { color: theme.colors.text.primary }]}>
-            No open polls
+            When to Meet
           </Text>
           <Text style={[theme.typography.body, { color: theme.colors.text.secondary, textAlign: 'center', lineHeight: 22 }]}>
-            Start a time poll inside any hangout to help your group agree on when to meet.
+            Everyone marks their free times on a grid. Best overlapping times light up green — no voting needed.
           </Text>
 
           <Pressable
-            onPress={() => router.push('/(tabs)/hangouts')}
+            onPress={() => setShowCreate(true)}
             style={({ pressed }) => [styles.emptyBtn, { opacity: pressed ? 0.85 : 1 }]}
           >
-            <Calendar size={18} color="#FFFFFF" strokeWidth={2.5} />
-            <Text style={styles.emptyBtnText}>Go to hangouts</Text>
+            <Plus size={18} color="#FFFFFF" strokeWidth={2.5} />
+            <Text style={styles.emptyBtnText}>Create session</Text>
           </Pressable>
 
           {/* How it works */}
           <View style={[styles.howItWorks, { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default }]}>
-            <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700', marginBottom: 10 }]}>
-              How it works
-            </Text>
             {[
-              { emoji: '1️⃣', text: 'Open a hangout and tap "Find a time"' },
-              { emoji: '2️⃣', text: 'Propose 2–5 date/time options' },
-              { emoji: '3️⃣', text: 'Everyone votes · best time wins' },
+              { emoji: '1️⃣', text: 'Pick dates you want to check (up to 7)' },
+              { emoji: '2️⃣', text: "Share with friends — everyone taps when they're free" },
+              { emoji: '3️⃣', text: 'Green slots = times that work for everyone' },
             ].map((step) => (
               <View key={step.emoji} style={styles.stepRow}>
                 <Text style={styles.stepEmoji}>{step.emoji}</Text>
@@ -190,21 +187,28 @@ export default function FindTimeScreen(): React.ReactElement {
         </Animated.View>
       )}
 
-      {/* Poll list */}
-      {!polls.isLoading && pollCount > 0 && (
+      {/* Session list */}
+      {!sessions.isLoading && data.length > 0 && (
         <FlatList
-          data={polls.data}
+          data={data}
           keyExtractor={(item) => item.id}
-          renderItem={({ item, index }) => <PollCard item={item} index={index} />}
-          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 32 }]}
+          renderItem={({ item, index }) => <SessionCard item={item} index={index} />}
+          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
-            <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary, paddingBottom: 8, fontWeight: '600', letterSpacing: 0.3 }]}>
-              OPEN POLLS
+            <Text style={[styles.listHeader, { color: theme.colors.text.tertiary }]}>
+              YOUR SESSIONS
             </Text>
           }
         />
       )}
+
+      {/* Create standalone session sheet */}
+      <CreateSessionSheet
+        visible={showCreate}
+        onClose={() => setShowCreate(false)}
+        onCreated={() => setShowCreate(false)}
+      />
     </View>
   );
 }
@@ -212,6 +216,9 @@ export default function FindTimeScreen(): React.ReactElement {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingBottom: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -220,6 +227,19 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '800',
     letterSpacing: -0.5,
+  },
+  newBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  newBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
   center: {
     flex: 1,
@@ -289,6 +309,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 10,
   },
+  listHeader: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -304,32 +330,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-  },
-  pillRow: {
-    flexDirection: 'row',
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 20,
-  },
-  pillText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  deadlineBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-    flexShrink: 0,
-  },
-  deadlineText: {
-    fontSize: 11,
-    fontWeight: '700',
   },
 });

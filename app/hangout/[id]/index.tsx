@@ -292,28 +292,68 @@ export default function HangoutDetailScreen(): React.ReactElement {
           <View style={styles.rsvpButtons}>
             <RSVPButton
               label="Going"
-              icon={<CheckCircle size={16} color="#FFFFFF" />}
+              icon={<CheckCircle size={15} color={myParticipation.status === 'accepted' ? '#FFFFFF' : '#22C55E'} />}
               active={myParticipation.status === 'accepted'}
-              variant="primary"
+              activeColor="#22C55E"
               onPress={() => handleRSVP('accepted')}
             />
             <RSVPButton
               label="Maybe"
-              icon={<HelpCircle size={16} color={theme.colors.text.primary} />}
+              icon={<HelpCircle size={15} color={myParticipation.status === 'maybe' ? '#FFFFFF' : '#F59E0B'} />}
               active={myParticipation.status === 'maybe'}
-              variant="secondary"
+              activeColor="#F59E0B"
               onPress={() => handleRSVP('maybe')}
             />
             <RSVPButton
               label="Can't"
-              icon={<XCircle size={16} color={theme.colors.danger} />}
+              icon={<XCircle size={15} color={myParticipation.status === 'declined' ? '#FFFFFF' : '#EF4444'} />}
               active={myParticipation.status === 'declined'}
-              variant="ghost"
+              activeColor="#EF4444"
               onPress={() => handleRSVP('declined')}
             />
           </View>
         </View>
       ) : null}
+
+      {/* Plan cards — before participants so they're easy to reach */}
+      <SectionHeader title="Plan" />
+      <View style={styles.planCards}>
+        <Pressable
+          onPress={() => router.push(`/hangout/${hangoutId}/dayplan` as any)}
+          style={({ pressed }) => [
+            styles.planCard,
+            { backgroundColor: '#8B5CF6' + '12', borderColor: '#8B5CF6' + '30', opacity: pressed ? 0.8 : 1 },
+          ]}
+        >
+          <View style={[styles.planCardIcon, { backgroundColor: '#8B5CF6' + '20' }]}>
+            <Route size={22} color="#8B5CF6" strokeWidth={1.8} />
+          </View>
+          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, marginTop: 10, fontWeight: '700' }]}>
+            Itinerary
+          </Text>
+          <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 2 }]}>
+            Map out your day
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push(`/hangout/${hangoutId}/when-to-meet` as any)}
+          style={({ pressed }) => [
+            styles.planCard,
+            { backgroundColor: '#22C55E' + '10', borderColor: '#22C55E' + '30', opacity: pressed ? 0.8 : 1 },
+          ]}
+        >
+          <View style={[styles.planCardIcon, { backgroundColor: '#22C55E' + '18' }]}>
+            <Clock size={22} color="#22C55E" strokeWidth={1.8} />
+          </View>
+          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, marginTop: 10, fontWeight: '700' }]}>
+            When to meet
+          </Text>
+          <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 2 }]}>
+            Find a time for everyone
+          </Text>
+        </Pressable>
+      </View>
 
       {/* Participants */}
       <SectionHeader
@@ -492,56 +532,6 @@ export default function HangoutDetailScreen(): React.ReactElement {
         )}
       </Pressable>
 
-      {/* Day Plan + Find a time — two-up visual cards */}
-      <SectionHeader title="Plan" />
-      <View style={styles.planCards}>
-        {/* Itinerary card */}
-        <Pressable
-          onPress={() => router.push(`/hangout/${hangoutId}/dayplan` as any)}
-          style={({ pressed }) => [
-            styles.planCard,
-            {
-              backgroundColor: '#8B5CF6' + '12',
-              borderColor: '#8B5CF6' + '30',
-              opacity: pressed ? 0.8 : 1,
-            },
-          ]}
-        >
-          <View style={[styles.planCardIcon, { backgroundColor: '#8B5CF6' + '20' }]}>
-            <Route size={22} color="#8B5CF6" strokeWidth={1.8} />
-          </View>
-          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, marginTop: 10, fontWeight: '700' }]}>
-            Itinerary
-          </Text>
-          <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 2 }]}>
-            Map out your day
-          </Text>
-        </Pressable>
-
-        {/* Find time card */}
-        <Pressable
-          onPress={() => router.push(`/hangout/${hangoutId}/time-poll` as any)}
-          style={({ pressed }) => [
-            styles.planCard,
-            {
-              backgroundColor: theme.colors.bg.surface,
-              borderColor: theme.colors.border.default,
-              opacity: pressed ? 0.8 : 1,
-            },
-          ]}
-        >
-          <View style={[styles.planCardIcon, { backgroundColor: theme.colors.bg.subtle }]}>
-            <Clock size={22} color={theme.colors.text.secondary} strokeWidth={1.8} />
-          </View>
-          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, marginTop: 10, fontWeight: '700' }]}>
-            Find a time
-          </Text>
-          <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 2 }]}>
-            Vote on date & time
-          </Text>
-        </Pressable>
-      </View>
-
       {/* Host: cancel hangout */}
       {isHost && !isCancelled ? (
         <View style={{ marginTop: 24 }}>
@@ -610,28 +600,59 @@ function RSVPButton({
   label,
   icon,
   active,
-  variant,
+  activeColor,
   onPress,
 }: {
   label: string;
   icon: React.ReactNode;
   active: boolean;
-  variant: 'primary' | 'secondary' | 'ghost';
+  activeColor: string;
   onPress: () => void;
 }): React.ReactElement {
+  const theme = useTheme();
   return (
-    <View style={{ flex: 1 }}>
-      <Button
-        label={label}
-        leadingIcon={icon}
-        variant={active ? variant : 'secondary'}
-        size="sm"
-        onPress={onPress}
-        fullWidth
-      />
-    </View>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        rsvpStyles.btn,
+        {
+          backgroundColor: active ? activeColor : activeColor + '14',
+          borderColor: active ? activeColor : activeColor + '45',
+          opacity: pressed ? 0.75 : 1,
+        },
+      ]}
+    >
+      {icon}
+      <Text style={[rsvpStyles.label, { color: active ? '#FFFFFF' : activeColor }]}>
+        {label}
+      </Text>
+      {active && <View style={rsvpStyles.dot} />}
+    </Pressable>
   );
 }
+
+const rsvpStyles = StyleSheet.create({
+  btn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+  },
+});
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
