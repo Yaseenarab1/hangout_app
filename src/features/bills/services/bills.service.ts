@@ -120,7 +120,7 @@ export async function createBill(params: CreateBillParams): Promise<Bill> {
   const { data: bill, error: billError } = await db()
     .from('bills')
     .insert({
-      hangout_id: params.hangout_id,
+      hangout_id: params.hangout_id || null,
       payer_id: params.payer_id,
       amount_cents: params.amount_cents,
       description: params.description,
@@ -315,7 +315,7 @@ export async function createItemizedBill(params: CreateItemizedBillParams): Prom
   const { data: bill, error: billError } = await db()
     .from('bills')
     .insert({
-      hangout_id: params.hangout_id ?? null,
+      hangout_id: params.hangout_id || null,
       payer_id: params.payer_id,
       mode: 'itemized',
       amount_cents: totalCents,
@@ -336,7 +336,7 @@ export async function createItemizedBill(params: CreateItemizedBillParams): Prom
   // Insert guest participants first so we can get their IDs
   const guestRows = params.shares
     .filter((s) => s.guest_name)
-    .map((s) => ({ bill_id: billId, name: s.guest_name!, added_by: auth.user!.id }));
+    .map((s) => ({ bill_id: billId, name: s.guest_name! }));
 
   let guestMap = new Map<string, string>(); // name → id
   if (guestRows.length > 0) {
