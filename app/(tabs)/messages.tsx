@@ -5,20 +5,52 @@ import { MessageCircle, ChevronRight, Users, Plus } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';
 import { Avatar, EmptyState, Skeleton, SectionHeader } from '@/components/ui';
 import { useMyHangouts } from '@/features/hangouts';
-import { UnreadBadge } from '@/features/messaging';
+import { UnreadBadge, useUnreadHangoutIds } from '@/features/messaging';
 import { useConversations } from '@/features/conversations';
 import { useSession } from '@/features/auth';
 import { useTheme } from '@/hooks/useTheme';
 import type { Hangout } from '@/features/hangouts';
 import type { Conversation } from '@/features/conversations';
 
+function isConvUnread(conv: Conversation, myId: string): boolean {
+  if (!conv.last_message_at) return false;
+  // Don't count your own last message as unread
+  if (conv.last_message?.sender_id === myId) return false;
+  const me = conv.participants.find((p) => p.user_id === myId);
+  if (!me?.last_read_at) return true;
+  return conv.last_message_at > me.last_read_at;
+}
+
 export default function MessagesTab(): React.ReactElement {
   const theme = useTheme();
   const { user } = useSession();
   const hangouts = useMyHangouts();
   const convs = useConversations();
+  const unreadHangoutIds = useUnreadHangoutIds();
 
-  const active = (hangouts.data ?? []).filter((h) => h.status !== 'cancelled');
+  const myId = user?.id ?? '';
+
+  const allActive = (hangouts.data ?? []).filter((h) => h.status !== 'cancelled');
+  // Sort: unread first, then by last_message_at desc (hangouts without messages go to end)
+  const active = [...allActive].sort((a, b) => {
+    const aUnread = unreadHangoutIds.has(a.id);
+    const bUnread = unreadHangoutIds.has(b.id);
+    if (aUnread !== bUnread) return aUnread ? -1 : 1;
+    return 0;
+  });
+
+  const allConvs = convs.conversations;
+  const sortedConvs = [...allConvs].sort((a, b) => {
+    const aUnread = isConvUnread(a, myId);
+    const bUnread = isConvUnread(b, myId);
+    if (aUnread !== bUnread) return aUnread ? -1 : 1;
+    // Secondary sort: most recent first
+    if (a.last_message_at && b.last_message_at) {
+      return b.last_message_at.localeCompare(a.last_message_at);
+    }
+    return 0;
+  });
+
   const isLoading = hangouts.isLoading || convs.isLoading;
   const isRefreshing = hangouts.isRefetching || convs.isRefetching;
 
@@ -60,12 +92,12 @@ export default function MessagesTab(): React.ReactElement {
       ) : (
         <>
           {/* DMs + Groups */}
-          {convs.conversations.length > 0 && (
+          {sortedConvs.length > 0 && (
             <>
               <SectionHeader title="Direct messages" />
               <View style={styles.list}>
-                {convs.conversations.map((c) => (
-                  <ConversationRow key={c.id} conv={c} myId={user?.id ?? ''} />
+                {sortedConvs.map((c) => (
+                  <ConversationRow key={c.id} conv={c} myId={myId} isUnread={isConvUnread(c, myId)} />
                 ))}
               </View>
             </>
@@ -77,14 +109,14 @@ export default function MessagesTab(): React.ReactElement {
               <SectionHeader title="Hangout chats" />
               <View style={styles.list}>
                 {active.map((h) => (
-                  <HangoutChatRow key={h.id} hangout={h} />
+                  <HangoutChatRow key={h.id} hangout={h} isUnread={unreadHangoutIds.has(h.id)} />
                 ))}
               </View>
             </>
           )}
 
           {/* Empty state when nothing at all */}
-          {convs.conversations.length === 0 && active.length === 0 && (
+          {sortedConvs.length === 0 && active.length === 0 && (
             <EmptyState
               icon={<MessageCircle size={42} color={theme.colors.text.tertiary} strokeWidth={1.5} />}
               title="No chats yet"
@@ -100,13 +132,14 @@ export default function MessagesTab(): React.ReactElement {
 function ConversationRow({
   conv,
   myId,
+  isUnread,
 }: {
   conv: Conversation;
   myId: string;
+  isUnread: boolean;
 }): React.ReactElement {
   const theme = useTheme();
 
-  // For DMs, show the other person. For groups, show group name.
   const otherParticipant =
     conv.type === 'dm'
       ? conv.participants.find((p) => p.user_id !== myId)
@@ -134,7 +167,7 @@ function ConversationRow({
         styles.row,
         {
           backgroundColor: theme.colors.bg.surface,
-          borderColor: theme.colors.border.default,
+          borderColor: isUnread ? theme.colors.accent : theme.colors.border.default,
         },
         pressed && { opacity: 0.7 },
       ]}
@@ -154,7 +187,10 @@ function ConversationRow({
 
       <View style={{ flex: 1 }}>
         <Text
-          style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}
+          style={[
+            theme.typography.bodyMedium,
+            { color: theme.colors.text.primary, fontWeight: isUnread ? '700' : '400' },
+          ]}
           numberOfLines={1}
         >
           {displayName}
@@ -172,12 +208,13 @@ function ConversationRow({
           {formatTime(conv.last_message_at)}
         </Text>
       )}
+      {isUnread && <View style={styles.unreadDot} />}
       <ChevronRight size={16} color={theme.colors.text.tertiary} />
     </Pressable>
   );
 }
 
-function HangoutChatRow({ hangout }: { hangout: Hangout }): React.ReactElement {
+function HangoutChatRow({ hangout, isUnread }: { hangout: Hangout; isUnread: boolean }): React.ReactElement {
   const theme = useTheme();
 
   return (
@@ -187,7 +224,7 @@ function HangoutChatRow({ hangout }: { hangout: Hangout }): React.ReactElement {
         styles.row,
         {
           backgroundColor: theme.colors.bg.surface,
-          borderColor: theme.colors.border.default,
+          borderColor: isUnread ? theme.colors.accent : theme.colors.border.default,
         },
         pressed && { opacity: 0.7 },
       ]}
@@ -197,7 +234,10 @@ function HangoutChatRow({ hangout }: { hangout: Hangout }): React.ReactElement {
       </View>
       <View style={{ flex: 1 }}>
         <Text
-          style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}
+          style={[
+            theme.typography.bodyMedium,
+            { color: theme.colors.text.primary, fontWeight: isUnread ? '700' : '400' },
+          ]}
           numberOfLines={1}
         >
           {hangout.title}
@@ -248,5 +288,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#8B5CF6',
   },
 });

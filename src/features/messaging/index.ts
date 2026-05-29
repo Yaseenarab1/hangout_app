@@ -15,3 +15,4 @@ export { ReactionPicker } from './components/ReactionPicker';
 export { ReplyPreview } from './components/ReplyPreview';
 export { DateSeparator } from './components/DateSeparator';
 export { UnreadBadge } from './components/UnreadBadge';
+export { useUnreadHangoutIds } from './hooks/useUnreadHangoutIds';
