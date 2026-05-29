@@ -23,6 +23,7 @@ import Reanimated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   Heart,
   MessageCircle,
@@ -136,8 +137,13 @@ export function FeedCard({ post, cardHeight = REELS_HEIGHT }: Props): React.Reac
           )
         }
       >
-        {/* ── Bottom scrim ── */}
-        <View pointerEvents="none" style={[styles.scrim, { height: Math.floor(cardHeight * 0.55) }]} />
+        {/* ── Bottom gradient scrim ── */}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.65)']}
+          locations={[0, 0.5, 1]}
+          style={[StyleSheet.absoluteFill, { top: '35%' }]}
+          pointerEvents="none"
+        />
 
         {/* ── Right-side actions (TikTok layout) ── */}
         <View style={styles.actionsCol} pointerEvents="box-none">
@@ -453,13 +459,6 @@ function PhotoCarousel({
 }
 
 const styles = StyleSheet.create({
-  scrim: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.50)',
-  },
   actionsCol: {
     position: 'absolute',
     right: 12,

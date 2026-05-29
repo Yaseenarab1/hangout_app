@@ -1,8 +1,7 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
-  Platform,
   Pressable,
   StyleSheet,
   FlatList,
@@ -20,7 +19,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, useNavigation } from 'expo-router';
+import { router } from 'expo-router';
 import { ChevronRight, Map, Plus, MapPin } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useMyProfile } from '@/features/profile';
@@ -34,12 +33,10 @@ import type { FeedPostWithUrl } from '@/features/feed';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const REELS_HEIGHT = Math.floor(SCREEN_H * 0.78);
-const TAB_BAR_HIDDEN: object = { display: 'none' };
 
 export default function HomeTab(): React.ReactElement {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
   const profile = useMyProfile();
   const hangouts = useMyHangouts();
   const feedPosts = useFeedPosts();
@@ -50,54 +47,11 @@ export default function HomeTab(): React.ReactElement {
     .slice(0, 3);
 
   const lastScrollY = useRef(0);
-  const tabBarShown = useRef(true);
-  const [fabVisible, setFabVisible] = useState(true);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [listHeight, setListHeight] = useState(0);
 
-  const tabBarStyle = {
-    backgroundColor: theme.colors.bg.canvas,
-    borderTopColor: theme.colors.border.default,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    height: Platform.OS === 'ios' ? 84 : 60,
-    paddingTop: 6,
-    elevation: 0,
-    shadowOpacity: 0,
-  };
-
-  // Restore tab bar when leaving this screen
-  useEffect(() => {
-    return () => {
-      (navigation as any).setOptions({ tabBarStyle });
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigation]);
-
-  function showTabBar() {
-    if (!tabBarShown.current) {
-      tabBarShown.current = true;
-      (navigation as any).setOptions({ tabBarStyle });
-    }
-  }
-
-  function hideTabBar() {
-    if (tabBarShown.current) {
-      tabBarShown.current = false;
-      (navigation as any).setOptions({ tabBarStyle: TAB_BAR_HIDDEN });
-    }
-  }
-
   function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    const y = e.nativeEvent.contentOffset.y;
-    const dy = y - lastScrollY.current;
-    if (dy > 10 && y > 80) {
-      setFabVisible(false);
-      hideTabBar();
-    } else if (dy < -10 || y < 20) {
-      setFabVisible(true);
-      showTabBar();
-    }
-    lastScrollY.current = y;
+    lastScrollY.current = e.nativeEvent.contentOffset.y;
   }
 
   return (
@@ -177,7 +131,7 @@ export default function HomeTab(): React.ReactElement {
         }
       />
 
-      <HomeFab visible={fabVisible} />
+      <HomeFab visible={true} />
     </View>
   );
 }
