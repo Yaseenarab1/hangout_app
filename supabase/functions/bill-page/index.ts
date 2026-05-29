@@ -140,7 +140,7 @@ serve(async (req: Request) => {
   // Fetch shares with profile info
   const { data: shares } = await supabase
     .from('bill_shares')
-    .select('id, user_id, amount_cents, settled_at, profile:profiles(full_name)')
+    .select('id, user_id, guest_name, amount_cents, settled_at, profile:profiles(display_name)')
     .eq('bill_id', billId);
 
   // Fetch item assignments for the bill
@@ -181,7 +181,7 @@ serve(async (req: Request) => {
   // Per-person breakdown
   html += `<div class="card"><h2>Who owes what</h2>`;
   for (const share of shares ?? []) {
-    const name = (share.profile as any)?.full_name ?? 'Guest';
+    const name = (share.profile as any)?.display_name ?? (share as any).guest_name ?? 'Guest';
     const isPaid = !!share.settled_at;
     html += `<div class="row"><span>${esc(name)} <span class="badge ${isPaid ? 'badge-green' : 'badge-orange'}">${isPaid ? 'Paid' : 'Owes'}</span></span><span>${cents(share.amount_cents)}</span></div>`;
   }
@@ -241,7 +241,7 @@ serve(async (req: Request) => {
     // No share param — show each person with a "This is my row" link
     html += `<p style="font-size:13px;color:#71717a;margin-bottom:12px">Tap your name to mark as paid or dispute an item.</p>`;
     for (const share of shares ?? []) {
-      const name = (share.profile as any)?.full_name ?? 'Guest';
+      const name = (share.profile as any)?.display_name ?? (share as any).guest_name ?? 'Guest';
       html += `<a class="btn btn-outline" style="display:block;margin-bottom:8px;text-align:center" href="?token=${encodeURIComponent(token)}&share=${encodeURIComponent(share.id)}">I'm ${esc(name)}</a>`;
     }
   }

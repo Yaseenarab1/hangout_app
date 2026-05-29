@@ -194,29 +194,6 @@ function HomeHeader({
         <HeroPlanCard onPress={() => router.push('/hangout/new')} theme={theme} />
       </View>
 
-      {/* Quick decisions */}
-      <View style={styles.quickSection}>
-        <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary, fontWeight: '700', letterSpacing: 0.6, marginBottom: 8 }]}>
-          QUICK DECISIONS
-        </Text>
-        <View style={styles.tilesRow}>
-          <Tile
-            icon={<UtensilsCrossed size={22} color="#F59E0B" strokeWidth={1.5} />}
-            iconBg="#F59E0B18"
-            title="Where to eat"
-            onPress={() => router.push('/hangout/new-food')}
-            theme={theme}
-          />
-          <Tile
-            icon={<Compass size={22} color="#3B82F6" strokeWidth={1.5} />}
-            iconBg="#3B82F618"
-            title="What to do"
-            onPress={() => router.push('/hangout/new-activity')}
-            theme={theme}
-          />
-        </View>
-      </View>
-
       {/* Upcoming hangouts */}
       {upcoming.length > 0 && (
         <View style={styles.upcomingSection}>

@@ -40,6 +40,18 @@ export type RestaurantSearchPickerProps = {
   max?: number;
 };
 
+const QUICK_CATEGORIES = [
+  { id: 'eats',      label: '🍽️ Eats',      cuisine: 'restaurants' },
+  { id: 'bars',      label: '🍺 Bars',       cuisine: 'bars' },
+  { id: 'brunch',    label: '🥂 Brunch',     cuisine: 'brunch' },
+  { id: 'coffee',    label: '☕ Coffee',     cuisine: 'coffee' },
+  { id: 'rooftop',   label: '🌆 Rooftop',    cuisine: 'rooftop' },
+  { id: 'sushi',     label: '🍣 Sushi',      cuisine: 'sushi' },
+  { id: 'pizza',     label: '🍕 Pizza',      cuisine: 'pizza' },
+  { id: 'tacos',     label: '🌮 Tacos',      cuisine: 'tacos' },
+  { id: 'dessert',   label: '🍦 Dessert',    cuisine: 'dessert' },
+] as const;
+
 const PRICE_LEVELS = [
   { value: 1, label: '$' },
   { value: 2, label: '$$' },
@@ -369,8 +381,40 @@ export function RestaurantSearchPicker({
           autoCapitalize="none"
           autoCorrect={false}
           trailing={<SearchIcon size={18} color={theme.colors.text.tertiary} />}
-          containerStyle={{ marginBottom: 6 }}
+          containerStyle={{ marginBottom: 8 }}
         />
+
+        {/* Quick category chips — always visible */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 6, paddingRight: 16, marginBottom: 8 }}
+        >
+          {QUICK_CATEGORIES.map((cat) => {
+            const active = selectedCuisine === cat.cuisine;
+            return (
+              <Pressable
+                key={cat.id}
+                onPress={() => {
+                  setSelectedCuisine(active ? undefined : cat.cuisine);
+                  if (!active) setQuery('');
+                }}
+                style={({ pressed }) => [
+                  styles.quickChip,
+                  {
+                    backgroundColor: active ? theme.colors.accent + '20' : theme.colors.bg.surface,
+                    borderColor: active ? theme.colors.accent : theme.colors.border.default,
+                  },
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Text style={[theme.typography.caption, { color: active ? theme.colors.accent : theme.colors.text.secondary, fontWeight: active ? '600' : '400' }]}>
+                  {cat.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
 
         {/* Always-visible manual add link — before results so it's never buried */}
         {!showCustomInput && (
@@ -875,6 +919,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     minWidth: 120,
     maxWidth: 220,
+  },
+  quickChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
   },
   filtersToggle: {
     flexDirection: 'row',

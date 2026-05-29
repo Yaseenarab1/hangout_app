@@ -417,6 +417,7 @@ export default function HangoutDetailScreen(): React.ReactElement {
             visible={showAddPoll}
             onClose={() => setShowAddPoll(false)}
             hangoutId={hangoutId}
+            onCalendarPress={() => router.push(`/hangout/${hangoutId}/when-to-meet` as any)}
           />
         </>
       )}

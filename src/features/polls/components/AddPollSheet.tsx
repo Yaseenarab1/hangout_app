@@ -44,12 +44,14 @@ export type AddPollSheetProps = {
   visible: boolean;
   onClose: () => void;
   hangoutId: string;
+  onCalendarPress?: () => void;
 };
 
 export function AddPollSheet({
   visible,
   onClose,
   hangoutId,
+  onCalendarPress,
 }: AddPollSheetProps): React.ReactElement {
   const theme = useTheme();
   const createPoll = useCreatePollOnHangout(hangoutId);
@@ -196,6 +198,14 @@ export function AddPollSheet({
             contentContainerStyle={styles.kindList}
             showsVerticalScrollIndicator={false}
           >
+            {onCalendarPress && (
+              <KindChoice
+                icon={<Clock size={24} color="#22C55E" />}
+                title="Find a time"
+                subtitle="See when everyone is free and pick a date."
+                onPress={() => { onClose(); onCalendarPress(); }}
+              />
+            )}
             <KindChoice
               icon={<Activity size={24} color={theme.colors.accent} />}
               title="Activities"

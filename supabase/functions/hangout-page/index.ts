@@ -136,7 +136,7 @@ serve(async (req: Request) => {
   // Fetch participants (app users)
   const { data: participants } = await supabase
     .from('hangout_participants')
-    .select('status, profile:profiles(full_name, avatar_url)')
+    .select('status, profile:profiles(display_name, avatar_url)')
     .eq('hangout_id', hangoutId)
     .in('status', ['accepted', 'maybe']);
 
@@ -203,7 +203,7 @@ serve(async (req: Request) => {
   const going: string[] = [];
   const maybe: string[] = [];
   for (const p of participants ?? []) {
-    const name = (p.profile as any)?.full_name ?? 'Someone';
+    const name = (p.profile as any)?.display_name ?? 'Someone';
     if (p.status === 'accepted') going.push(name);
     else maybe.push(name);
   }

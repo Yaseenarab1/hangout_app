@@ -26,6 +26,10 @@ export function useUpdateReadState(hangoutId: string) {
         last_read_message_id: lastReadMessageId,
         last_read_at: new Date().toISOString(),
       }));
+      // Remove this hangout from the global unread set immediately
+      qc.setQueryData<string[]>(['messages-unread-all'], (prev) =>
+        prev ? prev.filter((id) => id !== hangoutId) : [],
+      );
     },
   });
 }
