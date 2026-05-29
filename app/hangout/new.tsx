@@ -28,15 +28,35 @@ import {
   ParticipantPicker,
 } from '@/features/hangouts';
 
-type Step = 'details' | 'when' | 'invite';
+type Step = 'type' | 'details' | 'when' | 'invite';
 type TimeChoice = 'known' | 'poll' | null;
+
+type HangoutType = {
+  emoji: string;
+  label: string;
+};
+
+const HANGOUT_TYPES: HangoutType[] = [
+  { emoji: '🍽', label: 'Dinner' },
+  { emoji: '🎉', label: 'Night out' },
+  { emoji: '🎬', label: 'Movie night' },
+  { emoji: '⚽', label: 'Sports' },
+  { emoji: '☕', label: 'Brunch' },
+  { emoji: '🎮', label: 'Game night' },
+  { emoji: '🥂', label: 'Drinks' },
+  { emoji: '🚗', label: 'Road trip' },
+  { emoji: '🪩', label: 'Party' },
+  { emoji: '✨', label: 'Other' },
+];
+
+const STEP_ORDER: Step[] = ['type', 'details', 'when', 'invite'];
 
 function StepDots({ step }: { step: Step }) {
   return (
     <View style={styles.dots}>
-      <View style={[styles.dot, step === 'details' && styles.dotActive]} />
-      <View style={[styles.dot, step === 'when' && styles.dotActive]} />
-      <View style={[styles.dot, step === 'invite' && styles.dotActive]} />
+      {STEP_ORDER.map((s) => (
+        <View key={s} style={[styles.dot, step === s && styles.dotActive]} />
+      ))}
     </View>
   );
 }
@@ -45,7 +65,7 @@ export default function NewHangoutScreen(): React.ReactElement {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const createHangout = useCreateHangout();
-  const [step, setStep] = useState<Step>('details');
+  const [step, setStep] = useState<Step>('type');
   const [timeChoice, setTimeChoice] = useState<TimeChoice>(null);
   const [pickedDate, setPickedDate] = useState<Date>(new Date());
   const [addressText, setAddressText] = useState('');
@@ -123,6 +143,75 @@ export default function NewHangoutScreen(): React.ReactElement {
 
   const headerTop = insets.top + 12;
 
+  // ── Step 1: type ─────────────────────────────────────────────────────
+  if (step === 'type') {
+    return (
+      <View style={[styles.root, { backgroundColor: theme.colors.bg.canvas }]}>
+        <View style={[styles.navBar, { paddingTop: headerTop, backgroundColor: theme.colors.bg.canvas }]}>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={12}
+            style={({ pressed }) => [styles.closeBtn, { backgroundColor: theme.colors.bg.subtle, opacity: pressed ? 0.6 : 1 }]}
+          >
+            <X size={18} color={theme.colors.text.primary} strokeWidth={2} />
+          </Pressable>
+          <StepDots step="type" />
+          <View style={{ width: 36 }} />
+        </View>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+        >
+          <View style={styles.hero}>
+            <Text style={styles.heroEmoji}>✌️</Text>
+            <Text style={[theme.typography.h2, { color: theme.colors.text.primary, marginTop: 12, letterSpacing: -0.5, textAlign: 'center' }]}>
+              What kind of hangout?
+            </Text>
+            <Text style={[theme.typography.body, { color: theme.colors.text.secondary, marginTop: 4, textAlign: 'center' }]}>
+              Pick one to get started — or skip.
+            </Text>
+          </View>
+
+          <View style={styles.typeGrid}>
+            {HANGOUT_TYPES.map((t) => (
+              <Pressable
+                key={t.label}
+                onPress={() => {
+                  setValue('title', t.label, { shouldDirty: true, shouldValidate: true });
+                  setStep('details');
+                }}
+                style={({ pressed }) => [
+                  styles.typeCard,
+                  {
+                    backgroundColor: theme.colors.bg.surface,
+                    borderColor: theme.colors.border.default,
+                    opacity: pressed ? 0.75 : 1,
+                  },
+                ]}
+              >
+                <Text style={styles.typeEmoji}>{t.emoji}</Text>
+                <Text style={[theme.typography.caption, { color: theme.colors.text.primary, fontWeight: '600', marginTop: 6, textAlign: 'center' }]}>
+                  {t.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Pressable
+            onPress={() => setStep('details')}
+            style={{ alignItems: 'center', paddingTop: 24, paddingBottom: 8 }}
+          >
+            <Text style={[theme.typography.body, { color: theme.colors.text.tertiary }]}>
+              Skip
+            </Text>
+          </Pressable>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ── Step 2: details ───────────────────────────────────────────────────
   if (step === 'details') {
     return (
       <KeyboardAvoidingView
@@ -132,11 +221,11 @@ export default function NewHangoutScreen(): React.ReactElement {
         {/* Nav bar */}
         <View style={[styles.navBar, { paddingTop: headerTop, backgroundColor: theme.colors.bg.canvas }]}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => setStep('type')}
             hitSlop={12}
             style={({ pressed }) => [styles.closeBtn, { backgroundColor: theme.colors.bg.subtle, opacity: pressed ? 0.6 : 1 }]}
           >
-            <X size={18} color={theme.colors.text.primary} strokeWidth={2} />
+            <ChevronRight size={18} color={theme.colors.text.primary} strokeWidth={2} style={{ transform: [{ rotate: '180deg' }] }} />
           </Pressable>
           <StepDots step="details" />
           <View style={{ width: 36 }} />
@@ -391,13 +480,13 @@ export default function NewHangoutScreen(): React.ReactElement {
     );
   }
 
-  // ── Step 3: Invite ────────────────────────────────────────────────────
+  // ── Step 4: Invite ────────────────────────────────────────────────────
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.bg.canvas }]}>
       {/* Nav bar */}
       <View style={[styles.navBar, { paddingTop: headerTop, backgroundColor: theme.colors.bg.canvas }]}>
         <Pressable
-          onPress={() => setStep('details')}
+          onPress={() => setStep('when')}
           hitSlop={12}
           style={({ pressed }) => [styles.closeBtn, { backgroundColor: theme.colors.bg.subtle, opacity: pressed ? 0.6 : 1 }]}
         >
@@ -512,6 +601,23 @@ const styles = StyleSheet.create({
   },
   heroEmoji: {
     fontSize: 48,
+  },
+  typeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 4,
+  },
+  typeCard: {
+    width: '47%',
+    paddingVertical: 18,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  typeEmoji: {
+    fontSize: 36,
   },
   form: {
     gap: 16,

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { useScrollToTop } from '@react-navigation/native';
 import { ChevronRight, Map, Plus, MapPin } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useMyProfile } from '@/features/profile';
@@ -46,13 +47,26 @@ export default function HomeTab(): React.ReactElement {
     .filter((h) => h.status !== 'cancelled')
     .slice(0, 3);
 
+  const listRef = useRef<FlatList<FeedPostWithUrl>>(null);
+  useScrollToTop(listRef as any);
+
   const lastScrollY = useRef(0);
+  const [fabVisible, setFabVisible] = useState(true);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [listHeight, setListHeight] = useState(0);
 
-  function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    lastScrollY.current = e.nativeEvent.contentOffset.y;
-  }
+  const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const prev = lastScrollY.current;
+    lastScrollY.current = y;
+    if (y < 60) {
+      setFabVisible(true);
+    } else if (y > prev + 6) {
+      setFabVisible(false);
+    } else if (y < prev - 6) {
+      setFabVisible(true);
+    }
+  }, []);
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.bg.canvas }]}>
@@ -81,6 +95,7 @@ export default function HomeTab(): React.ReactElement {
 
       {/* Main feed */}
       <FlatList<FeedPostWithUrl>
+        ref={listRef}
         data={feedPosts.data ?? []}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
@@ -131,7 +146,7 @@ export default function HomeTab(): React.ReactElement {
         }
       />
 
-      <HomeFab visible={true} />
+      <HomeFab visible={fabVisible} />
     </View>
   );
 }
