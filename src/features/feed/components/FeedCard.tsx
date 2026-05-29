@@ -1,8 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
-  Animated,
   Pressable,
   StyleSheet,
   Dimensions,
@@ -20,8 +19,10 @@ import Reanimated, {
   withSpring,
   withTiming,
   Easing,
+  interpolate,
   type SharedValue,
 } from 'react-native-reanimated';
+import { Image } from 'expo-image';
 import {
   Heart,
   MessageCircle,
@@ -41,8 +42,9 @@ import { useReactToPost } from '../hooks/useReactToPost';
 import { CommentsSheet } from './CommentsSheet';
 import type { FeedPostWithUrl } from '../types';
 
-const { width: SCREEN_W } = Dimensions.get('window');
-const MAX_IMG_HEIGHT = SCREEN_W * 1.25;
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+const REELS_HEIGHT = Math.floor(SCREEN_H * 0.78);
+const HEART_SIZE = 90;
 const POST_LINK_BASE = 'hangoutplanner://post';
 
 interface Props {
@@ -64,11 +66,6 @@ export function FeedCard({ post }: Props): React.ReactElement {
   const urls = post.image_urls ?? [post.image_url];
   const isEphemeral = isOwn && post.expires_at != null;
   const expiresIn = isEphemeral ? getExpiresIn(post.expires_at!) : null;
-
-  const imgHeight =
-    post.width && post.height
-      ? Math.min((SCREEN_W * post.height) / post.width, MAX_IMG_HEIGHT)
-      : SCREEN_W;
 
   const liked = post.viewer_has_liked ?? false;
   const heartScale = useSharedValue(1);
@@ -105,73 +102,23 @@ export function FeedCard({ post }: Props): React.ReactElement {
     const link = `${POST_LINK_BASE}/${post.id}`;
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ['Cancel', 'Copy link', 'Share via…'],
-          cancelButtonIndex: 0,
-        },
+        { options: ['Cancel', 'Copy link', 'Share via…'], cancelButtonIndex: 0 },
         async (idx) => {
-          if (idx === 1) {
-            await Clipboard.setStringAsync(link);
-            toast.success('Link copied!');
-          } else if (idx === 2) {
-            await Share.share({ url: link, message: link });
-          }
+          if (idx === 1) { await Clipboard.setStringAsync(link); toast.success('Link copied!'); }
+          else if (idx === 2) { await Share.share({ url: link, message: link }); }
         },
       );
     } else {
-      // Android: native share sheet directly
       await Share.share({ message: link });
     }
   }
 
   return (
     <View style={styles.card}>
-      {/* ── Author row ── */}
-      <View style={styles.authorRow}>
-        <Pressable
-          onPress={() => router.push(`/profile/${post.author_id}`)}
-          style={styles.authorTouchable}
-          hitSlop={4}
-        >
-          <Avatar
-            id={author?.id ?? ''}
-            displayName={author?.display_name ?? ''}
-            uri={author?.avatar_url ?? null}
-            size="sm"
-          />
-          <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
-              {author?.display_name ?? ''}
-            </Text>
-            <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary }]}>
-              {timeAgo}
-              {isEphemeral && expiresIn ? ` · disappears in ${expiresIn}` : ''}
-            </Text>
-          </View>
-        </Pressable>
-        {isOwn && (
-          <Pressable
-            onPress={() =>
-              Alert.alert('Post options', undefined, [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Delete',
-                  style: 'destructive',
-                  onPress: () => deletePost.mutate(post.id),
-                },
-              ])
-            }
-            hitSlop={12}
-          >
-            <MoreHorizontal size={20} color={theme.colors.text.tertiary} />
-          </Pressable>
-        )}
-      </View>
-
-      {/* ── Photo carousel ── */}
+      {/* ── Photo carousel (full-height, Reels style) ── */}
       <PhotoCarousel
         urls={urls}
-        imgHeight={imgHeight}
+        height={REELS_HEIGHT}
         activeIndex={activeIndex}
         setActiveIndex={setActiveIndex}
         isEphemeral={isEphemeral}
@@ -187,85 +134,124 @@ export function FeedCard({ post }: Props): React.ReactElement {
             ],
           )
         }
-      />
+      >
+        {/* ── Bottom scrim so text is readable ── */}
+        <View
+          pointerEvents="none"
+          style={styles.gradientScrim}
+        />
 
-      {/* ── Action bar ── */}
-      <View style={styles.actions}>
-        <Pressable
-          onPress={handleHeartTap}
-          onPressIn={() => pressIn(heartScale)}
-          onPressOut={() => pressOut(heartScale)}
-          hitSlop={10}
-          style={styles.actionBtn}
-        >
-          <Reanimated.View style={heartAnimStyle}>
-            <Heart
-              size={26}
-              color={liked ? '#EF4444' : theme.colors.text.primary}
-              fill={liked ? '#EF4444' : 'transparent'}
-            />
-          </Reanimated.View>
-          {(post.like_count ?? 0) > 0 && (
-            <Text
-              style={[
-                theme.typography.caption,
-                { color: theme.colors.text.secondary, marginLeft: 5, fontWeight: '600' },
-              ]}
+        {/* ── Right-side actions (TikTok layout) ── */}
+        <View style={styles.actionsCol} pointerEvents="box-none">
+          <Pressable
+            onPress={handleHeartTap}
+            onPressIn={() => pressIn(heartScale)}
+            onPressOut={() => pressOut(heartScale)}
+            hitSlop={10}
+            style={styles.actionItem}
+          >
+            <Reanimated.View style={heartAnimStyle}>
+              <Heart
+                size={30}
+                color={liked ? '#EF4444' : '#FFFFFF'}
+                fill={liked ? '#EF4444' : 'transparent'}
+              />
+            </Reanimated.View>
+            {(post.like_count ?? 0) > 0 && (
+              <Text style={styles.actionCount}>{post.like_count}</Text>
+            )}
+          </Pressable>
+
+          <Pressable
+            onPress={() => setCommentsVisible(true)}
+            onPressIn={() => pressIn(commentScale)}
+            onPressOut={() => pressOut(commentScale)}
+            hitSlop={10}
+            style={styles.actionItem}
+          >
+            <Reanimated.View style={commentAnimStyle}>
+              <MessageCircle size={28} color="#FFFFFF" />
+            </Reanimated.View>
+            {(post.comment_count ?? 0) > 0 && (
+              <Text style={styles.actionCount}>{post.comment_count}</Text>
+            )}
+          </Pressable>
+
+          <Pressable
+            onPress={handleShare}
+            onPressIn={() => pressIn(shareScale)}
+            onPressOut={() => pressOut(shareScale)}
+            hitSlop={10}
+            style={styles.actionItem}
+          >
+            <Reanimated.View style={shareAnimStyle}>
+              <Share2 size={26} color="#FFFFFF" />
+            </Reanimated.View>
+          </Pressable>
+
+          {isOwn && (
+            <Pressable
+              onPress={() =>
+                Alert.alert('Post options', undefined, [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Delete', style: 'destructive', onPress: () => deletePost.mutate(post.id) },
+                ])
+              }
+              hitSlop={12}
+              style={styles.actionItem}
             >
-              {post.like_count}
-            </Text>
+              <MoreHorizontal size={26} color="#FFFFFF" />
+            </Pressable>
           )}
-        </Pressable>
-
-        <Pressable
-          onPress={() => setCommentsVisible(true)}
-          onPressIn={() => pressIn(commentScale)}
-          onPressOut={() => pressOut(commentScale)}
-          hitSlop={10}
-          style={styles.actionBtn}
-        >
-          <Reanimated.View style={commentAnimStyle}>
-            <MessageCircle size={26} color={theme.colors.text.primary} />
-          </Reanimated.View>
-          {(post.comment_count ?? 0) > 0 && (
-            <Text
-              style={[
-                theme.typography.caption,
-                { color: theme.colors.text.secondary, marginLeft: 5, fontWeight: '600' },
-              ]}
-            >
-              {post.comment_count}
-            </Text>
-          )}
-        </Pressable>
-
-        <Pressable
-          onPress={handleShare}
-          onPressIn={() => pressIn(shareScale)}
-          onPressOut={() => pressOut(shareScale)}
-          hitSlop={10}
-          style={styles.actionBtn}
-        >
-          <Reanimated.View style={shareAnimStyle}>
-            <Share2 size={24} color={theme.colors.text.primary} />
-          </Reanimated.View>
-        </Pressable>
-      </View>
-
-      {/* ── Caption ── */}
-      {post.caption ? (
-        <View style={styles.captionRow}>
-          <Text style={[theme.typography.body, { color: theme.colors.text.primary }]}>
-            <Text
-              style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}
-              onPress={() => router.push(`/profile/${post.author_id}`)}
-            >
-              {author?.display_name}{' '}
-            </Text>
-            {post.caption}
-          </Text>
         </View>
-      ) : null}
+
+        {/* ── Bottom: author + caption ── */}
+        <View style={styles.bottomOverlay} pointerEvents="box-none">
+          <Pressable
+            onPress={() => router.push(`/profile/${post.author_id}`)}
+            style={styles.authorRow}
+            hitSlop={4}
+          >
+            <Avatar
+              id={author?.id ?? ''}
+              displayName={author?.display_name ?? ''}
+              uri={author?.avatar_url ?? null}
+              size="sm"
+            />
+            <View style={{ marginLeft: 8 }}>
+              <Text style={styles.authorName}>{author?.display_name ?? ''}</Text>
+              <Text style={styles.authorTime}>
+                {timeAgo}
+                {isEphemeral && expiresIn ? ` · disappears in ${expiresIn}` : ''}
+              </Text>
+            </View>
+          </Pressable>
+
+          {post.caption ? (
+            <Text style={styles.caption} numberOfLines={3}>
+              {post.caption}
+            </Text>
+          ) : null}
+
+          {urls.length > 1 && (
+            <View style={styles.dots} pointerEvents="none">
+              {urls.map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.dot,
+                    {
+                      backgroundColor: i === activeIndex ? '#FFFFFF' : 'rgba(255,255,255,0.45)',
+                      width: i === activeIndex ? 8 : 5,
+                      height: i === activeIndex ? 8 : 5,
+                    },
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+      </PhotoCarousel>
 
       {/* ── Comments sheet ── */}
       <Modal
@@ -274,7 +260,7 @@ export function FeedCard({ post }: Props): React.ReactElement {
         presentationStyle="pageSheet"
         onRequestClose={() => setCommentsVisible(false)}
       >
-        <View style={[{ flex: 1 }, { backgroundColor: theme.colors.bg.canvas }]}>
+        <View style={[{ flex: 1 }, { backgroundColor: '#09090b' }]}>
           <CommentsSheet postId={post.id} postAuthorId={post.author_id} />
         </View>
       </Modal>
@@ -302,89 +288,87 @@ function getExpiresIn(iso: string): string | null {
 }
 
 // ── PhotoCarousel ─────────────────────────────────────────────────────────────
-// Single-tap left third → prev photo. Single-tap right → next photo.
-// Double-tap anywhere → like + heart burst animation.
-
-const HEART_SIZE = 90;
+// Reanimated-based carousel running on the UI thread at 60fps.
+// Tap left/right third → navigate. Double-tap → like + heart burst.
 
 type CarouselProps = {
   urls: string[];
-  imgHeight: number;
+  height: number;
   activeIndex: number;
   setActiveIndex: (i: number) => void;
   isEphemeral: boolean;
   isPermanentPending: boolean;
   onDoubleTap: () => void;
   onKeepForever: () => void;
+  children?: React.ReactNode;
 };
 
 function PhotoCarousel({
   urls,
-  imgHeight,
+  height,
   activeIndex,
   setActiveIndex,
   isEphemeral,
   isPermanentPending,
   onDoubleTap,
   onKeepForever,
+  children,
 }: CarouselProps) {
-  const [fromIndex, setFromIndex] = useState<number | null>(null);
-  const [toIndex, setToIndex] = useState(activeIndex);
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const dirAnim = useRef(new Animated.Value(0)).current;
+  // Offset in screen-widths. 0 = current, 1 = going right, -1 = going left.
+  const offset = useSharedValue(0);
+
+  // Track previous index for cross-fade slide
+  const prevIndexRef = useRef(activeIndex);
+  const [renderFrom, setRenderFrom] = useState<number | null>(null);
+  const [renderTo, setRenderTo] = useState(activeIndex);
+
+  const fromAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: interpolate(offset.value, [-1, 0, 1], [-SCREEN_W, 0, SCREEN_W]) }],
+    position: 'absolute',
+    width: SCREEN_W,
+    height,
+  }));
+  const toAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: interpolate(offset.value, [-1, 0, 1], [0, 0, 0]) }],
+    width: SCREEN_W,
+    height,
+  }));
+
+  const goTo = useCallback((next: number) => {
+    if (next === renderTo) return;
+    const dir = next > renderTo ? 1 : -1;
+    setRenderFrom(renderTo);
+    setRenderTo(next);
+    offset.value = dir; // start from off-screen
+    offset.value = withSpring(0, { damping: 26, stiffness: 280, mass: 0.8 }, (done) => {
+      if (done) {
+        setRenderFrom(null);
+        offset.value = 0;
+      }
+    });
+    setActiveIndex(next);
+  }, [renderTo, offset, setActiveIndex]);
 
   // Double-tap detection
   const lastTapAt = useRef(0);
-  const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Heart burst animation
-  const [heartPos, setHeartPos] = useState({ x: SCREEN_W / 2, y: imgHeight / 2 });
+  // Heart burst
+  const [heartPos, setHeartPos] = useState({ x: SCREEN_W / 2, y: height / 2 });
   const heartScale = useSharedValue(0);
   const heartOpacity = useSharedValue(0);
-  const heartAnimStyle = useAnimatedStyle(() => ({
+  const heartBurstStyle = useAnimatedStyle(() => ({
     transform: [{ scale: heartScale.value }],
     opacity: heartOpacity.value,
   }));
-
-  useEffect(() => {
-    return () => {
-      if (fadeTimer.current) clearTimeout(fadeTimer.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (activeIndex === toIndex) return;
-    const dir = activeIndex > toIndex ? 1 : -1;
-
-    dirAnim.setValue(-dir * SCREEN_W);
-    setFromIndex(toIndex);
-    setToIndex(activeIndex);
-    slideAnim.setValue(dir * SCREEN_W);
-
-    Animated.spring(slideAnim, {
-      toValue: 0,
-      useNativeDriver: true,
-      tension: 120,
-      friction: 20,
-    }).start(({ finished }) => {
-      if (finished) {
-        setFromIndex(null);
-        slideAnim.setValue(0);
-      }
-    });
-  }, [activeIndex]);
+  const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function showHeartBurst(x: number, y: number) {
     if (fadeTimer.current) clearTimeout(fadeTimer.current);
     setHeartPos({ x, y });
-
-    // Reset then spring in with overshoot (same feel as the FAB icon rotation)
     heartScale.value = 0;
     heartOpacity.value = 0;
     heartScale.value = withSpring(1, { damping: 4, stiffness: 260 });
     heartOpacity.value = withTiming(1, { duration: 80 });
-
-    // Fade out after 850ms
     fadeTimer.current = setTimeout(() => {
       heartScale.value = withTiming(0.7, { duration: 380, easing: Easing.in(Easing.cubic) });
       heartOpacity.value = withTiming(0, { duration: 380 });
@@ -397,69 +381,39 @@ function PhotoCarousel({
     const y = e.nativeEvent.locationY;
 
     if (now - lastTapAt.current < 300) {
-      // Double-tap
       lastTapAt.current = 0;
       showHeartBurst(x, y);
       onDoubleTap();
     } else {
       lastTapAt.current = now;
-      // Navigate photos on single-tap
       if (urls.length > 1) {
-        if (x < SCREEN_W * 0.35 && activeIndex > 0) {
-          setActiveIndex(activeIndex - 1);
-        } else if (x >= SCREEN_W * 0.35 && activeIndex < urls.length - 1) {
-          setActiveIndex(activeIndex + 1);
+        if (x < SCREEN_W * 0.35 && renderTo > 0) {
+          goTo(renderTo - 1);
+        } else if (x >= SCREEN_W * 0.35 && renderTo < urls.length - 1) {
+          goTo(renderTo + 1);
         }
       }
     }
   }
 
   return (
-    <View style={{ width: SCREEN_W, height: imgHeight, overflow: 'hidden' }}>
-      {/* Outgoing image slides away */}
-      {fromIndex !== null && (
-        <Animated.Image
-          source={{ uri: urls[fromIndex]! }}
-          style={{
-            position: 'absolute',
-            width: SCREEN_W,
-            height: imgHeight,
-            transform: [{ translateX: Animated.add(slideAnim, dirAnim) }],
-          }}
-          resizeMode="cover"
-        />
-      )}
-
-      {/* Incoming image */}
-      <Animated.Image
-        source={{ uri: urls[toIndex]! }}
-        style={{
-          width: SCREEN_W,
-          height: imgHeight,
-          transform: [{ translateX: slideAnim }],
-        }}
-        resizeMode="cover"
-      />
-
-      {/* Full-area tap handler — handles both nav and double-tap */}
-      <Pressable onPress={handleTap} style={StyleSheet.absoluteFill} />
-
-      {/* Heart burst overlay — pointerEvents none so it doesn't block taps */}
-      <Reanimated.View
-        pointerEvents="none"
-        style={[
-          styles.heartBurst,
-          {
-            left: heartPos.x - HEART_SIZE / 2,
-            top: heartPos.y - HEART_SIZE / 2,
-          },
-          heartAnimStyle,
-        ]}
-      >
-        <Heart size={HEART_SIZE} color="#fff" fill="#fff" />
+    <View style={{ width: SCREEN_W, height, overflow: 'hidden' }}>
+      {/* Current (target) image */}
+      <Reanimated.View style={toAnimStyle}>
+        <Image source={{ uri: urls[renderTo]! }} style={{ width: SCREEN_W, height }} contentFit="cover" />
       </Reanimated.View>
 
-      {/* Keep on profile overlay — rendered AFTER the full-area Pressable, so it captures its own taps */}
+      {/* Outgoing image slides away */}
+      {renderFrom !== null && (
+        <Reanimated.View style={fromAnimStyle}>
+          <Image source={{ uri: urls[renderFrom]! }} style={{ width: SCREEN_W, height }} contentFit="cover" />
+        </Reanimated.View>
+      )}
+
+      {/* Overlay children (gradient, actions, author) */}
+      {children}
+
+      {/* Keep on profile overlay */}
       {isEphemeral && (
         <Pressable
           onPress={onKeepForever}
@@ -473,61 +427,103 @@ function PhotoCarousel({
         </Pressable>
       )}
 
-      {/* Dot indicators */}
-      {urls.length > 1 && (
-        <View pointerEvents="none" style={styles.dots}>
-          {urls.map((_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.dot,
-                {
-                  backgroundColor: i === activeIndex ? '#FFFFFF' : 'rgba(255,255,255,0.5)',
-                  width: i === activeIndex ? 8 : 6,
-                  height: i === activeIndex ? 8 : 6,
-                },
-              ]}
-            />
-          ))}
-        </View>
-      )}
+      {/* Heart burst */}
+      <Reanimated.View
+        pointerEvents="none"
+        style={[
+          styles.heartBurst,
+          { left: heartPos.x - HEART_SIZE / 2, top: heartPos.y - HEART_SIZE / 2 },
+          heartBurstStyle,
+        ]}
+      >
+        <Heart size={HEART_SIZE} color="#fff" fill="#fff" />
+      </Reanimated.View>
 
-      {/* Count badge */}
-      {urls.length > 1 && (
-        <View pointerEvents="none" style={styles.countBadge}>
-          <Text style={styles.countText}>{activeIndex + 1}/{urls.length}</Text>
-        </View>
-      )}
+      {/* Full-area tap handler */}
+      <Pressable onPress={handleTap} style={StyleSheet.absoluteFill} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    marginBottom: 4,
+    marginBottom: 2,
+  },
+  gradientScrim: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: Math.floor(REELS_HEIGHT * 0.55),
+    backgroundColor: 'rgba(0,0,0,0.50)',
+  },
+  actionsCol: {
+    position: 'absolute',
+    right: 12,
+    bottom: 100,
+    alignItems: 'center',
+    gap: 20,
+  },
+  actionItem: {
+    alignItems: 'center',
+  },
+  actionCount: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 3,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  bottomOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 64,
+    paddingHorizontal: 14,
+    paddingBottom: 20,
   },
   authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    marginBottom: 8,
   },
-  authorTouchable: {
+  authorName: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  authorTime: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    marginTop: 1,
+  },
+  caption: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 8,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  dots: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    gap: 5,
+    marginBottom: 4,
   },
-  heartBurst: {
-    position: 'absolute',
-    width: HEART_SIZE,
-    height: HEART_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
+  dot: {
+    borderRadius: 4,
   },
   keepOverlay: {
     position: 'absolute',
-    top: 10,
-    left: 10,
+    top: 14,
+    left: 14,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.55)',
@@ -541,46 +537,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  dots: {
+  heartBurst: {
     position: 'absolute',
-    bottom: 10,
-    width: SCREEN_W,
-    flexDirection: 'row',
+    width: HEART_SIZE,
+    height: HEART_SIZE,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    gap: 5,
-  },
-  dot: {
-    borderRadius: 4,
-  },
-  countBadge: {
-    position: 'absolute',
-    top: 10,
-    right: 12,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  countText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  actions: {
-    flexDirection: 'row',
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 6,
-    gap: 18,
-    alignItems: 'center',
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  captionRow: {
-    paddingHorizontal: 14,
-    paddingBottom: 12,
   },
 });

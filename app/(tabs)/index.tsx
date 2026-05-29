@@ -20,7 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useNavigation } from 'expo-router';
-import { Compass, UtensilsCrossed, ChevronRight, Map, Plus } from 'lucide-react-native';
+import { ChevronRight, Map, Plus, MapPin } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useMyProfile } from '@/features/profile';
 import { useMyHangouts } from '@/features/hangouts';
@@ -235,64 +235,101 @@ function UpcomingRow({
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   const d = hangout.start_time ? new Date(hangout.start_time) : null;
-  const dayNum = d
-    ? d.toLocaleDateString('en-US', { day: 'numeric' })
+  const dayNum = d ? d.toLocaleDateString('en-US', { day: 'numeric' }) : null;
+  const monthAbbr = d ? d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase() : null;
+  const weekday = d ? d.toLocaleDateString('en-US', { weekday: 'long' }) : null;
+  const timeStr = d
+    ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
     : null;
-  const monthAbbr = d
-    ? d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()
-    : null;
-  const weekday = d
-    ? d.toLocaleDateString('en-US', { weekday: 'short' })
-    : null;
+
+  const isPlanning = hangout.status === 'planning';
 
   return (
     <Animated.View style={animStyle}>
       <Pressable
         onPress={() => router.push(`/hangout/${hangout.id}`)}
-        onPressIn={() => {
-          scale.value = withTiming(0.97, { duration: 100, easing: Easing.out(Easing.cubic) });
-        }}
-        onPressOut={() => {
-          scale.value = withSpring(1, { damping: 15, stiffness: 400 });
-        }}
+        onPressIn={() => { scale.value = withTiming(0.97, { duration: 100, easing: Easing.out(Easing.cubic) }); }}
+        onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 400 }); }}
         style={[
-          styles.upcomingRow,
+          styles.upcomingCard,
           {
             backgroundColor: theme.colors.bg.surface,
             borderColor: theme.colors.border.default,
-            ...(theme.mode === 'light'
-              ? { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2, elevation: 1 }
-              : {}),
           },
         ]}
       >
-        {/* Date badge */}
-        {d ? (
-          <View style={[styles.dateBadge, { backgroundColor: theme.colors.accent + '14' }]}>
-            <Text style={[styles.dateBadgeMonth, { color: theme.colors.accent }]}>{monthAbbr}</Text>
-            <Text style={[styles.dateBadgeDay, { color: theme.colors.accent }]}>{dayNum}</Text>
-          </View>
-        ) : (
-          <View style={[styles.dateBadge, { backgroundColor: theme.colors.bg.subtle }]}>
-            <Text style={[styles.dateBadgeMonth, { color: theme.colors.text.tertiary }]}>TBD</Text>
-          </View>
-        )}
-        <View style={{ flex: 1, marginLeft: 12 }}>
+        {/* Left accent bar */}
+        <View style={[styles.accentBar, { backgroundColor: theme.colors.accent }]} />
+
+        {/* Date column */}
+        <View style={[styles.dateCol, { backgroundColor: theme.colors.accent + '12' }]}>
+          {d ? (
+            <>
+              <Text style={[styles.dateMonth, { color: theme.colors.accent }]}>{monthAbbr}</Text>
+              <Text style={[styles.dateDay, { color: theme.colors.accent }]}>{dayNum}</Text>
+            </>
+          ) : (
+            <Text style={[styles.dateTbd, { color: theme.colors.text.tertiary }]}>TBD</Text>
+          )}
+        </View>
+
+        {/* Info */}
+        <View style={{ flex: 1, paddingLeft: 14, paddingRight: 6 }}>
           <Text
-            style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}
+            style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700' }]}
             numberOfLines={1}
           >
             {hangout.title}
           </Text>
-          {weekday && dayNum ? (
-            <Text
-              style={[theme.typography.caption, { color: theme.colors.text.tertiary, marginTop: 1 }]}
-            >
-              {weekday}
-              {hangout.primary_location_name ? ` · ${hangout.primary_location_name}` : ''}
+
+          {weekday && timeStr && (
+            <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 3 }]}>
+              {weekday} at {timeStr}
             </Text>
+          )}
+
+          {hangout.primary_location_name ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 3 }}>
+              <MapPin size={11} color={theme.colors.text.tertiary} strokeWidth={2} />
+              <Text
+                style={[theme.typography.caption, { color: theme.colors.text.tertiary }]}
+                numberOfLines={1}
+              >
+                {hangout.primary_location_name}
+              </Text>
+            </View>
           ) : null}
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, gap: 6 }}>
+            <View
+              style={[
+                styles.statusPill,
+                {
+                  backgroundColor: isPlanning
+                    ? theme.colors.warning + '18'
+                    : theme.colors.success + '18',
+                  borderColor: isPlanning
+                    ? theme.colors.warning + '60'
+                    : theme.colors.success + '60',
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  theme.typography.caption,
+                  {
+                    color: isPlanning ? theme.colors.warning : theme.colors.success,
+                    fontWeight: '600',
+                    fontSize: 11,
+                  },
+                ]}
+              >
+                {isPlanning ? 'Planning' : 'Scheduled'}
+              </Text>
+            </View>
+          </View>
         </View>
+
         <ChevronRight size={16} color={theme.colors.text.tertiary} strokeWidth={2} />
       </Pressable>
     </Animated.View>
@@ -332,59 +369,6 @@ function HeroPlanCard({
   );
 }
 
-function Tile({
-  icon,
-  iconBg,
-  title,
-  onPress,
-  theme,
-}: {
-  icon: React.ReactNode;
-  iconBg: string;
-  title: string;
-  onPress: () => void;
-  theme: ReturnType<typeof useTheme>;
-}): React.ReactElement {
-  const scale = useSharedValue(1);
-  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-
-  return (
-    <Animated.View style={[animStyle, { flex: 1 }]}>
-      <Pressable
-        onPress={onPress}
-        onPressIn={() => {
-          scale.value = withTiming(0.95, { duration: 100, easing: Easing.out(Easing.cubic) });
-        }}
-        onPressOut={() => {
-          scale.value = withSpring(1, { damping: 15, stiffness: 400 });
-        }}
-        style={[
-          styles.tile,
-          {
-            backgroundColor: theme.colors.bg.surface,
-            borderColor: theme.colors.border.default,
-            ...(theme.mode === 'light'
-              ? { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 }
-              : {}),
-          },
-        ]}
-      >
-        <View style={[styles.tileIconWrap, { backgroundColor: iconBg }]}>
-          {icon}
-        </View>
-        <Text
-          style={[
-            theme.typography.caption,
-            { color: theme.colors.text.primary, marginTop: 10, fontWeight: '600', lineHeight: 16 },
-          ]}
-          numberOfLines={2}
-        >
-          {title}
-        </Text>
-      </Pressable>
-    </Animated.View>
-  );
-}
 
 const styles = StyleSheet.create({
   root: {
@@ -430,57 +414,57 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  quickSection: {
-    paddingHorizontal: 16,
-    marginBottom: 4,
-  },
-  tilesRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  tile: {
-    flex: 1,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: 14,
-  },
-  tileIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   upcomingSection: {
     paddingHorizontal: 16,
     marginTop: 8,
   },
-  upcomingRow: {
+  upcomingCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+    paddingRight: 14,
+    paddingVertical: 14,
   },
-  dateBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
+  accentBar: {
+    width: 4,
+    alignSelf: 'stretch',
+    borderRadius: 2,
+    marginLeft: 0,
+    marginRight: 0,
+  },
+  dateCol: {
+    width: 54,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 4,
+    borderRadius: 10,
+    marginLeft: 10,
     flexShrink: 0,
+    minHeight: 54,
   },
-  dateBadgeMonth: {
-    fontSize: 9,
+  dateMonth: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    lineHeight: 13,
+  },
+  dateDay: {
+    fontSize: 26,
+    fontWeight: '800',
+    lineHeight: 30,
+  },
+  dateTbd: {
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
-    lineHeight: 12,
   },
-  dateBadgeDay: {
-    fontSize: 18,
-    fontWeight: '700',
-    lineHeight: 22,
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 20,
+    borderWidth: 1,
   },
   feedHeader: {
     flexDirection: 'row',
