@@ -17,6 +17,10 @@ import {
   Images,
   Receipt,
   Route,
+  UtensilsCrossed,
+  Dices,
+  Plus,
+  ChevronRight,
 } from 'lucide-react-native';
 import { UnreadBadge } from '@/features/messaging';
 import { usePhotosSummary } from '@/features/photos/hooks/usePhotosSummary';
@@ -192,23 +196,23 @@ export default function HangoutDetailScreen(): React.ReactElement {
   }
 
   const h = hangout.data;
-  const acceptedCount = h.participants.filter((p) => p.status === 'accepted').length;
-  const totalCount = h.participants.filter((p) => p.status !== 'removed').length;
-  const sortedParticipants = [...h.participants]
-    .filter((p) => p.status !== 'removed')
+  const myStatus = myParticipation?.status;
+  const canUseWhenToMeet = isHost || myStatus === 'accepted' || myStatus === 'maybe';
+
+  // "Going" list = host + explicitly accepted participants only
+  const goingParticipants = [...h.participants]
+    .filter(p => p.role === 'host' || p.status === 'accepted')
     .sort((a, b) => {
-      // Hosts first, then by status (accepted > maybe > invited > declined)
-      const order: Record<ParticipantStatus, number> = {
-        accepted: 0,
-        maybe: 1,
-        invited: 2,
-        declined: 3,
-        removed: 4,
-      };
       if (a.role === 'host' && b.role !== 'host') return -1;
       if (b.role === 'host' && a.role !== 'host') return 1;
-      return order[a.status] - order[b.status];
+      return 0;
     });
+  const pendingCount = h.participants.filter(
+    p => p.role !== 'host' && (p.status === 'invited' || p.status === 'maybe'),
+  ).length;
+
+  // Keep for legacy uses (acceptedCount used in other places)
+  const acceptedCount = h.participants.filter((p) => p.status === 'accepted').length;
 
   return (
     <Screen
@@ -274,7 +278,9 @@ export default function HangoutDetailScreen(): React.ReactElement {
         <Fact
           icon={<Users size={20} color={theme.colors.accent} />}
           label="Going"
-          value={`${acceptedCount} / ${totalCount}`}
+          value={`${acceptedCount} going`}
+          onPress={() => router.push(`/hangout/${hangoutId}/participants` as any)}
+          actionLabel="See who →"
         />
       </View>
 
@@ -315,71 +321,117 @@ export default function HangoutDetailScreen(): React.ReactElement {
         </View>
       ) : null}
 
-      {/* Plan cards — before participants so they're easy to reach */}
-      <SectionHeader title="Plan" />
-      <View style={styles.planCards}>
-        <Pressable
-          onPress={() => router.push(`/hangout/${hangoutId}/dayplan` as any)}
-          style={({ pressed }) => [
-            styles.planCard,
-            { backgroundColor: '#8B5CF6' + '12', borderColor: '#8B5CF6' + '30', opacity: pressed ? 0.8 : 1 },
-          ]}
-        >
-          <View style={[styles.planCardIcon, { backgroundColor: '#8B5CF6' + '20' }]}>
-            <Route size={22} color="#8B5CF6" strokeWidth={1.8} />
-          </View>
-          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, marginTop: 10, fontWeight: '700' }]}>
-            Itinerary
-          </Text>
-          <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 2 }]}>
-            Map out your day
-          </Text>
-        </Pressable>
+      {/* Plan section — visible to all participants (declined users see it, just can't use When to Meet) */}
+      {(isHost || !!myParticipation) && (
+        <>
+          <SectionHeader
+            title="Plan"
+            actionLabel={canManage && !isCancelled ? '+ Add' : undefined}
+            onAction={canManage && !isCancelled ? () => setShowAddPoll(true) : undefined}
+          />
 
-        <Pressable
-          onPress={() => router.push(`/hangout/${hangoutId}/when-to-meet` as any)}
-          style={({ pressed }) => [
-            styles.planCard,
-            { backgroundColor: '#22C55E' + '10', borderColor: '#22C55E' + '30', opacity: pressed ? 0.8 : 1 },
-          ]}
-        >
-          <View style={[styles.planCardIcon, { backgroundColor: '#22C55E' + '18' }]}>
-            <Clock size={22} color="#22C55E" strokeWidth={1.8} />
-          </View>
-          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, marginTop: 10, fontWeight: '700' }]}>
-            When to meet
-          </Text>
-          <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 2 }]}>
-            Find a time for everyone
-          </Text>
-        </Pressable>
-      </View>
+          {/* Top cards: Itinerary (host/co-host only) + When to Meet */}
+          <View style={styles.planCards}>
+            {canManage && (
+              <Pressable
+                onPress={() => router.push(`/hangout/${hangoutId}/dayplan` as any)}
+                style={({ pressed }) => [
+                  styles.planCard,
+                  { backgroundColor: '#8B5CF6' + '12', borderColor: '#8B5CF6' + '30', opacity: pressed ? 0.8 : 1 },
+                ]}
+              >
+                <View style={[styles.planCardIcon, { backgroundColor: '#8B5CF6' + '20' }]}>
+                  <Route size={22} color="#8B5CF6" strokeWidth={1.8} />
+                </View>
+                <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, marginTop: 10, fontWeight: '700' }]}>
+                  Itinerary
+                </Text>
+                <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 2 }]}>
+                  Map out your day
+                </Text>
+              </Pressable>
+            )}
 
-      {/* Participants */}
-      <SectionHeader
-        title="Who's coming"
-        count={totalCount}
-        actionLabel={canManage ? 'Manage' : undefined}
-        onAction={
-          canManage ? () => router.push(`/hangout/${hangoutId}/participants`) : undefined
-        }
-      />
-      <Card padding="none" style={{ overflow: 'hidden' }}>
-        {sortedParticipants.map((p, idx) => (
-          <View key={p.user_id}>
-            <ParticipantRow participant={p} />
-            {idx < sortedParticipants.length - 1 ? (
-              <View
-                style={{
-                  height: StyleSheet.hairlineWidth,
-                  backgroundColor: theme.colors.border.default,
-                  marginLeft: 68,
-                }}
-              />
-            ) : null}
+            <Pressable
+              onPress={canUseWhenToMeet ? () => router.push(`/hangout/${hangoutId}/when-to-meet` as any) : undefined}
+              style={({ pressed }) => [
+                styles.planCard,
+                { backgroundColor: '#22C55E' + '10', borderColor: '#22C55E' + '30' },
+                canUseWhenToMeet && pressed && { opacity: 0.8 },
+                !canUseWhenToMeet && { opacity: 0.38 },
+              ]}
+            >
+              <View style={[styles.planCardIcon, { backgroundColor: '#22C55E' + '18' }]}>
+                <Clock size={22} color="#22C55E" strokeWidth={1.8} />
+              </View>
+              <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, marginTop: 10, fontWeight: '700' }]}>
+                When to meet
+              </Text>
+              <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 2 }]}>
+                {canUseWhenToMeet ? 'Find a time for everyone' : "Update your RSVP to join"}
+              </Text>
+            </Pressable>
           </View>
-        ))}
-      </Card>
+
+          {/* Restaurant / activity poll cards */}
+          {polls.data?.map((poll) => {
+            const hasFollowUp = polls.data?.some(
+              (p) =>
+                p.created_at > poll.created_at &&
+                ((poll.kind === 'cuisine' && p.kind === 'restaurant') ||
+                  (poll.kind === 'activity' && p.kind === 'restaurant')),
+            );
+            return (
+              <View key={poll.id}>
+                <PollCard pollId={poll.id} canManage={canManage} />
+                {poll.phase === 'closed' && canManage ? (
+                  <PollFollowUpCardWrapper
+                    pollId={poll.id}
+                    hangoutId={hangoutId}
+                    alreadyHasFollowUp={Boolean(hasFollowUp)}
+                  />
+                ) : null}
+              </View>
+            );
+          })}
+
+          {/* Host-only empty-state prompt when no polls exist yet */}
+          {canManage && !isCancelled && (!polls.data || polls.data.length === 0) && (
+            <Pressable
+              onPress={() => setShowAddPoll(true)}
+              style={[
+                styles.addPlanRow,
+                { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default },
+              ]}
+            >
+              <View style={styles.addPlanIcons}>
+                <View style={[styles.addPlanIconBubble, { backgroundColor: '#F59E0B' + '18' }]}>
+                  <UtensilsCrossed size={16} color="#F59E0B" strokeWidth={2} />
+                </View>
+                <View style={[styles.addPlanIconBubble, { backgroundColor: '#3B82F6' + '18' }]}>
+                  <Dices size={16} color="#3B82F6" strokeWidth={2} />
+                </View>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700' }]}>
+                  Plan a restaurant or activity
+                </Text>
+                <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 1 }]}>
+                  Let everyone vote on where to go
+                </Text>
+              </View>
+              <Plus size={18} color={theme.colors.text.tertiary} strokeWidth={2} />
+            </Pressable>
+          )}
+
+          <AddPollSheet
+            visible={showAddPoll}
+            onClose={() => setShowAddPoll(false)}
+            hangoutId={hangoutId}
+          />
+        </>
+      )}
+
       {/* Web RSVPs */}
       {(webRsvps.data ?? []).length > 0 && (
         <Card padding="none" style={{ overflow: 'hidden', marginTop: 6 }}>
@@ -404,41 +456,6 @@ export default function HangoutDetailScreen(): React.ReactElement {
         </Card>
       )}
 
-      {/* Polls */}
-      {((polls.data && polls.data.length > 0) || canManage) ? (
-        <SectionHeader
-          title="Votes"
-          actionLabel={canManage && !isCancelled ? '+ Add vote' : undefined}
-          onAction={canManage && !isCancelled ? () => setShowAddPoll(true) : undefined}
-        />
-      ) : null}
-
-      {polls.data?.map((poll) => {
-        const hasFollowUp = polls.data?.some(
-          (p) =>
-            p.created_at > poll.created_at &&
-            ((poll.kind === 'cuisine' && p.kind === 'restaurant') ||
-              (poll.kind === 'activity' && p.kind === 'restaurant')),
-        );
-        return (
-          <View key={poll.id}>
-            <PollCard pollId={poll.id} canManage={canManage} />
-            {poll.phase === 'closed' && canManage ? (
-              <PollFollowUpCardWrapper
-                pollId={poll.id}
-                hangoutId={hangoutId}
-                alreadyHasFollowUp={Boolean(hasFollowUp)}
-              />
-            ) : null}
-          </View>
-        );
-      })}
-
-      <AddPollSheet
-        visible={showAddPoll}
-        onClose={() => setShowAddPoll(false)}
-        hangoutId={hangoutId}
-      />
 
       {/* Chat entry */}
       <SectionHeader title="Group chat" />
@@ -562,16 +579,8 @@ function Fact({
   actionLabel?: string;
 }): React.ReactElement {
   const theme = useTheme();
-  return (
-    <View
-      style={[
-        styles.fact,
-        {
-          backgroundColor: theme.colors.bg.surface,
-          borderColor: theme.colors.border.default,
-        },
-      ]}
-    >
+  const inner = (
+    <>
       <View style={{ marginBottom: 8 }}>{icon}</View>
       <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary }]}>
         {label}
@@ -585,13 +594,31 @@ function Fact({
       >
         {value}
       </Text>
-      {onPress && actionLabel && (
-        <Pressable onPress={onPress} hitSlop={4} style={{ marginTop: 6 }}>
-          <Text style={[theme.typography.caption, { color: theme.colors.accent, fontWeight: '600' }]}>
-            {actionLabel}
-          </Text>
-        </Pressable>
+      {actionLabel && (
+        <Text style={[theme.typography.caption, { color: theme.colors.accent, fontWeight: '600', marginTop: 6 }]}>
+          {actionLabel}
+        </Text>
       )}
+    </>
+  );
+
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.fact,
+          { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default },
+          pressed && { opacity: 0.7 },
+        ]}
+      >
+        {inner}
+      </Pressable>
+    );
+  }
+  return (
+    <View style={[styles.fact, { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default }]}>
+      {inner}
     </View>
   );
 }
@@ -681,6 +708,26 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addPlanRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    marginTop: 8,
+  },
+  addPlanIcons: {
+    flexDirection: 'row',
+    gap: -8,
+  },
+  addPlanIconBubble: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },

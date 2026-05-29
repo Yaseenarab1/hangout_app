@@ -19,7 +19,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CalendarDays, ChevronRight, Plus, Users } from 'lucide-react-native';
+import { CalendarDays, ChevronRight, Plus, Users, Share2 } from 'lucide-react-native';
+import { Share } from 'react-native';
+
+const SUPABASE_URL = 'https://cruosjnuhcuewjnzhlja.supabase.co';
 import { useQuery } from '@tanstack/react-query';
 import { useTheme } from '@/hooks/useTheme';
 import { useSession } from '@/features/auth';
@@ -47,6 +50,8 @@ function SessionCard({ item, index }: { item: AvailabilitySession; index: number
   function handlePress() {
     if (item.hangout_id) {
       router.push(`/hangout/${item.hangout_id}/when-to-meet` as any);
+    } else {
+      router.push(`/availability/${item.id}` as any);
     }
   }
 
@@ -85,6 +90,17 @@ function SessionCard({ item, index }: { item: AvailabilitySession; index: number
           </Text>
         </View>
 
+        <Pressable
+          onPress={(e) => {
+            e.stopPropagation();
+            const url = `${SUPABASE_URL}/functions/v1/availability-page?id=${item.id}`;
+            Share.share({ message: `Fill in when you're free! ${url}`, url });
+          }}
+          hitSlop={8}
+          style={[styles.shareBtn, { backgroundColor: ACCENT + '12' }]}
+        >
+          <Share2 size={15} color={ACCENT} strokeWidth={2} />
+        </Pressable>
         <ChevronRight size={16} color={theme.colors.text.tertiary} strokeWidth={2} />
       </Pressable>
     </Animated.View>
@@ -327,6 +343,14 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  shareBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,

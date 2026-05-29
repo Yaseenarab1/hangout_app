@@ -5,14 +5,21 @@ import {
   Modal,
   ScrollView,
   Pressable,
+  Share,
   StyleSheet,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { X, Check } from 'lucide-react-native';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { X, Check, Copy, Users } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/ui';
 import { useCreateSession } from '../hooks/useCreateSession';
-import type { CreateSessionInput } from '../types';
+import type { CreateSessionInput, AvailabilitySession } from '../types';
+
+const SUPABASE_URL = 'https://cruosjnuhcuewjnzhlja.supabase.co';
+
+function getShareUrl(sessionId: string): string {
+  return `${SUPABASE_URL}/functions/v1/availability-page?id=${sessionId}`;
+}
 
 const ACCENT = '#8B5CF6';
 
@@ -61,6 +68,7 @@ export function CreateSessionSheet({ visible, hangoutId, onClose, onCreated }: P
   const [startHour, setStartHour] = useState(9);
   const [endHour, setEndHour] = useState(22);
   const [showHourPicker, setShowHourPicker] = useState<'start' | 'end' | null>(null);
+  const [createdSession, setCreatedSession] = useState<AvailabilitySession | null>(null);
 
   function toggleDate(d: string) {
     setSelectedDates((prev) => {
@@ -75,35 +83,86 @@ export function CreateSessionSheet({ visible, hangoutId, onClose, onCreated }: P
   }
 
   async function handleCreate() {
+    if (selectedDates.size === 0) return;
     const dates = [...selectedDates].sort();
-    const input: CreateSessionInput = {
-      hangoutId,
-      dates,
-      startHour,
-      endHour,
-    };
-    try {
-      const session = await createSession.mutateAsync(input);
-      setSelectedDates(new Set());
-      onCreated(session.id);
-    } catch {
-      // error handled by mutation
-    }
+    const input: CreateSessionInput = { hangoutId, dates, startHour, endHour };
+    const session = await createSession.mutateAsync(input).catch(() => null);
+    if (!session) return; // onError already showed alert
+    setCreatedSession(session);
+    onCreated(session.id);
+  }
+
+  function handleShare(session: AvailabilitySession) {
+    const url = getShareUrl(session.id);
+    Share.share({
+      message: `Fill in when you're free! ${url}`,
+      url,
+    });
+  }
+
+  function handleClose() {
+    setSelectedDates(new Set());
+    setCreatedSession(null);
+    onClose();
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <View style={[styles.container, { backgroundColor: theme.colors.bg.canvas }]}>
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: theme.colors.border.default }]}>
-          <Pressable onPress={onClose} hitSlop={12} style={styles.dismissBtn}>
+          <Pressable onPress={handleClose} hitSlop={12} style={styles.dismissBtn}>
             <X size={20} color={theme.colors.text.secondary} />
           </Pressable>
-          <Text style={[styles.title, { color: theme.colors.text.primary }]}>When can we meet?</Text>
+          <Text style={[styles.title, { color: theme.colors.text.primary }]}>
+            {createdSession ? 'Session created!' : 'When can we meet?'}
+          </Text>
           <View style={{ width: 36 }} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* ── Success / share screen ── */}
+        {createdSession && (
+          <Animated.View entering={FadeIn.duration(300)} style={styles.successWrap}>
+            <View style={[styles.successIcon, { backgroundColor: ACCENT + '15' }]}>
+              <Check size={36} color={ACCENT} strokeWidth={2.5} />
+            </View>
+            <Text style={[styles.successTitle, { color: theme.colors.text.primary }]}>
+              Ready to share
+            </Text>
+            <Text style={[theme.typography.body, { color: theme.colors.text.secondary, textAlign: 'center', lineHeight: 22 }]}>
+              Send the link to anyone — they can fill in their availability even without the app.
+            </Text>
+
+            <Pressable
+              onPress={() => handleShare(createdSession)}
+              style={[styles.shareBtn, { backgroundColor: ACCENT }]}
+            >
+              <Users size={18} color="#FFF" strokeWidth={2} />
+              <Text style={styles.shareBtnText}>Share availability link</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                const url = getShareUrl(createdSession.id);
+                Share.share({ message: url, url });
+              }}
+              style={[styles.copyBtn, { backgroundColor: theme.colors.bg.subtle, borderColor: theme.colors.border.default }]}
+            >
+              <Copy size={15} color={theme.colors.text.secondary} strokeWidth={2} />
+              <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, fontWeight: '600' }]}>
+                Copy link
+              </Text>
+            </Pressable>
+
+            <Pressable onPress={handleClose} style={{ marginTop: 16 }}>
+              <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary, fontWeight: '600' }]}>
+                Done
+              </Text>
+            </Pressable>
+          </Animated.View>
+        )}
+
+        {!createdSession && <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {/* Instruction */}
           <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginBottom: 16, lineHeight: 18 }]}>
             Pick up to 7 dates you want to check. Everyone fills in when they're free.
@@ -215,20 +274,22 @@ export function CreateSessionSheet({ visible, hangoutId, onClose, onCreated }: P
               })}
             </ScrollView>
           )}
-        </ScrollView>
+        </ScrollView>}
 
-        {/* Footer */}
-        <View style={[styles.footer, { borderTopColor: theme.colors.border.default, backgroundColor: theme.colors.bg.canvas }]}>
-          <Button
-            label={selectedDates.size === 0 ? 'Pick dates to continue' : `Create — ${selectedDates.size} date${selectedDates.size === 1 ? '' : 's'}`}
-            variant="primary"
-            fullWidth
-            size="lg"
-            disabled={selectedDates.size === 0}
-            loading={createSession.isPending}
-            onPress={handleCreate}
-          />
-        </View>
+        {/* Footer — only shown on the create form, not success screen */}
+        {!createdSession && (
+          <View style={[styles.footer, { borderTopColor: theme.colors.border.default, backgroundColor: theme.colors.bg.canvas }]}>
+            <Button
+              label={selectedDates.size === 0 ? 'Pick dates to continue' : `Create — ${selectedDates.size} date${selectedDates.size === 1 ? '' : 's'}`}
+              variant="primary"
+              fullWidth
+              size="lg"
+              disabled={selectedDates.size === 0}
+              loading={createSession.isPending}
+              onPress={handleCreate}
+            />
+          </View>
+        )}
       </View>
     </Modal>
   );
@@ -306,5 +367,53 @@ const styles = StyleSheet.create({
   footer: {
     padding: 20,
     borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  successWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 36,
+    gap: 12,
+  },
+  successIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  successTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  shareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingHorizontal: 28,
+    paddingVertical: 16,
+    borderRadius: 16,
+    shadowColor: ACCENT,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  shareBtnText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  copyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
   },
 });

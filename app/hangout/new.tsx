@@ -9,11 +9,12 @@ import {
   KeyboardAvoidingView,
   ScrollView,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { X, Navigation, MapPin, ChevronRight, Users } from 'lucide-react-native';
+import { X, Navigation, MapPin, ChevronRight, Users, Clock, CalendarDays } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Input, Textarea, Button } from '@/components/ui';
 import { useTheme } from '@/hooks/useTheme';
@@ -27,12 +28,14 @@ import {
   ParticipantPicker,
 } from '@/features/hangouts';
 
-type Step = 'details' | 'invite';
+type Step = 'details' | 'when' | 'invite';
+type TimeChoice = 'known' | 'poll' | null;
 
 function StepDots({ step }: { step: Step }) {
   return (
     <View style={styles.dots}>
       <View style={[styles.dot, step === 'details' && styles.dotActive]} />
+      <View style={[styles.dot, step === 'when' && styles.dotActive]} />
       <View style={[styles.dot, step === 'invite' && styles.dotActive]} />
     </View>
   );
@@ -43,6 +46,8 @@ export default function NewHangoutScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const createHangout = useCreateHangout();
   const [step, setStep] = useState<Step>('details');
+  const [timeChoice, setTimeChoice] = useState<TimeChoice>(null);
+  const [pickedDate, setPickedDate] = useState<Date>(new Date());
   const [addressText, setAddressText] = useState('');
   const [locatingMe, setLocatingMe] = useState(false);
   const saveSearchLocation = useSaveSearchLocation();
@@ -100,9 +105,18 @@ export default function NewHangoutScreen(): React.ReactElement {
   }
 
   const onSubmit = (input: CreateHangoutInput): void => {
-    createHangout.mutate(input, {
+    const payload: CreateHangoutInput =
+      timeChoice === 'known'
+        ? { ...input, startTime: pickedDate.toISOString() }
+        : input;
+
+    createHangout.mutate(payload, {
       onSuccess: (hangout) => {
-        router.replace(`/hangout/${hangout.id}`);
+        if (timeChoice === 'poll') {
+          router.replace(`/hangout/${hangout.id}/when-to-meet?create=1` as any);
+        } else {
+          router.replace(`/hangout/${hangout.id}`);
+        }
       },
     });
   };
@@ -240,9 +254,9 @@ export default function NewHangoutScreen(): React.ReactElement {
           ]}
         >
           <Button
-            label="Next: invite friends"
+            label="Next: when?"
             trailingIcon={<ChevronRight size={16} color="#FFFFFF" />}
-            onPress={() => setStep('invite')}
+            onPress={() => setStep('when')}
             disabled={!isValid || !watch('title')}
             fullWidth
             size="lg"
@@ -252,7 +266,132 @@ export default function NewHangoutScreen(): React.ReactElement {
     );
   }
 
-  // ── Step 2: Invite ────────────────────────────────────────────────────
+  // ── Step 2: When ─────────────────────────────────────────────────────
+  if (step === 'when') {
+    return (
+      <KeyboardAvoidingView
+        style={[styles.root, { backgroundColor: theme.colors.bg.canvas }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={[styles.navBar, { paddingTop: headerTop, backgroundColor: theme.colors.bg.canvas }]}>
+          <Pressable
+            onPress={() => setStep('details')}
+            hitSlop={12}
+            style={({ pressed }) => [styles.closeBtn, { backgroundColor: theme.colors.bg.subtle, opacity: pressed ? 0.6 : 1 }]}
+          >
+            <ChevronRight size={18} color={theme.colors.text.primary} strokeWidth={2} style={{ transform: [{ rotate: '180deg' }] }} />
+          </Pressable>
+          <StepDots step="when" />
+          <View style={{ width: 36 }} />
+        </View>
+
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: headerTop + 120 }]}
+        >
+          <View style={styles.hero}>
+            <Text style={styles.heroEmoji}>⏰</Text>
+            <Text style={[theme.typography.h2, { color: theme.colors.text.primary, marginTop: 12, letterSpacing: -0.5 }]}>
+              When is this happening?
+            </Text>
+            <Text style={[theme.typography.body, { color: theme.colors.text.secondary, marginTop: 4 }]}>
+              Pick one — you can always change it later.
+            </Text>
+          </View>
+
+          <View style={styles.timeChoices}>
+            {/* I know the time */}
+            <Pressable
+              onPress={() => setTimeChoice(timeChoice === 'known' ? null : 'known')}
+              style={[
+                styles.timeCard,
+                {
+                  backgroundColor: timeChoice === 'known'
+                    ? '#8B5CF6' + '15'
+                    : theme.colors.bg.surface,
+                  borderColor: timeChoice === 'known'
+                    ? '#8B5CF6'
+                    : theme.colors.border.default,
+                  borderWidth: timeChoice === 'known' ? 2 : 1,
+                },
+              ]}
+            >
+              <View style={[styles.timeCardIcon, { backgroundColor: '#8B5CF6' + '20' }]}>
+                <CalendarDays size={24} color="#8B5CF6" strokeWidth={1.8} />
+              </View>
+              <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700', marginTop: 12 }]}>
+                I know the time
+              </Text>
+              <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 3 }]}>
+                Set a date and time now
+              </Text>
+            </Pressable>
+
+            {/* Find a time together */}
+            <Pressable
+              onPress={() => setTimeChoice(timeChoice === 'poll' ? null : 'poll')}
+              style={[
+                styles.timeCard,
+                {
+                  backgroundColor: timeChoice === 'poll'
+                    ? '#22C55E' + '12'
+                    : theme.colors.bg.surface,
+                  borderColor: timeChoice === 'poll'
+                    ? '#22C55E'
+                    : theme.colors.border.default,
+                  borderWidth: timeChoice === 'poll' ? 2 : 1,
+                },
+              ]}
+            >
+              <View style={[styles.timeCardIcon, { backgroundColor: '#22C55E' + '18' }]}>
+                <Clock size={24} color="#22C55E" strokeWidth={1.8} />
+              </View>
+              <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700', marginTop: 12 }]}>
+                Find a time together
+              </Text>
+              <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 3 }]}>
+                Poll the group with When to Meet
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Date + time picker — inline when "I know the time" is selected */}
+          {timeChoice === 'known' && (
+            <View style={[styles.pickerWrap, { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default }]}>
+              <DateTimePicker
+                value={pickedDate}
+                mode="datetime"
+                display="spinner"
+                onChange={(_, date) => { if (date) setPickedDate(date); }}
+                themeVariant={theme.mode === 'dark' ? 'dark' : 'light'}
+                style={{ width: '100%' }}
+              />
+            </View>
+          )}
+        </ScrollView>
+
+        <View style={[styles.footer, { paddingBottom: headerTop + (Platform.OS === 'ios' ? 8 : 16), backgroundColor: theme.colors.bg.canvas, borderTopColor: theme.colors.border.default }]}>
+          <Button
+            label="Next: invite friends"
+            trailingIcon={<ChevronRight size={16} color="#FFFFFF" />}
+            onPress={() => setStep('invite')}
+            fullWidth
+            size="lg"
+          />
+          {timeChoice === null && (
+            <Pressable onPress={() => setStep('invite')} style={{ marginTop: 12, alignItems: 'center' }}>
+              <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary }]}>
+                Decide later
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  // ── Step 3: Invite ────────────────────────────────────────────────────
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.bg.canvas }]}>
       {/* Nav bar */}
@@ -397,5 +536,29 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 20,
     paddingHorizontal: 20,
+  },
+  timeChoices: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  timeCard: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 18,
+    alignItems: 'flex-start',
+  },
+  timeCardIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerWrap: {
+    marginTop: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
 });

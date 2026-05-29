@@ -7,10 +7,13 @@ import {
   ActivityIndicator,
   Pressable,
   Platform,
+  Share,
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useLocalSearchParams, router } from 'expo-router';
-import { ArrowLeft, Users, CalendarDays } from 'lucide-react-native';
+import { ArrowLeft, Users, CalendarDays, Share2 } from 'lucide-react-native';
+
+const SUPABASE_URL = 'https://cruosjnuhcuewjnzhlja.supabase.co';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 import { useSession } from '@/features/auth';
@@ -27,9 +30,9 @@ const ACCENT = '#8B5CF6';
 export default function WhenToMeetScreen(): React.ReactElement {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { id: hangoutId } = useLocalSearchParams<{ id: string }>();
+  const { id: hangoutId, create } = useLocalSearchParams<{ id: string; create?: string }>();
   const { user } = useSession();
-  const [showCreate, setShowCreate] = useState(false);
+  const [showCreate, setShowCreate] = useState(create === '1');
 
   const hangout = useHangout(hangoutId ?? '');
   const session = useHangoutSession(hangoutId);
@@ -101,6 +104,18 @@ export default function WhenToMeetScreen(): React.ReactElement {
           style={[styles.createBtn, { backgroundColor: ACCENT }]}
         >
           <Text style={styles.createBtnText}>Set up</Text>
+        </Pressable>
+      )}
+      {s && (
+        <Pressable
+          onPress={() => {
+            const url = `${SUPABASE_URL}/functions/v1/availability-page?id=${s.id}`;
+            Share.share({ message: `Fill in when you're free! ${url}`, url });
+          }}
+          hitSlop={10}
+          style={[styles.shareBtn, { backgroundColor: theme.colors.bg.subtle }]}
+        >
+          <Share2 size={16} color={ACCENT} strokeWidth={2} />
         </Pressable>
       )}
     </View>
@@ -223,6 +238,13 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
+  },
+  shareBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   center: {
     flex: 1,

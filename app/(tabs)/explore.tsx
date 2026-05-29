@@ -1,15 +1,18 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
+  TextInput,
   ScrollView,
+  FlatList,
   Pressable,
   StyleSheet,
   ActivityIndicator,
-  Dimensions,
   Platform,
+  Linking,
 } from 'react-native';
-import MapView, { Marker, type Region } from 'react-native-maps';
+import MapView, { type Region } from 'react-native-maps';
+import * as Location from 'expo-location';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -17,10 +20,10 @@ import Animated, {
   withSpring,
   Easing,
   FadeInDown,
-  SlideInDown,
+  FadeIn,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
-import { MapPin, ChevronRight, Star, List, Map, X } from 'lucide-react-native';
+import { MapPin, Star, Navigation, ExternalLink, List, Map, Search, X } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
@@ -32,15 +35,8 @@ import { PlaceDetailSheet } from '@/features/places/components/PlaceDetailSheet'
 import type { Place } from '@/features/places';
 
 const ACCENT = '#8B5CF6';
-const { height: SCREEN_H } = Dimensions.get('window');
+const NYC: { lat: number; lng: number } = { lat: 40.758, lng: -73.9855 };
 
-// NYC Times Square default
-const DEFAULT_REGION: Region = {
-  latitude: 40.758,
-  longitude: -73.9855,
-  latitudeDelta: 0.06,
-  longitudeDelta: 0.06,
-};
 
 const CATEGORIES = [
   { id: 'bars',          label: 'Bars',      emoji: '🍺', query: 'bars' },
@@ -57,6 +53,38 @@ const CATEGORIES = [
 
 type Category = (typeof CATEGORIES)[number];
 type ViewMode = 'list' | 'map';
+type LatLng = { lat: number; lng: number };
+
+function openInMaps(place: Place): void {
+  const name = encodeURIComponent(place.name);
+  if (place.location) {
+    const { lat, lng } = place.location;
+    if (Platform.OS === 'ios') {
+      Linking.openURL(`maps://?q=${name}&ll=${lat},${lng}`).catch(() =>
+        Linking.openURL(`https://maps.apple.com/?q=${name}&ll=${lat},${lng}`),
+      );
+    } else {
+      Linking.openURL(`geo:${lat},${lng}?q=${name}`).catch(() =>
+        Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`),
+      );
+    }
+  } else {
+    Linking.openURL(place.mapsUrl ?? `https://maps.apple.com/?q=${name}`).catch(() => {});
+  }
+}
+
+function openCategoryInMaps(cat: Category, locationName?: string): void {
+  const q = encodeURIComponent(
+    locationName ? `${cat.query} near ${locationName}` : cat.query,
+  );
+  if (Platform.OS === 'ios') {
+    Linking.openURL(`maps://?q=${q}`).catch(() =>
+      Linking.openURL(`https://maps.apple.com/?q=${q}`),
+    );
+  } else {
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${q}`).catch(() => {});
+  }
+}
 
 export default function ExploreScreen(): React.ReactElement {
   const theme = useTheme();
@@ -66,42 +94,108 @@ export default function ExploreScreen(): React.ReactElement {
   const [detailPlace, setDetailPlace] = useState<Place | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedPin, setSelectedPin] = useState<Place | null>(null);
-  const location = useSearchLocation();
+  const [userLocation, setUserLocation] = useState<LatLng | null>(null);
+  const [searchText, setSearchText] = useState('');
+  const [committedSearch, setCommittedSearch] = useState('');
+
   const mapRef = useRef<MapView>(null);
+  const mapListRef = useRef<FlatList>(null);
+  const searchRef = useRef<TextInput>(null);
+  const location = useSearchLocation();
+
+  // Request location permission once and get coords
+  useEffect(() => {
+    Location.requestForegroundPermissionsAsync()
+      .then(({ status }) => {
+        if (status !== 'granted') return null;
+        return Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+      })
+      .then((pos) => {
+        if (pos) setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      })
+      .catch(() => {});
+  }, []);
 
   const EXPLORE_RADIUS = 4828;
+  const searchCenter: LatLng = location.data ?? userLocation ?? NYC;
+
+  const activeQuery = activeCategory?.query ?? committedSearch;
+
   const placesQuery = useQuery({
-    queryKey: ['explore', activeCategory?.id, location.data?.lat, location.data?.lng],
+    queryKey: ['explore', activeCategory?.id ?? committedSearch, searchCenter.lat, searchCenter.lng],
     queryFn: () =>
       searchPlaces({
-        query: activeCategory!.query,
-        location: location.data ? { lat: location.data.lat, lng: location.data.lng } : undefined,
+        query: activeQuery,
+        location: searchCenter,
         radius: EXPLORE_RADIUS,
       }),
-    enabled: !!activeCategory,
+    enabled: !!activeCategory || !!committedSearch,
     staleTime: 5 * 60_000,
-    select: (data) => filterByRadius(data, location.data, EXPLORE_RADIUS),
+    retry: 1,
+    select: (data) => filterByRadius(data, location.data ?? null, EXPLORE_RADIUS),
   });
 
   const results = placesQuery.data ?? [];
 
-  const mapRegion: Region = location.data
-    ? {
-        latitude: location.data.lat,
-        longitude: location.data.lng,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      }
-    : DEFAULT_REGION;
+  // Animate map to center when entering map mode or user location resolves
+  useEffect(() => {
+    if (viewMode !== 'map' || !mapRef.current) return;
+    const center = userLocation ?? location.data ?? NYC;
+    mapRef.current.animateToRegion(
+      { latitude: center.lat, longitude: center.lng, latitudeDelta: 0.04, longitudeDelta: 0.04 },
+      600,
+    );
+  }, [viewMode, userLocation]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function handlePinTap(place: Place) {
-    setSelectedPin(place);
-  }
-
-  function handleSwitchToMap() {
-    setViewMode('map');
+  function submitSearch() {
+    const q = searchText.trim();
+    if (!q) return;
+    setActiveCategory(null);
     setSelectedPin(null);
+    setCommittedSearch(q);
+    searchRef.current?.blur();
   }
+
+  function clearSearch() {
+    setSearchText('');
+    setCommittedSearch('');
+    setSelectedPin(null);
+    searchRef.current?.blur();
+  }
+
+  // Auto-select & pan to first result when results arrive in map mode
+  useEffect(() => {
+    if (viewMode !== 'map' || results.length === 0) return;
+    const first = results[0]!;
+    setSelectedPin(first);
+    if (first.location && mapRef.current) {
+      mapRef.current.animateToRegion(
+        { latitude: first.location.lat, longitude: first.location.lng, latitudeDelta: 0.015, longitudeDelta: 0.015 },
+        500,
+      );
+    }
+  }, [viewMode, activeCategory?.id, committedSearch, results.length > 0 ? results[0]!.placeId : null]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function selectMapPlace(place: Place) {
+    setSelectedPin(place);
+    if (place.location && mapRef.current) {
+      mapRef.current.animateToRegion(
+        { latitude: place.location.lat, longitude: place.location.lng, latitudeDelta: 0.012, longitudeDelta: 0.012 },
+        350,
+      );
+    }
+    const idx = results.findIndex((p) => p.placeId === place.placeId);
+    if (idx >= 0) mapListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+  }
+
+  const mapInitialRegion: Region = {
+    latitude: searchCenter.lat,
+    longitude: searchCenter.lng,
+    latitudeDelta: 0.06,
+    longitudeDelta: 0.06,
+  };
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.bg.canvas }]}>
@@ -118,33 +212,62 @@ export default function ExploreScreen(): React.ReactElement {
       >
         <Text style={[styles.navTitle, { color: theme.colors.text.primary }]}>Explore</Text>
 
-        {/* List / Map toggle */}
         <View style={[styles.toggle, { backgroundColor: theme.colors.bg.subtle }]}>
           <ToggleBtn
-            icon={<List size={15} color={viewMode === 'list' ? '#FFFFFF' : theme.colors.text.secondary} strokeWidth={2} />}
+            icon={<List size={15} color={viewMode === 'list' ? '#FFF' : theme.colors.text.secondary} strokeWidth={2} />}
             label="List"
             active={viewMode === 'list'}
             onPress={() => setViewMode('list')}
           />
           <ToggleBtn
-            icon={<Map size={15} color={viewMode === 'map' ? '#FFFFFF' : theme.colors.text.secondary} strokeWidth={2} />}
+            icon={<Map size={15} color={viewMode === 'map' ? '#FFF' : theme.colors.text.secondary} strokeWidth={2} />}
             label="Map"
             active={viewMode === 'map'}
-            onPress={handleSwitchToMap}
+            onPress={() => setViewMode('map')}
           />
         </View>
       </View>
 
-      {/* Category chips — always visible */}
+      {/* Search bar */}
+      <View style={[styles.searchRow, { backgroundColor: theme.colors.bg.canvas }]}>
+        <View style={[styles.searchBox, { backgroundColor: theme.colors.bg.subtle, borderColor: theme.colors.border.default }]}>
+          <Search size={16} color={theme.colors.text.tertiary} strokeWidth={2} />
+          <TextInput
+            ref={searchRef}
+            style={[styles.searchInput, { color: theme.colors.text.primary }]}
+            placeholder="Search places…"
+            placeholderTextColor={theme.colors.text.tertiary}
+            value={searchText}
+            onChangeText={setSearchText}
+            onSubmitEditing={submitSearch}
+            returnKeyType="search"
+            clearButtonMode="never"
+          />
+          {searchText.length > 0 && (
+            <Pressable onPress={clearSearch} hitSlop={8}>
+              <X size={15} color={theme.colors.text.tertiary} strokeWidth={2.5} />
+            </Pressable>
+          )}
+        </View>
+        {searchText.trim().length > 0 && (
+          <Pressable onPress={submitSearch} style={[styles.searchBtn, { backgroundColor: ACCENT }]}>
+            <Text style={styles.searchBtnText}>Go</Text>
+          </Pressable>
+        )}
+      </View>
+
+      {/* Category chips */}
       <View style={[styles.chipsBar, { borderBottomColor: theme.colors.border.default }]}>
-        {/* Location banner */}
         <Pressable
           onPress={() => setPickerVisible(true)}
-          style={[styles.locationChip, { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default }]}
+          style={[
+            styles.locationChip,
+            { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default },
+          ]}
         >
           <MapPin size={13} color={ACCENT} />
           <Text style={[styles.locationChipText, { color: theme.colors.text.primary }]} numberOfLines={1}>
-            {location.data ? location.data.name : 'Location'}
+            {location.data ? location.data.name : 'Nearby'}
           </Text>
         </Pressable>
 
@@ -163,6 +286,8 @@ export default function ExploreScreen(): React.ReactElement {
                 onPress={() => {
                   setActiveCategory(active ? null : cat);
                   setSelectedPin(null);
+                  setCommittedSearch('');
+                  setSearchText('');
                 }}
                 theme={theme}
               />
@@ -171,45 +296,83 @@ export default function ExploreScreen(): React.ReactElement {
         </ScrollView>
       </View>
 
-      {/* ── LIST VIEW ─────────────────────────────────────────────────────── */}
-      {viewMode === 'list' && (
-        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-          {!activeCategory && <NoSelection theme={theme} onPickCategory={setActiveCategory} />}
+      {/* ── LIST VIEW — hidden (not unmounted) when map is active ──────────── */}
+      <View style={{ flex: 1, display: viewMode === 'list' ? 'flex' : 'none' }}>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {!activeCategory && !committedSearch && (
+            <NoSelection
+              theme={theme}
+              onPickCategory={(cat) => { setActiveCategory(cat); setCommittedSearch(''); setSearchText(''); }}
+            />
+          )}
 
-          {activeCategory && placesQuery.isLoading && (
+          {(activeCategory || committedSearch) && placesQuery.isLoading && (
             <View style={styles.centered}>
               <ActivityIndicator color={ACCENT} size="large" />
               <Text style={[theme.typography.body, { color: theme.colors.text.secondary, marginTop: 12 }]}>
-                Finding {activeCategory.label.toLowerCase()} near you…
+                {activeCategory ? `Finding ${activeCategory.label.toLowerCase()} near you…` : `Searching "${committedSearch}"…`}
               </Text>
             </View>
           )}
 
-          {activeCategory && placesQuery.isError && (
-            <View style={styles.centered}>
-              <Text style={[theme.typography.body, { color: theme.colors.text.secondary }]}>
-                Couldn't load results. Check your connection.
+          {(activeCategory || committedSearch) && placesQuery.isError && (
+            <Animated.View entering={FadeIn.duration(300)} style={styles.centered}>
+              <Text style={styles.emptyEmoji}>😕</Text>
+              <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, marginBottom: 4 }]}>
+                Couldn't load results
               </Text>
-            </View>
+              {activeCategory && (
+                <Pressable
+                  onPress={() => openCategoryInMaps(activeCategory, location.data?.name)}
+                  style={[styles.mapsBtn, { backgroundColor: ACCENT }]}
+                >
+                  <ExternalLink size={14} color="#FFF" />
+                  <Text style={styles.mapsBtnText}>Search in Maps</Text>
+                </Pressable>
+              )}
+            </Animated.View>
           )}
 
-          {activeCategory && !placesQuery.isLoading && results.length === 0 && !placesQuery.isError && (
-            <View style={styles.centered}>
+          {(activeCategory || committedSearch) && !placesQuery.isLoading && !placesQuery.isError && results.length === 0 && (
+            <Animated.View entering={FadeIn.duration(300)} style={styles.centered}>
               <Text style={styles.emptyEmoji}>🔍</Text>
               <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>Nothing found nearby</Text>
-              <Text style={[theme.typography.body, { color: theme.colors.text.secondary, marginTop: 4 }]}>
-                Try a different category or change your location.
-              </Text>
-            </View>
+              {activeCategory && (
+                <Pressable
+                  onPress={() => openCategoryInMaps(activeCategory, location.data?.name)}
+                  style={[styles.mapsBtn, { backgroundColor: ACCENT, marginTop: 16 }]}
+                >
+                  <ExternalLink size={14} color="#FFF" />
+                  <Text style={styles.mapsBtnText}>Search in Maps</Text>
+                </Pressable>
+              )}
+            </Animated.View>
           )}
 
           {results.length > 0 && (
             <View style={styles.resultsList}>
+              {activeCategory && (
+                <Pressable
+                  onPress={() => openCategoryInMaps(activeCategory, location.data?.name)}
+                  style={[styles.viewAllRow, { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default }]}
+                >
+                  <MapPin size={14} color={ACCENT} />
+                  <Text style={[theme.typography.caption, { color: ACCENT, fontWeight: '700', flex: 1 }]}>
+                    View all {results.length} on Maps
+                  </Text>
+                  <ExternalLink size={13} color={ACCENT} />
+                </Pressable>
+              )}
+
               {results.map((place, i) => (
-                <Animated.View key={place.placeId} entering={FadeInDown.delay(i * 40).springify().damping(18).stiffness(260)}>
+                <Animated.View
+                  key={place.placeId}
+                  entering={FadeInDown.delay(Math.min(i * 40, 400)).springify().damping(18).stiffness(260)}
+                >
                   <PlaceCard
                     place={place}
                     onPress={() => setDetailPlace(place)}
+                    onDirections={() => openInMaps(place)}
                     theme={theme}
                   />
                 </Animated.View>
@@ -219,149 +382,173 @@ export default function ExploreScreen(): React.ReactElement {
 
           <View style={{ height: insets.bottom + 20 }} />
         </ScrollView>
-      )}
+      </View>
 
-      {/* ── MAP VIEW ──────────────────────────────────────────────────────── */}
-      {viewMode === 'map' && (
-        <View style={{ flex: 1 }}>
-          <MapView
-            ref={mapRef}
-            style={StyleSheet.absoluteFillObject}
-            initialRegion={mapRegion}
-            showsUserLocation
-            showsMyLocationButton={false}
-            userInterfaceStyle={theme.mode === 'dark' ? 'dark' : 'light'}
-          >
-            {results.filter((p) => p.location).map((place) => (
-              <Marker
-                key={place.placeId}
-                coordinate={{
-                  latitude: place.location!.lat,
-                  longitude: place.location!.lng,
-                }}
-                onPress={() => handlePinTap(place)}
-                tracksViewChanges={false}
-              >
-                <View
-                  style={[
-                    styles.pin,
-                    {
-                      backgroundColor: selectedPin?.placeId === place.placeId ? ACCENT : '#FFFFFF',
-                      borderColor: ACCENT,
-                    },
-                  ]}
-                >
-                  <Text style={styles.pinEmoji}>{activeCategory?.emoji ?? '📍'}</Text>
-                </View>
-              </Marker>
-            ))}
-          </MapView>
+      {/* ── MAP VIEW — hidden (not unmounted) when list is active ─────────── */}
+      <View style={{ flex: 1, display: viewMode === 'map' ? 'flex' : 'none' }}>
+        {/* MapView — NO Marker children (avoids AIRMap Fabric crash in RN 0.76) */}
+        <MapView
+          ref={mapRef}
+          style={StyleSheet.absoluteFillObject}
+          initialRegion={mapInitialRegion}
+          showsUserLocation={!!userLocation}
+          showsMyLocationButton={false}
+          showsPointsOfInterest={false}
+          showsTraffic={false}
+        />
 
-          {/* No category picked — overlay hint */}
-          {!activeCategory && (
-            <View style={[styles.mapHint, { backgroundColor: theme.colors.bg.surface + 'F0' }]}>
-              <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
-                Pick a category above to see places on the map
+        {/* Center-pin — stays fixed on screen as map pans beneath it */}
+        {selectedPin && (
+          <View style={styles.centerPinWrap} pointerEvents="none">
+            <MapPin size={44} color={ACCENT} fill={ACCENT + '50'} strokeWidth={1.5} />
+            <View style={[styles.centerPinLabel, { backgroundColor: theme.colors.bg.surface }]}>
+              <Text style={{ color: theme.colors.text.primary, fontWeight: '700', fontSize: 13 }} numberOfLines={1}>
+                {selectedPin.name}
               </Text>
-            </View>
-          )}
-
-          {/* Loading overlay */}
-          {activeCategory && placesQuery.isLoading && (
-            <View style={[styles.mapHint, { backgroundColor: theme.colors.bg.surface + 'F0' }]}>
-              <ActivityIndicator color={ACCENT} />
-              <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 8 }]}>
-                Loading places…
-              </Text>
-            </View>
-          )}
-
-          {/* Selected pin bottom card */}
-          {selectedPin && (
-            <Animated.View
-              entering={SlideInDown.springify().damping(22).stiffness(300)}
-              style={[
-                styles.pinCard,
-                {
-                  bottom: insets.bottom + 16,
-                  backgroundColor: theme.colors.bg.surface,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: -4 },
-                  shadowOpacity: 0.12,
-                  shadowRadius: 20,
-                  elevation: 16,
-                },
-              ]}
-            >
-              <Pressable
-                onPress={() => setSelectedPin(null)}
-                hitSlop={10}
-                style={[styles.pinCardClose, { backgroundColor: theme.colors.bg.subtle }]}
-              >
-                <X size={14} color={theme.colors.text.secondary} />
-              </Pressable>
-
-              <View style={styles.pinCardInner}>
-                {selectedPin.photos?.[0] ? (
-                  <Image
-                    source={{ uri: getPlacePhotoUrl(selectedPin.photos[0], 200) }}
-                    style={styles.pinCardPhoto}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <View style={[styles.pinCardPhoto, styles.pinCardPhotoFallback, { backgroundColor: ACCENT + '12' }]}>
-                    <Text style={{ fontSize: 28 }}>{activeCategory?.emoji ?? '📍'}</Text>
-                  </View>
-                )}
-
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontSize: 16, fontWeight: '700' }]}
-                    numberOfLines={1}
-                  >
-                    {selectedPin.name}
+              {selectedPin.rating ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                  <Star size={10} color="#F59E0B" fill="#F59E0B" />
+                  <Text style={{ color: theme.colors.text.secondary, fontSize: 11, fontWeight: '600' }}>
+                    {selectedPin.rating.toFixed(1)}
                   </Text>
-                  {selectedPin.primaryType && (
-                    <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary, marginTop: 2 }]} numberOfLines={1}>
-                      {selectedPin.primaryType}
-                    </Text>
-                  )}
-                  <View style={styles.pinCardMeta}>
-                    {selectedPin.rating && (
-                      <View style={styles.ratingRow}>
-                        <Star size={11} color="#F59E0B" fill="#F59E0B" />
-                        <Text style={[theme.typography.caption, { color: theme.colors.text.primary, fontWeight: '700', marginLeft: 3 }]}>
-                          {selectedPin.rating.toFixed(1)}
-                        </Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        )}
+
+        {/* "Pick a vibe" hint pill — only shown when nothing is selected, clean & small */}
+        {!activeCategory && !committedSearch && (
+          <View style={styles.mapHintRow} pointerEvents="none">
+            <View style={[styles.mapHintPill, { backgroundColor: theme.colors.bg.surface + 'F2' }]}>
+              <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, fontWeight: '600' }]}>
+                Pick a vibe from the chips above
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Compact loading chip */}
+        {(activeCategory || committedSearch) && placesQuery.isLoading && (
+          <View style={styles.mapHintRow} pointerEvents="none">
+            <View style={[styles.mapLoadingChip, { backgroundColor: theme.colors.bg.surface + 'F2' }]}>
+              <ActivityIndicator size="small" color={ACCENT} />
+              <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, fontWeight: '600' }]}>
+                Loading {activeCategory?.label ?? 'places'}…
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Results count badge above the card strip */}
+        {(activeCategory || committedSearch) && !placesQuery.isLoading && results.length > 0 && (
+          <View
+            style={[styles.mapResultsBadge, { bottom: insets.bottom + 196 }]}
+            pointerEvents="none"
+          >
+            <View style={[styles.mapBadgePill, { backgroundColor: ACCENT }]}>
+              <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 12 }}>
+                {results.length} {activeCategory?.label ?? 'places'} nearby
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Bottom horizontal card strip — swipe to browse, tap to pan map */}
+        {(activeCategory || committedSearch) && !placesQuery.isLoading && results.length > 0 && (
+          <View style={[styles.mapStrip, { bottom: insets.bottom + 16 }]}>
+            <FlatList
+              ref={mapListRef}
+              data={results}
+              keyExtractor={(item) => item.placeId}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.mapStripContent}
+              onScrollToIndexFailed={() => {}}
+              renderItem={({ item }) => {
+                const active = selectedPin?.placeId === item.placeId;
+                return (
+                  <Pressable
+                    onPress={() => selectMapPlace(item)}
+                    style={[
+                      styles.mapCard,
+                      {
+                        backgroundColor: theme.colors.bg.surface,
+                        borderColor: active ? ACCENT : theme.colors.border.default,
+                        borderWidth: active ? 2 : StyleSheet.hairlineWidth,
+                        shadowColor: active ? ACCENT : '#000',
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: active ? 0.25 : 0.12,
+                        shadowRadius: 12,
+                        elevation: active ? 10 : 5,
+                      },
+                    ]}
+                  >
+                    {item.photos?.[0] ? (
+                      <Image
+                        source={{ uri: getPlacePhotoUrl(item.photos[0], 300) }}
+                        style={styles.mapCardPhoto}
+                        contentFit="cover"
+                      />
+                    ) : (
+                      <View style={[styles.mapCardPhoto, { backgroundColor: ACCENT + '12', alignItems: 'center', justifyContent: 'center' }]}>
+                        <MapPin size={22} color={ACCENT + '60'} />
                       </View>
                     )}
-                    {selectedPin.priceLevel && (
-                      <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary, fontWeight: '600' }]}>
-                        {'$'.repeat(selectedPin.priceLevel)}
+                    <View style={styles.mapCardBody}>
+                      <Text
+                        style={{ color: theme.colors.text.primary, fontWeight: '700', fontSize: 13 }}
+                        numberOfLines={1}
+                      >
+                        {item.name}
                       </Text>
-                    )}
-                  </View>
-                </View>
+                      {item.primaryType ? (
+                        <Text style={{ color: theme.colors.text.tertiary, fontSize: 11, marginTop: 1 }} numberOfLines={1}>
+                          {item.primaryType}
+                        </Text>
+                      ) : null}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                        {item.rating ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                            <Star size={10} color="#F59E0B" fill="#F59E0B" />
+                            <Text style={{ color: theme.colors.text.primary, fontWeight: '700', fontSize: 11 }}>
+                              {item.rating.toFixed(1)}
+                            </Text>
+                          </View>
+                        ) : null}
+                        {item.priceLevel ? (
+                          <Text style={{ color: theme.colors.text.tertiary, fontSize: 11, fontWeight: '600' }}>
+                            {'$'.repeat(item.priceLevel)}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <View style={styles.mapCardActions}>
+                        <Pressable
+                          onPress={(e) => { e.stopPropagation(); openInMaps(item); }}
+                          style={[styles.mapCardBtn, { backgroundColor: ACCENT + '15' }]}
+                          hitSlop={6}
+                        >
+                          <Navigation size={13} color={ACCENT} strokeWidth={2} />
+                        </Pressable>
+                        <Pressable
+                          onPress={(e) => { e.stopPropagation(); setDetailPlace(item); }}
+                          style={[styles.mapCardBtn, { backgroundColor: ACCENT }]}
+                          hitSlop={6}
+                        >
+                          <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 11 }}>Info</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  </Pressable>
+                );
+              }}
+            />
+          </View>
+        )}
+      </View>
 
-                <Pressable
-                  onPress={() => {
-                    setDetailPlace(selectedPin);
-                    setSelectedPin(null);
-                  }}
-                  style={({ pressed }) => [styles.pinCardBtn, { opacity: pressed ? 0.7 : 1, backgroundColor: ACCENT }]}
-                >
-                  <Text style={styles.pinCardBtnText}>Open</Text>
-                </Pressable>
-              </View>
-            </Animated.View>
-          )}
-        </View>
-      )}
-
-      {/* Location picker sheet */}
       <LocationPickerSheet visible={pickerVisible} onClose={() => setPickerVisible(false)} />
 
-      {/* Place detail sheet */}
       <PlaceDetailSheet
         visible={!!detailPlace}
         placeId={detailPlace?.placeId ?? null}
@@ -375,41 +562,21 @@ export default function ExploreScreen(): React.ReactElement {
 // ── Sub-components ─────────────────────────────────────────────────────────
 
 function ToggleBtn({
-  icon,
-  label,
-  active,
-  onPress,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
+  icon, label, active, onPress,
+}: { icon: React.ReactNode; label: string; active: boolean; onPress: () => void }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.toggleBtn, active && { backgroundColor: ACCENT }]}
-    >
+    <Pressable onPress={onPress} style={[styles.toggleBtn, active && { backgroundColor: ACCENT }]}>
       {icon}
-      <Text style={[styles.toggleLabel, { color: active ? '#FFFFFF' : '#9CA3AF' }]}>{label}</Text>
+      <Text style={[styles.toggleLabel, { color: active ? '#FFF' : '#9CA3AF' }]}>{label}</Text>
     </Pressable>
   );
 }
 
 function CategoryChip({
-  cat,
-  active,
-  onPress,
-  theme,
-}: {
-  cat: Category;
-  active: boolean;
-  onPress: () => void;
-  theme: ReturnType<typeof useTheme>;
-}) {
+  cat, active, onPress, theme,
+}: { cat: Category; active: boolean; onPress: () => void; theme: ReturnType<typeof useTheme> }) {
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-
   return (
     <Pressable
       onPress={onPress}
@@ -418,16 +585,12 @@ function CategoryChip({
     >
       <Animated.View
         style={[
-          animStyle,
-          styles.chip,
-          {
-            backgroundColor: active ? ACCENT : theme.colors.bg.surface,
-            borderColor: active ? ACCENT : theme.colors.border.default,
-          },
+          animStyle, styles.chip,
+          { backgroundColor: active ? ACCENT : theme.colors.bg.surface, borderColor: active ? ACCENT : theme.colors.border.default },
         ]}
       >
         <Text style={styles.chipEmoji}>{cat.emoji}</Text>
-        <Text style={[theme.typography.caption, { color: active ? '#FFFFFF' : theme.colors.text.primary, fontWeight: '600' }]}>
+        <Text style={[theme.typography.caption, { color: active ? '#FFF' : theme.colors.text.primary, fontWeight: '600' }]}>
           {cat.label}
         </Text>
       </Animated.View>
@@ -436,12 +599,8 @@ function CategoryChip({
 }
 
 function NoSelection({
-  theme,
-  onPickCategory,
-}: {
-  theme: ReturnType<typeof useTheme>;
-  onPickCategory: (cat: Category) => void;
-}) {
+  theme, onPickCategory,
+}: { theme: ReturnType<typeof useTheme>; onPickCategory: (cat: Category) => void }) {
   return (
     <View style={styles.noSelectionWrap}>
       <Text style={[theme.typography.h3, { color: theme.colors.text.primary, marginBottom: 6 }]}>
@@ -460,14 +619,8 @@ function NoSelection({
 }
 
 function BigCategoryTile({
-  cat,
-  onPress,
-  theme,
-}: {
-  cat: Category;
-  onPress: () => void;
-  theme: ReturnType<typeof useTheme>;
-}) {
+  cat, onPress, theme,
+}: { cat: Category; onPress: () => void; theme: ReturnType<typeof useTheme> }) {
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
@@ -477,7 +630,9 @@ function BigCategoryTile({
       onPressOut={() => { scale.value = withSpring(1, { damping: 12, stiffness: 300 }); }}
       style={{ width: '30.5%' }}
     >
-      <Animated.View style={[animStyle, styles.bigChip, { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default }]}>
+      <Animated.View
+        style={[animStyle, styles.bigChip, { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default }]}
+      >
         <Text style={styles.bigEmoji}>{cat.emoji}</Text>
         <Text style={[theme.typography.caption, { color: theme.colors.text.primary, marginTop: 6, fontWeight: '600' }]}>
           {cat.label}
@@ -488,18 +643,11 @@ function BigCategoryTile({
 }
 
 function PlaceCard({
-  place,
-  onPress,
-  theme,
-}: {
-  place: Place;
-  onPress: () => void;
-  theme: ReturnType<typeof useTheme>;
-}) {
+  place, onPress, onDirections, theme,
+}: { place: Place; onPress: () => void; onDirections: () => void; theme: ReturnType<typeof useTheme> }) {
   const photo = place.photos?.[0];
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-
   return (
     <Pressable
       onPress={onPress}
@@ -507,48 +655,50 @@ function PlaceCard({
       onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 350 }); }}
     >
       <Animated.View
-        style={[
-          animStyle,
-          styles.card,
-          { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default },
-        ]}
+        style={[animStyle, styles.card, { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default }]}
       >
         {photo ? (
           <Image source={{ uri: getPlacePhotoUrl(photo, 300) }} style={styles.cardPhoto} contentFit="cover" />
         ) : (
           <View style={[styles.cardPhoto, { backgroundColor: ACCENT + '10', alignItems: 'center', justifyContent: 'center' }]}>
-            <Text style={{ fontSize: 30 }}>🏠</Text>
+            <MapPin size={22} color={ACCENT + '60'} />
           </View>
         )}
         <View style={styles.cardInfo}>
           <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]} numberOfLines={1}>
             {place.name}
           </Text>
-          {place.primaryType && (
+          {place.primaryType ? (
             <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary, marginTop: 2 }]} numberOfLines={1}>
               {place.primaryType}
             </Text>
-          )}
+          ) : null}
           <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 3 }]} numberOfLines={1}>
             {place.address}
           </Text>
           <View style={styles.metaRow}>
-            {place.rating && (
+            {place.rating ? (
               <View style={styles.ratingRow}>
                 <Star size={12} color="#F59E0B" fill="#F59E0B" />
                 <Text style={[theme.typography.caption, { color: theme.colors.text.primary, fontWeight: '700', marginLeft: 3 }]}>
                   {place.rating.toFixed(1)}
                 </Text>
               </View>
-            )}
-            {place.priceLevel && (
+            ) : null}
+            {place.priceLevel ? (
               <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary, fontWeight: '600' }]}>
                 {'$'.repeat(place.priceLevel)}
               </Text>
-            )}
+            ) : null}
           </View>
         </View>
-        <ChevronRight size={16} color={theme.colors.text.tertiary} style={{ marginRight: 4 }} />
+        <Pressable
+          onPress={(e) => { e.stopPropagation(); onDirections(); }}
+          hitSlop={8}
+          style={[styles.directionsBtn, { backgroundColor: ACCENT + '12' }]}
+        >
+          <Navigation size={15} color={ACCENT} strokeWidth={2} />
+        </Pressable>
       </Animated.View>
     </Pressable>
   );
@@ -564,17 +714,8 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  navTitle: {
-    fontSize: 26,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  toggle: {
-    flexDirection: 'row',
-    borderRadius: 12,
-    padding: 3,
-    gap: 2,
-  },
+  navTitle: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
+  toggle: { flexDirection: 'row', borderRadius: 12, padding: 3, gap: 2 },
   toggleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -583,10 +724,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 9,
   },
-  toggleLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
+  toggleLabel: { fontSize: 13, fontWeight: '600' },
   chipsBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -606,15 +744,8 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     maxWidth: 110,
   },
-  locationChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  chipStrip: {
-    gap: 8,
-    paddingRight: 12,
-    alignItems: 'center',
-  },
+  locationChipText: { fontSize: 12, fontWeight: '600' },
+  chipStrip: { gap: 8, paddingRight: 12, alignItems: 'center' },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -632,24 +763,30 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   emptyEmoji: { fontSize: 40, marginBottom: 8 },
-  noSelectionWrap: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  bigGrid: {
+  mapsBtn: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  bigChip: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 20,
-    borderRadius: 16,
-    borderWidth: 1,
+    gap: 7,
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 14,
   },
+  mapsBtnText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
+  noSelectionWrap: { paddingHorizontal: 16, paddingTop: 16 },
+  bigGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  bigChip: { alignItems: 'center', justifyContent: 'center', paddingVertical: 20, borderRadius: 16, borderWidth: 1 },
   bigEmoji: { fontSize: 28 },
   resultsList: { paddingTop: 12, paddingHorizontal: 16, gap: 10 },
+  viewAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 2,
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -661,85 +798,140 @@ const styles = StyleSheet.create({
   },
   cardPhoto: { width: 90, height: 90 },
   cardInfo: { flex: 1, paddingVertical: 10 },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 5,
-  },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 },
   ratingRow: { flexDirection: 'row', alignItems: 'center' },
-  // Map styles
-  pin: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: ACCENT,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 6,
+  directionsBtn: {
+    width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  pinEmoji: { fontSize: 16 },
-  mapHint: {
-    position: 'absolute',
-    top: SCREEN_H * 0.3,
-    left: 32,
-    right: 32,
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-  },
-  pinCard: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    borderRadius: 20,
-    padding: 16,
-  },
-  pinCardClose: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-  },
-  pinCardInner: {
+  // Search bar
+  searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
   },
-  pinCardPhoto: {
-    width: 72,
-    height: 72,
-    borderRadius: 12,
-    flexShrink: 0,
-  },
-  pinCardPhotoFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pinCardMeta: {
+  searchBox: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+    borderWidth: 1,
   },
-  pinCardBtn: {
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 0,
+  },
+  searchBtn: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
-    flexShrink: 0,
   },
-  pinCardBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
+  searchBtnText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
+  // Map
+  centerPinWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 190,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerPinLabel: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    maxWidth: 220,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  mapHintRow: {
+    position: 'absolute',
+    top: 16,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  mapHintPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  mapLoadingChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  mapResultsBadge: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  mapBadgePill: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    shadowColor: ACCENT,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  mapStrip: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+  },
+  mapStripContent: {
+    paddingHorizontal: 12,
+    gap: 10,
+  },
+  mapCard: {
+    width: 180,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  mapCardPhoto: {
+    width: '100%',
+    height: 110,
+  },
+  mapCardBody: {
+    padding: 10,
+  },
+  mapCardActions: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 8,
+  },
+  mapCardBtn: {
+    flex: 1,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

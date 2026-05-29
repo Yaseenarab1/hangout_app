@@ -30,14 +30,19 @@ async function fetchSessionWithResponses(sessionId: string): Promise<SessionWith
     .eq('id', sessionId)
     .single();
 
-  if (sErr || !session) return null;
+  if (sErr) {
+    // PGRST116 = 0 rows (session doesn't exist or RLS blocked it)
+    if (sErr.code === 'PGRST116') return null;
+    throw new Error(`availability_sessions fetch failed: ${sErr.message} (${sErr.code})`);
+  }
+  if (!session) return null;
 
   const { data: responses, error: rErr } = await db
     .from('availability_responses')
-    .select('*, profile:profiles(display_name, avatar_url)')
+    .select('id, session_id, user_id, guest_name, available, created_at, updated_at')
     .eq('session_id', sessionId);
 
-  if (rErr) throw rErr;
+  if (rErr) throw new Error(`availability_responses fetch failed: ${rErr.message} (${rErr.code})`);
 
   return { ...session, responses: responses ?? [] } as SessionWithResponses;
 }

@@ -27,36 +27,46 @@ ALTER TABLE public.availability_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.availability_responses ENABLE ROW LEVEL SECURITY;
 
 -- Sessions: creator or hangout participant can see/insert
-CREATE POLICY "avail_sessions_select" ON public.availability_sessions
-  FOR SELECT USING (
-    auth.uid() = created_by
-    OR hangout_id IS NULL
-    OR (hangout_id IS NOT NULL AND public.is_hangout_participant(hangout_id, auth.uid()))
-  );
+DO $$ BEGIN
+  CREATE POLICY "avail_sessions_select" ON public.availability_sessions
+    FOR SELECT USING (
+      auth.uid() = created_by
+      OR hangout_id IS NULL
+      OR (hangout_id IS NOT NULL AND public.is_hangout_participant(hangout_id, auth.uid()))
+    );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE POLICY "avail_sessions_insert" ON public.availability_sessions
-  FOR INSERT WITH CHECK (auth.uid() = created_by);
+DO $$ BEGIN
+  CREATE POLICY "avail_sessions_insert" ON public.availability_sessions
+    FOR INSERT WITH CHECK (auth.uid() = created_by);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE POLICY "avail_sessions_delete" ON public.availability_sessions
-  FOR DELETE USING (auth.uid() = created_by);
+DO $$ BEGIN
+  CREATE POLICY "avail_sessions_delete" ON public.availability_sessions
+    FOR DELETE USING (auth.uid() = created_by);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Responses: readable by session viewers; writable only by self
-CREATE POLICY "avail_responses_select" ON public.availability_responses
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM public.availability_sessions s
-      WHERE s.id = session_id
-        AND (
-          auth.uid() = s.created_by
-          OR s.hangout_id IS NULL
-          OR (s.hangout_id IS NOT NULL AND public.is_hangout_participant(s.hangout_id, auth.uid()))
-        )
-    )
-  );
+DO $$ BEGIN
+  CREATE POLICY "avail_responses_select" ON public.availability_responses
+    FOR SELECT USING (
+      EXISTS (
+        SELECT 1 FROM public.availability_sessions s
+        WHERE s.id = session_id
+          AND (
+            auth.uid() = s.created_by
+            OR s.hangout_id IS NULL
+            OR (s.hangout_id IS NOT NULL AND public.is_hangout_participant(s.hangout_id, auth.uid()))
+          )
+      )
+    );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE POLICY "avail_responses_upsert" ON public.availability_responses
-  FOR ALL USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+DO $$ BEGIN
+  CREATE POLICY "avail_responses_upsert" ON public.availability_responses
+    FOR ALL USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.availability_sessions TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.availability_responses TO authenticated;
