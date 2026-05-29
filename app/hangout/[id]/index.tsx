@@ -321,73 +321,106 @@ export default function HangoutDetailScreen(): React.ReactElement {
         </View>
       ) : null}
 
-      {/* ── Decisions ── */}
+      {/* ── Planning tools (big cards) ── */}
       {(isHost || !!myParticipation) && (
         <>
+          <View style={styles.planningRow}>
+            {/* When to meet */}
+            <Pressable
+              onPress={canUseWhenToMeet && !isCancelled ? () => router.push(`/hangout/${hangoutId}/when-to-meet` as any) : undefined}
+              style={({ pressed }) => [
+                styles.planCard,
+                {
+                  backgroundColor: '#22C55E12',
+                  borderColor: '#22C55E40',
+                  opacity: (canUseWhenToMeet && !isCancelled) ? (pressed ? 0.7 : 1) : 0.45,
+                },
+              ]}
+            >
+              <View style={[styles.planCardIcon, { backgroundColor: '#22C55E20' }]}>
+                <Clock size={22} color="#22C55E" strokeWidth={1.8} />
+              </View>
+              <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700', marginTop: 10 }]}>
+                When to meet
+              </Text>
+              <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 3 }]}>
+                {canUseWhenToMeet ? 'Find a time' : 'Update RSVP first'}
+              </Text>
+            </Pressable>
+
+            {/* Itinerary */}
+            <Pressable
+              onPress={canManage && !isCancelled ? () => router.push(`/hangout/${hangoutId}/dayplan` as any) : undefined}
+              style={({ pressed }) => [
+                styles.planCard,
+                {
+                  backgroundColor: '#8B5CF612',
+                  borderColor: '#8B5CF640',
+                  opacity: (canManage && !isCancelled) ? (pressed ? 0.7 : 1) : 0.45,
+                },
+              ]}
+            >
+              <View style={[styles.planCardIcon, { backgroundColor: '#8B5CF620' }]}>
+                <Route size={22} color="#8B5CF6" strokeWidth={1.8} />
+              </View>
+              <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700', marginTop: 10 }]}>
+                Itinerary
+              </Text>
+              <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 3 }]}>
+                {canManage ? 'Map out the day' : 'Host only'}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* ── Decisions (polls + add) ── */}
           <SectionHeader title="Decisions" />
           <Card padding="none" style={{ overflow: 'hidden' }}>
-            {/* When to meet */}
-            <DecisionRow
-              icon={<Clock size={18} color="#22C55E" strokeWidth={1.8} />}
-              iconBg="#22C55E18"
-              title="When to meet"
-              subtitle={canUseWhenToMeet ? 'Find a time for everyone' : 'Update RSVP to join'}
-              onPress={canUseWhenToMeet && !isCancelled ? () => router.push(`/hangout/${hangoutId}/when-to-meet` as any) : undefined}
-              theme={theme}
-            />
-            <RowDivider theme={theme} />
-
             {/* Restaurant / activity polls */}
             {(polls.data ?? []).map((poll, idx) => {
               const icon = poll.kind === 'activity'
                 ? <Dices size={18} color="#3B82F6" strokeWidth={1.8} />
                 : <UtensilsCrossed size={18} color="#F59E0B" strokeWidth={1.8} />;
               const iconBg = poll.kind === 'activity' ? '#3B82F618' : '#F59E0B18';
-              const title = poll.kind === 'activity' ? 'What to do' : poll.kind === 'cuisine' ? 'Cuisine vote' : 'Where to eat';
+              const pollTitle = poll.kind === 'activity' ? 'What to do' : poll.kind === 'cuisine' ? 'Cuisine vote' : 'Where to eat';
               const subtitle = poll.phase === 'closed' ? 'Decided ✓' : poll.phase === 'voting' ? 'Voting now' : 'Suggesting options';
               return (
                 <React.Fragment key={poll.id}>
                   <DecisionRow
                     icon={icon}
                     iconBg={iconBg}
-                    title={title}
+                    title={pollTitle}
                     subtitle={subtitle}
                     onPress={() => {/* PollCard is on this screen below */}}
                     theme={theme}
                   />
-                  {(idx < (polls.data ?? []).length - 1 || canManage) && <RowDivider theme={theme} />}
+                  {(idx < (polls.data ?? []).length - 1 || (canManage && !isCancelled)) && <RowDivider theme={theme} />}
                 </React.Fragment>
               );
             })}
 
-            {/* Itinerary — host/co-host only */}
-            {canManage && (
-              <>
-                <DecisionRow
-                  icon={<Route size={18} color="#8B5CF6" strokeWidth={1.8} />}
-                  iconBg="#8B5CF618"
-                  title="Itinerary"
-                  subtitle="Map out your day"
-                  onPress={!isCancelled ? () => router.push(`/hangout/${hangoutId}/dayplan` as any) : undefined}
-                  theme={theme}
-                />
-                <RowDivider theme={theme} />
-                {/* Add a decision */}
-                {!isCancelled && (
-                  <Pressable
-                    onPress={() => setShowAddPoll(true)}
-                    style={({ pressed }) => [
-                      styles.decisionAdd,
-                      pressed && { opacity: 0.6 },
-                    ]}
-                  >
-                    <Plus size={15} color={theme.colors.accent} strokeWidth={2.5} />
-                    <Text style={[theme.typography.bodyMedium, { color: theme.colors.accent }]}>
-                      Add a decision
-                    </Text>
-                  </Pressable>
-                )}
-              </>
+            {/* Add a decision */}
+            {canManage && !isCancelled && (
+              <Pressable
+                onPress={() => setShowAddPoll(true)}
+                style={({ pressed }) => [
+                  styles.decisionAdd,
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
+                <Plus size={15} color={theme.colors.accent} strokeWidth={2.5} />
+                <Text style={[theme.typography.bodyMedium, { color: theme.colors.accent }]}>
+                  Add a decision
+                </Text>
+              </Pressable>
+            )}
+
+            {/* Empty state when no polls yet */}
+            {(polls.data ?? []).length === 0 && (!canManage || isCancelled) && (
+              <View style={{ padding: 16 }}>
+                <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary }]}>
+                  No decisions yet.
+                </Text>
+              </View>
             )}
           </Card>
 
@@ -695,6 +728,26 @@ function formatDateTime(iso: string): string {
 }
 
 const styles = StyleSheet.create({
+  planningRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  planCard: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    minHeight: 110,
+  },
+  planCardIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   decisionRow: {
     flexDirection: 'row',
     alignItems: 'center',

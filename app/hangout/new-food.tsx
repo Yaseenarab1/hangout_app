@@ -7,7 +7,7 @@ import {
   Alert,
 } from 'react-native';
 import * as Location from 'expo-location';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import {
   ChevronRight,
@@ -67,6 +67,7 @@ type FormState = {
 export default function NewFoodHangoutScreen(): React.ReactElement {
   const theme = useTheme();
   const createMutation = useCreateFoodHangout();
+  const { prefilledTitle } = useLocalSearchParams<{ prefilledTitle?: string }>();
 
   const [step, setStep] = useState<Step>('flow');
   const [flow, setFlow] = useState<Flow | null>(null);
@@ -77,7 +78,7 @@ export default function NewFoodHangoutScreen(): React.ReactElement {
 
   const { control, watch, setValue, getValues } = useForm<FormState>({
     defaultValues: {
-      title: '',
+      title: prefilledTitle ?? '',
       description: '',
       locationName: '',
       locationAddress: '',

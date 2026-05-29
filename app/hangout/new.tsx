@@ -34,19 +34,20 @@ type TimeChoice = 'known' | 'poll' | null;
 type HangoutType = {
   emoji: string;
   label: string;
+  category: 'food' | 'activity' | 'other';
 };
 
 const HANGOUT_TYPES: HangoutType[] = [
-  { emoji: '🍽', label: 'Dinner' },
-  { emoji: '🎉', label: 'Night out' },
-  { emoji: '🎬', label: 'Movie night' },
-  { emoji: '⚽', label: 'Sports' },
-  { emoji: '☕', label: 'Brunch' },
-  { emoji: '🎮', label: 'Game night' },
-  { emoji: '🥂', label: 'Drinks' },
-  { emoji: '🚗', label: 'Road trip' },
-  { emoji: '🪩', label: 'Party' },
-  { emoji: '✨', label: 'Other' },
+  { emoji: '🍽', label: 'Dinner', category: 'food' },
+  { emoji: '🥂', label: 'Drinks', category: 'food' },
+  { emoji: '☕', label: 'Brunch', category: 'food' },
+  { emoji: '🎉', label: 'Night out', category: 'food' },
+  { emoji: '🎬', label: 'Movie night', category: 'activity' },
+  { emoji: '⚽', label: 'Sports', category: 'activity' },
+  { emoji: '🎮', label: 'Game night', category: 'activity' },
+  { emoji: '🚗', label: 'Road trip', category: 'activity' },
+  { emoji: '🪩', label: 'Party', category: 'activity' },
+  { emoji: '✨', label: 'Other', category: 'other' },
 ];
 
 const STEP_ORDER: Step[] = ['type', 'details', 'when', 'invite'];
@@ -178,8 +179,14 @@ export default function NewHangoutScreen(): React.ReactElement {
               <Pressable
                 key={t.label}
                 onPress={() => {
-                  setValue('title', t.label, { shouldDirty: true, shouldValidate: true });
-                  setStep('details');
+                  if (t.category === 'food') {
+                    router.push({ pathname: '/hangout/new-food', params: { prefilledTitle: t.label } });
+                  } else if (t.category === 'activity') {
+                    router.push({ pathname: '/hangout/new-activity', params: { prefilledTitle: t.label } });
+                  } else {
+                    setValue('title', t.label, { shouldDirty: true, shouldValidate: true });
+                    setStep('details');
+                  }
                 }}
                 style={({ pressed }) => [
                   styles.typeCard,
