@@ -303,80 +303,43 @@ export async function fetchMyBills(): Promise<Bill[]> {
 }
 
 export async function createItemizedBill(params: CreateItemizedBillParams): Promise<Bill> {
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) throw new Error('Not authenticated');
-
   const subtotalCents = params.items.reduce(
     (s, i) => s + i.amount_cents * i.quantity,
     0,
   );
   const totalCents = subtotalCents + params.tax_cents + params.tip_cents;
 
-  const { data: bill, error: billError } = await db()
-    .from('bills')
-    .insert({
-      hangout_id: params.hangout_id || null,
-      payer_id: params.payer_id,
-      mode: 'itemized',
-      amount_cents: totalCents,
-      subtotal_cents: subtotalCents,
-      tax_cents: params.tax_cents,
-      tip_cents: params.tip_cents,
-      currency: 'USD',
-      description: params.description,
-      paid_at: params.paid_at ?? new Date().toISOString(),
-      created_by: auth.user.id,
-    })
-    .select(BILL_SELECT)
-    .single();
-
-  if (billError) throw billError;
-  const billId = (bill as any).id as string;
-
-  // Insert guest participants first so we can get their IDs
-  const guestRows = params.shares
-    .filter((s) => s.guest_name)
-    .map((s) => ({ bill_id: billId, name: s.guest_name! }));
-
-  let guestMap = new Map<string, string>(); // name → id
-  if (guestRows.length > 0) {
-    const { data: guests, error: guestErr } = await db()
-      .from('bill_guest_participants')
-      .insert(guestRows)
-      .select('id, name');
-    if (guestErr) throw guestErr;
-    for (const g of guests ?? []) {
-      guestMap.set(g.name, g.id);
-    }
-  }
-
-  // Insert shares
-  const shareRows = params.shares.map((s) => ({
-    bill_id: billId,
+  const sharesPayload = params.shares.map((s) => ({
     user_id: s.user_id ?? null,
-    guest_participant_id: s.guest_name ? (guestMap.get(s.guest_name) ?? null) : null,
+    guest_name: s.guest_name ?? null,
     amount_cents: s.amount_cents,
-    split_method: 'exact' as const,
-    weight: null,
   }));
 
-  const { error: sharesError } = await db().from('bill_shares').insert(shareRows);
-  if (sharesError) throw sharesError;
-
-  // Insert items
-  const itemRows = params.items.map((item, i) => ({
-    bill_id: billId,
+  const itemsPayload = params.items.map((item, i) => ({
     description: item.description,
     amount_cents: item.amount_cents,
     quantity: item.quantity,
-    source: item.source,
+    source: item.source ?? 'manual',
     position: item.position ?? i,
   }));
 
-  if (itemRows.length > 0) {
-    const { error: itemsError } = await db().from('bill_items').insert(itemRows);
-    if (itemsError) throw itemsError;
-  }
+  const { data: billId, error: rpcError } = await (supabase as any).rpc(
+    'rpc_create_itemized_bill',
+    {
+      p_hangout_id: params.hangout_id || null,
+      p_payer_id: params.payer_id,
+      p_amount_cents: totalCents,
+      p_subtotal_cents: subtotalCents,
+      p_tax_cents: params.tax_cents,
+      p_tip_cents: params.tip_cents,
+      p_description: params.description,
+      p_paid_at: params.paid_at ?? new Date().toISOString(),
+      p_shares: sharesPayload,
+      p_items: itemsPayload,
+    },
+  );
 
-  return bill as Bill;
+  if (rpcError) throw rpcError;
+
+  return fetchBill(billId as string);
 }
