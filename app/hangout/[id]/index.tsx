@@ -321,60 +321,78 @@ export default function HangoutDetailScreen(): React.ReactElement {
         </View>
       ) : null}
 
-      {/* Plan section — visible to all participants (declined users see it, just can't use When to Meet) */}
+      {/* ── Decisions ── */}
       {(isHost || !!myParticipation) && (
         <>
-          <SectionHeader
-            title="Plan"
-            actionLabel={canManage && !isCancelled ? '+ Add' : undefined}
-            onAction={canManage && !isCancelled ? () => setShowAddPoll(true) : undefined}
-          />
+          <SectionHeader title="Decisions" />
+          <Card padding="none" style={{ overflow: 'hidden' }}>
+            {/* When to meet */}
+            <DecisionRow
+              icon={<Clock size={18} color="#22C55E" strokeWidth={1.8} />}
+              iconBg="#22C55E18"
+              title="When to meet"
+              subtitle={canUseWhenToMeet ? 'Find a time for everyone' : 'Update RSVP to join'}
+              onPress={canUseWhenToMeet && !isCancelled ? () => router.push(`/hangout/${hangoutId}/when-to-meet` as any) : undefined}
+              theme={theme}
+            />
+            <RowDivider theme={theme} />
 
-          {/* Top cards: Itinerary (host/co-host only) + When to Meet */}
-          <View style={styles.planCards}>
+            {/* Restaurant / activity polls */}
+            {(polls.data ?? []).map((poll, idx) => {
+              const icon = poll.kind === 'activity'
+                ? <Dices size={18} color="#3B82F6" strokeWidth={1.8} />
+                : <UtensilsCrossed size={18} color="#F59E0B" strokeWidth={1.8} />;
+              const iconBg = poll.kind === 'activity' ? '#3B82F618' : '#F59E0B18';
+              const title = poll.kind === 'activity' ? 'What to do' : poll.kind === 'cuisine' ? 'Cuisine vote' : 'Where to eat';
+              const subtitle = poll.phase === 'closed' ? 'Decided ✓' : poll.phase === 'voting' ? 'Voting now' : 'Suggesting options';
+              return (
+                <React.Fragment key={poll.id}>
+                  <DecisionRow
+                    icon={icon}
+                    iconBg={iconBg}
+                    title={title}
+                    subtitle={subtitle}
+                    onPress={() => {/* PollCard is on this screen below */}}
+                    theme={theme}
+                  />
+                  {(idx < (polls.data ?? []).length - 1 || canManage) && <RowDivider theme={theme} />}
+                </React.Fragment>
+              );
+            })}
+
+            {/* Itinerary — host/co-host only */}
             {canManage && (
-              <Pressable
-                onPress={() => router.push(`/hangout/${hangoutId}/dayplan` as any)}
-                style={({ pressed }) => [
-                  styles.planCard,
-                  { backgroundColor: '#8B5CF6' + '12', borderColor: '#8B5CF6' + '30', opacity: pressed ? 0.8 : 1 },
-                ]}
-              >
-                <View style={[styles.planCardIcon, { backgroundColor: '#8B5CF6' + '20' }]}>
-                  <Route size={22} color="#8B5CF6" strokeWidth={1.8} />
-                </View>
-                <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, marginTop: 10, fontWeight: '700' }]}>
-                  Itinerary
-                </Text>
-                <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 2 }]}>
-                  Map out your day
-                </Text>
-              </Pressable>
+              <>
+                <DecisionRow
+                  icon={<Route size={18} color="#8B5CF6" strokeWidth={1.8} />}
+                  iconBg="#8B5CF618"
+                  title="Itinerary"
+                  subtitle="Map out your day"
+                  onPress={!isCancelled ? () => router.push(`/hangout/${hangoutId}/dayplan` as any) : undefined}
+                  theme={theme}
+                />
+                <RowDivider theme={theme} />
+                {/* Add a decision */}
+                {!isCancelled && (
+                  <Pressable
+                    onPress={() => setShowAddPoll(true)}
+                    style={({ pressed }) => [
+                      styles.decisionAdd,
+                      pressed && { opacity: 0.6 },
+                    ]}
+                  >
+                    <Plus size={15} color={theme.colors.accent} strokeWidth={2.5} />
+                    <Text style={[theme.typography.bodyMedium, { color: theme.colors.accent }]}>
+                      Add a decision
+                    </Text>
+                  </Pressable>
+                )}
+              </>
             )}
+          </Card>
 
-            <Pressable
-              onPress={canUseWhenToMeet ? () => router.push(`/hangout/${hangoutId}/when-to-meet` as any) : undefined}
-              style={({ pressed }) => [
-                styles.planCard,
-                { backgroundColor: '#22C55E' + '10', borderColor: '#22C55E' + '30' },
-                canUseWhenToMeet && pressed && { opacity: 0.8 },
-                !canUseWhenToMeet && { opacity: 0.38 },
-              ]}
-            >
-              <View style={[styles.planCardIcon, { backgroundColor: '#22C55E' + '18' }]}>
-                <Clock size={22} color="#22C55E" strokeWidth={1.8} />
-              </View>
-              <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, marginTop: 10, fontWeight: '700' }]}>
-                When to meet
-              </Text>
-              <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 2 }]}>
-                {canUseWhenToMeet ? 'Find a time for everyone' : "Update your RSVP to join"}
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* Restaurant / activity poll cards */}
-          {polls.data?.map((poll) => {
+          {/* Inline poll cards for voting */}
+          {(polls.data ?? []).map((poll) => {
             const hasFollowUp = polls.data?.some(
               (p) =>
                 p.created_at > poll.created_at &&
@@ -382,7 +400,7 @@ export default function HangoutDetailScreen(): React.ReactElement {
                   (poll.kind === 'activity' && p.kind === 'restaurant')),
             );
             return (
-              <View key={poll.id}>
+              <View key={poll.id} style={{ marginTop: 8 }}>
                 <PollCard pollId={poll.id} canManage={canManage} />
                 {poll.phase === 'closed' && canManage ? (
                   <PollFollowUpCardWrapper
@@ -395,35 +413,6 @@ export default function HangoutDetailScreen(): React.ReactElement {
             );
           })}
 
-          {/* Host-only empty-state prompt when no polls exist yet */}
-          {canManage && !isCancelled && (!polls.data || polls.data.length === 0) && (
-            <Pressable
-              onPress={() => setShowAddPoll(true)}
-              style={[
-                styles.addPlanRow,
-                { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default },
-              ]}
-            >
-              <View style={styles.addPlanIcons}>
-                <View style={[styles.addPlanIconBubble, { backgroundColor: '#F59E0B' + '18' }]}>
-                  <UtensilsCrossed size={16} color="#F59E0B" strokeWidth={2} />
-                </View>
-                <View style={[styles.addPlanIconBubble, { backgroundColor: '#3B82F6' + '18' }]}>
-                  <Dices size={16} color="#3B82F6" strokeWidth={2} />
-                </View>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700' }]}>
-                  Plan a restaurant or activity
-                </Text>
-                <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 1 }]}>
-                  Let everyone vote on where to go
-                </Text>
-              </View>
-              <Plus size={18} color={theme.colors.text.tertiary} strokeWidth={2} />
-            </Pressable>
-          )}
-
           <AddPollSheet
             visible={showAddPoll}
             onClose={() => setShowAddPoll(false)}
@@ -434,7 +423,7 @@ export default function HangoutDetailScreen(): React.ReactElement {
 
       {/* Web RSVPs */}
       {(webRsvps.data ?? []).length > 0 && (
-        <Card padding="none" style={{ overflow: 'hidden', marginTop: 6 }}>
+        <Card padding="none" style={{ overflow: 'hidden', marginTop: 16 }}>
           {(webRsvps.data ?? []).map((r, idx) => (
             <View key={r.id}>
               <View style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 }}>
@@ -456,98 +445,40 @@ export default function HangoutDetailScreen(): React.ReactElement {
         </Card>
       )}
 
-
-      {/* Chat entry */}
-      <SectionHeader title="Group chat" />
-      <Pressable
-        onPress={() => router.push(`/hangout/${hangoutId}/chat` as any)}
-        style={({ pressed }) => [
-          styles.chatRow,
-          {
-            backgroundColor: theme.colors.bg.surface,
-            borderColor: theme.colors.border.default,
-          },
-          pressed && { opacity: 0.7 },
-        ]}
-      >
-        <MessageCircle size={20} color={theme.colors.accent} strokeWidth={1.5} />
-        <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, flex: 1 }]}>
-          Group chat
-        </Text>
-        <UnreadBadge hangoutId={hangoutId} />
-      </Pressable>
-
-      {/* Photos entry */}
-      <SectionHeader title="Photos" />
-      <Pressable
-        onPress={() => router.push(`/hangout/${hangoutId}/photos` as any)}
-        style={({ pressed }) => [
-          styles.chatRow,
-          {
-            backgroundColor: theme.colors.bg.surface,
-            borderColor: theme.colors.border.default,
-          },
-          pressed && { opacity: 0.7 },
-        ]}
-      >
-        <Images size={20} color={theme.colors.accent} strokeWidth={1.5} />
-        <Text
-          style={[
-            theme.typography.bodyMedium,
-            { color: theme.colors.text.primary, flex: 1 },
-          ]}
+      {/* ── Together pills ── */}
+      <View style={{ marginTop: 12 }} />
+      <SectionHeader title="Together" />
+      <View style={styles.togetherRow}>
+        <TogetherPill
+          onPress={() => router.push(`/hangout/${hangoutId}/chat` as any)}
+          theme={theme}
         >
-          {photosSummary.count > 0
-            ? `${photosSummary.count} photo${photosSummary.count === 1 ? '' : 's'}`
-            : 'Add photos'}
-        </Text>
-        {previewPhotos.length > 0 && (
-          <View style={{ flexDirection: 'row', gap: 4 }}>
-            {previewPhotos.map((p) => (
-              <Image
-                key={p.id}
-                source={{ uri: p.thumbnailSignedUrl ?? p.signedUrl }}
-                style={{ width: 36, height: 36, borderRadius: 6 }}
-                contentFit="cover"
-              />
-            ))}
-          </View>
-        )}
-      </Pressable>
-
-      {/* Bills entry */}
-      <SectionHeader title="Bills" />
-      <Pressable
-        onPress={() => router.push(`/hangout/${hangoutId}/bills` as any)}
-        style={({ pressed }) => [
-          styles.chatRow,
-          {
-            backgroundColor: theme.colors.bg.surface,
-            borderColor: theme.colors.border.default,
-          },
-          pressed && { opacity: 0.7 },
-        ]}
-      >
-        <Receipt size={20} color={theme.colors.accent} strokeWidth={1.5} />
-        <Text
-          style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, flex: 1 }]}
+          <MessageCircle size={17} color={theme.colors.accent} strokeWidth={1.5} />
+          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>Chat</Text>
+          <UnreadBadge hangoutId={hangoutId} />
+        </TogetherPill>
+        <TogetherPill
+          onPress={() => router.push(`/hangout/${hangoutId}/photos` as any)}
+          theme={theme}
         >
-          Expenses
-        </Text>
-        {myBalance.data && myBalance.data.net_cents !== 0 && (
-          <Text
-            style={{
-              fontSize: 13,
-              fontWeight: '600',
-              color: myBalance.data.net_cents > 0 ? '#22C55E' : theme.colors.danger,
-            }}
-          >
-            {myBalance.data.net_cents > 0
-              ? `+${formatCents(myBalance.data.net_cents)}`
-              : formatCents(myBalance.data.net_cents)}
+          <Images size={17} color={theme.colors.accent} strokeWidth={1.5} />
+          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
+            {photosSummary.count > 0 ? `${photosSummary.count} Photos` : 'Photos'}
           </Text>
-        )}
-      </Pressable>
+        </TogetherPill>
+        <TogetherPill
+          onPress={() => router.push(`/hangout/${hangoutId}/bills` as any)}
+          theme={theme}
+        >
+          <Receipt size={17} color={theme.colors.accent} strokeWidth={1.5} />
+          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>Bills</Text>
+          {myBalance.data && myBalance.data.net_cents !== 0 && (
+            <Text style={{ fontSize: 12, fontWeight: '700', color: myBalance.data.net_cents > 0 ? '#22C55E' : theme.colors.danger }}>
+              {myBalance.data.net_cents > 0 ? `+${formatCents(myBalance.data.net_cents)}` : formatCents(myBalance.data.net_cents)}
+            </Text>
+          )}
+        </TogetherPill>
+      </View>
 
       {/* Host: cancel hangout */}
       {isHost && !isCancelled ? (
@@ -562,6 +493,76 @@ export default function HangoutDetailScreen(): React.ReactElement {
         </View>
       ) : null}
     </Screen>
+  );
+}
+
+function DecisionRow({
+  icon,
+  iconBg,
+  title,
+  subtitle,
+  onPress,
+  theme,
+}: {
+  icon: React.ReactNode;
+  iconBg: string;
+  title: string;
+  subtitle: string;
+  onPress?: () => void;
+  theme: ReturnType<typeof useTheme>;
+}): React.ReactElement {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      style={({ pressed }) => [
+        styles.decisionRow,
+        pressed && onPress ? { opacity: 0.7 } : undefined,
+      ]}
+    >
+      <View style={[styles.decisionIcon, { backgroundColor: iconBg }]}>{icon}</View>
+      <View style={{ flex: 1 }}>
+        <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
+          {title}
+        </Text>
+        <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 1 }]}>
+          {subtitle}
+        </Text>
+      </View>
+      {onPress && <ChevronRight size={15} color={theme.colors.text.tertiary} strokeWidth={2} />}
+    </Pressable>
+  );
+}
+
+function RowDivider({ theme }: { theme: ReturnType<typeof useTheme> }): React.ReactElement {
+  return (
+    <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border.default, marginLeft: 56 }} />
+  );
+}
+
+function TogetherPill({
+  children,
+  onPress,
+  theme,
+}: {
+  children: React.ReactNode;
+  onPress: () => void;
+  theme: ReturnType<typeof useTheme>;
+}): React.ReactElement {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.togetherPill,
+        {
+          backgroundColor: theme.colors.bg.surface,
+          borderColor: theme.colors.border.default,
+          opacity: pressed ? 0.7 : 1,
+        },
+      ]}
+    >
+      {children}
+    </Pressable>
   );
 }
 
@@ -693,50 +694,38 @@ function formatDateTime(iso: string): string {
 }
 
 const styles = StyleSheet.create({
-  planCards: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  planCard: {
-    flex: 1,
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 14,
-    minHeight: 110,
-  },
-  planCardIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addPlanRow: {
+  decisionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 14,
-    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
   },
-  addPlanIcons: {
-    flexDirection: 'row',
-    gap: -8,
-  },
-  addPlanIconBubble: {
+  decisionIcon: {
     width: 34,
     height: 34,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chatRow: {
+  decisionAdd: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingVertical: 13,
+  },
+  togetherRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  togetherPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
   },
