@@ -57,15 +57,8 @@ export default function HomeTab(): React.ReactElement {
 
   const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const y = e.nativeEvent.contentOffset.y;
-    const prev = lastScrollY.current;
     lastScrollY.current = y;
-    if (y < 60) {
-      setFabVisible(true);
-    } else if (y > prev + 6) {
-      setFabVisible(false);
-    } else if (y < prev - 6) {
-      setFabVisible(true);
-    }
+    setFabVisible(y < 10);
   }, []);
 
   return (
