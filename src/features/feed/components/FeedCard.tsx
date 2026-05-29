@@ -18,8 +18,8 @@ import Reanimated, {
   withSequence,
   withSpring,
   withTiming,
+  runOnJS,
   Easing,
-  interpolate,
   type SharedValue,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
@@ -49,9 +49,10 @@ const POST_LINK_BASE = 'hangoutplanner://post';
 
 interface Props {
   post: FeedPostWithUrl;
+  cardHeight?: number;
 }
 
-export function FeedCard({ post }: Props): React.ReactElement {
+export function FeedCard({ post, cardHeight = REELS_HEIGHT }: Props): React.ReactElement {
   const theme = useTheme();
   const { user } = useSession();
   const deletePost = useDeletePost();
@@ -114,11 +115,11 @@ export function FeedCard({ post }: Props): React.ReactElement {
   }
 
   return (
-    <View style={styles.card}>
+    <View style={{ height: cardHeight }}>
       {/* ── Photo carousel (full-height, Reels style) ── */}
       <PhotoCarousel
         urls={urls}
-        height={REELS_HEIGHT}
+        height={cardHeight}
         activeIndex={activeIndex}
         setActiveIndex={setActiveIndex}
         isEphemeral={isEphemeral}
@@ -135,11 +136,8 @@ export function FeedCard({ post }: Props): React.ReactElement {
           )
         }
       >
-        {/* ── Bottom scrim so text is readable ── */}
-        <View
-          pointerEvents="none"
-          style={styles.gradientScrim}
-        />
+        {/* ── Bottom scrim ── */}
+        <View pointerEvents="none" style={[styles.scrim, { height: Math.floor(cardHeight * 0.55) }]} />
 
         {/* ── Right-side actions (TikTok layout) ── */}
         <View style={styles.actionsCol} pointerEvents="box-none">
@@ -151,11 +149,7 @@ export function FeedCard({ post }: Props): React.ReactElement {
             style={styles.actionItem}
           >
             <Reanimated.View style={heartAnimStyle}>
-              <Heart
-                size={30}
-                color={liked ? '#EF4444' : '#FFFFFF'}
-                fill={liked ? '#EF4444' : 'transparent'}
-              />
+              <Heart size={30} color={liked ? '#EF4444' : '#FFFFFF'} fill={liked ? '#EF4444' : 'transparent'} />
             </Reanimated.View>
             {(post.like_count ?? 0) > 0 && (
               <Text style={styles.actionCount}>{post.like_count}</Text>
@@ -288,8 +282,8 @@ function getExpiresIn(iso: string): string | null {
 }
 
 // ── PhotoCarousel ─────────────────────────────────────────────────────────────
-// Reanimated-based carousel running on the UI thread at 60fps.
-// Tap left/right third → navigate. Double-tap → like + heart burst.
+// Two Reanimated.Image views: outgoing slides away, incoming slides in.
+// runOnJS used for all React state updates from worklet callbacks.
 
 type CarouselProps = {
   urls: string[];
@@ -314,40 +308,53 @@ function PhotoCarousel({
   onKeepForever,
   children,
 }: CarouselProps) {
-  // Offset in screen-widths. 0 = current, 1 = going right, -1 = going left.
-  const offset = useSharedValue(0);
+  // currentIdx: which image is "on screen" (JS state for React renders)
+  const [currentIdx, setCurrentIdx] = useState(activeIndex);
+  // outgoingIdx: image sliding away (null = no transition)
+  const [outgoingIdx, setOutgoingIdx] = useState<number | null>(null);
+  const animating = useRef(false);
 
-  // Track previous index for cross-fade slide
-  const prevIndexRef = useRef(activeIndex);
-  const [renderFrom, setRenderFrom] = useState<number | null>(null);
-  const [renderTo, setRenderTo] = useState(activeIndex);
+  // Separate x values for outgoing and incoming
+  const outgoingX = useSharedValue(0);
+  const incomingX = useSharedValue(0);
 
-  const fromAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: interpolate(offset.value, [-1, 0, 1], [-SCREEN_W, 0, SCREEN_W]) }],
-    position: 'absolute',
-    width: SCREEN_W,
-    height,
+  const outgoingStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: outgoingX.value }],
   }));
-  const toAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: interpolate(offset.value, [-1, 0, 1], [0, 0, 0]) }],
-    width: SCREEN_W,
-    height,
+  const incomingStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: incomingX.value }],
   }));
+
+  // Callbacks must be plain functions wrapped with runOnJS — not inline in worklet
+  const clearOutgoing = useCallback(() => {
+    setOutgoingIdx(null);
+    animating.current = false;
+  }, []);
 
   const goTo = useCallback((next: number) => {
-    if (next === renderTo) return;
-    const dir = next > renderTo ? 1 : -1;
-    setRenderFrom(renderTo);
-    setRenderTo(next);
-    offset.value = dir; // start from off-screen
-    offset.value = withSpring(0, { damping: 26, stiffness: 280, mass: 0.8 }, (done) => {
+    if (animating.current || next === currentIdx) return;
+    if (next < 0 || next >= urls.length) return;
+
+    const dir = next > currentIdx ? 1 : -1; // 1 = going forward (slide left), -1 = going backward
+
+    // Outgoing starts at 0, moves to -SCREEN_W (forward) or +SCREEN_W (backward)
+    // Incoming starts at dir*SCREEN_W, moves to 0
+    outgoingX.value = 0;
+    incomingX.value = dir * SCREEN_W;
+
+    setOutgoingIdx(currentIdx);
+    setCurrentIdx(next);
+    setActiveIndex(next);
+    animating.current = true;
+
+    outgoingX.value = withSpring(-dir * SCREEN_W, { damping: 28, stiffness: 300, mass: 0.85 });
+    incomingX.value = withSpring(0, { damping: 28, stiffness: 300, mass: 0.85 }, (done) => {
+      'worklet';
       if (done) {
-        setRenderFrom(null);
-        offset.value = 0;
+        runOnJS(clearOutgoing)();
       }
     });
-    setActiveIndex(next);
-  }, [renderTo, offset, setActiveIndex]);
+  }, [currentIdx, urls.length, outgoingX, incomingX, setActiveIndex, clearOutgoing]);
 
   // Double-tap detection
   const lastTapAt = useRef(0);
@@ -387,10 +394,10 @@ function PhotoCarousel({
     } else {
       lastTapAt.current = now;
       if (urls.length > 1) {
-        if (x < SCREEN_W * 0.35 && renderTo > 0) {
-          goTo(renderTo - 1);
-        } else if (x >= SCREEN_W * 0.35 && renderTo < urls.length - 1) {
-          goTo(renderTo + 1);
+        if (x < SCREEN_W * 0.35) {
+          goTo(currentIdx - 1);
+        } else {
+          goTo(currentIdx + 1);
         }
       }
     }
@@ -398,22 +405,22 @@ function PhotoCarousel({
 
   return (
     <View style={{ width: SCREEN_W, height, overflow: 'hidden' }}>
-      {/* Current (target) image */}
-      <Reanimated.View style={toAnimStyle}>
-        <Image source={{ uri: urls[renderTo]! }} style={{ width: SCREEN_W, height }} contentFit="cover" />
+      {/* Current (incoming) image */}
+      <Reanimated.View style={[{ position: 'absolute', width: SCREEN_W, height }, incomingStyle]}>
+        <Image source={{ uri: urls[currentIdx]! }} style={{ width: SCREEN_W, height }} contentFit="cover" />
       </Reanimated.View>
 
       {/* Outgoing image slides away */}
-      {renderFrom !== null && (
-        <Reanimated.View style={fromAnimStyle}>
-          <Image source={{ uri: urls[renderFrom]! }} style={{ width: SCREEN_W, height }} contentFit="cover" />
+      {outgoingIdx !== null && (
+        <Reanimated.View style={[{ position: 'absolute', width: SCREEN_W, height }, outgoingStyle]}>
+          <Image source={{ uri: urls[outgoingIdx]! }} style={{ width: SCREEN_W, height }} contentFit="cover" />
         </Reanimated.View>
       )}
 
-      {/* Overlay children (gradient, actions, author) */}
+      {/* Overlay children (scrim, actions, author) */}
       {children}
 
-      {/* Keep on profile overlay */}
+      {/* Keep on profile */}
       {isEphemeral && (
         <Pressable
           onPress={onKeepForever}
@@ -427,7 +434,7 @@ function PhotoCarousel({
         </Pressable>
       )}
 
-      {/* Heart burst */}
+      {/* Heart burst overlay */}
       <Reanimated.View
         pointerEvents="none"
         style={[
@@ -439,22 +446,18 @@ function PhotoCarousel({
         <Heart size={HEART_SIZE} color="#fff" fill="#fff" />
       </Reanimated.View>
 
-      {/* Full-area tap handler */}
+      {/* Full-area tap handler — MUST be last to not block children */}
       <Pressable onPress={handleTap} style={StyleSheet.absoluteFill} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    marginBottom: 2,
-  },
-  gradientScrim: {
+  scrim: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: Math.floor(REELS_HEIGHT * 0.55),
     backgroundColor: 'rgba(0,0,0,0.50)',
   },
   actionsCol: {

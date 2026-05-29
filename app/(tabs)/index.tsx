@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   FlatList,
   RefreshControl,
   ActivityIndicator,
+  Dimensions,
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from 'react-native';
@@ -31,6 +32,8 @@ import { FeedCard } from '@/features/feed/components/FeedCard';
 import type { Hangout } from '@/features/hangouts';
 import type { FeedPostWithUrl } from '@/features/feed';
 
+const { height: SCREEN_H } = Dimensions.get('window');
+const REELS_HEIGHT = Math.floor(SCREEN_H * 0.78);
 const TAB_BAR_HIDDEN: object = { display: 'none' };
 
 export default function HomeTab(): React.ReactElement {
@@ -49,6 +52,8 @@ export default function HomeTab(): React.ReactElement {
   const lastScrollY = useRef(0);
   const tabBarShown = useRef(true);
   const [fabVisible, setFabVisible] = useState(true);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const [listHeight, setListHeight] = useState(0);
 
   const tabBarStyle = {
     backgroundColor: theme.colors.bg.canvas,
@@ -124,14 +129,18 @@ export default function HomeTab(): React.ReactElement {
       <FlatList<FeedPostWithUrl>
         data={feedPosts.data ?? []}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <FeedCard post={item} />}
+        renderItem={({ item }) => (
+          <FeedCard post={item} cardHeight={listHeight || REELS_HEIGHT} />
+        )}
         ListHeaderComponent={
-          <HomeHeader
-            greetingName={greetingName}
-            upcoming={upcoming}
-            hasPosts={(feedPosts.data?.length ?? 0) > 0}
-            theme={theme}
-          />
+          <View onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}>
+            <HomeHeader
+              greetingName={greetingName}
+              upcoming={upcoming}
+              hasPosts={(feedPosts.data?.length ?? 0) > 0}
+              theme={theme}
+            />
+          </View>
         }
         ListEmptyComponent={
           feedPosts.isLoading ? (
@@ -149,7 +158,16 @@ export default function HomeTab(): React.ReactElement {
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+        onLayout={(e) => setListHeight(e.nativeEvent.layout.height)}
+        snapToOffsets={
+          headerHeight > 0 && listHeight > 0 && (feedPosts.data?.length ?? 0) > 0
+            ? Array.from({ length: (feedPosts.data?.length ?? 0) + 1 }, (_, i) =>
+                i === 0 ? 0 : headerHeight + (i - 1) * listHeight,
+              )
+            : undefined
+        }
+        decelerationRate="fast"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
         refreshControl={
           <RefreshControl
             refreshing={feedPosts.isRefetching && !feedPosts.isLoading}
