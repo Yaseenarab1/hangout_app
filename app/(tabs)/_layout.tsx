@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, CalendarCheck, MessageCircle, User, Clock } from 'lucide-react-native';
+import { Home, CalendarCheck, MessageCircle, User } from 'lucide-react-native';
 import { Platform, StyleSheet } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -47,15 +47,6 @@ export default function TabsLayout(): React.ReactElement {
         }}
       />
       <Tabs.Screen
-        name="find-time"
-        options={{
-          title: 'Find Time',
-          tabBarIcon: ({ color, size }) => (
-            <Clock color={color} size={size} strokeWidth={1.5} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="messages"
         options={{
           title: 'Messages',
@@ -75,6 +66,8 @@ export default function TabsLayout(): React.ReactElement {
       <Tabs.Screen name="friends" options={{ href: null }} />
       {/* Explore is reachable from hangout screens — hidden from tab bar for now */}
       <Tabs.Screen name="explore" options={{ href: null }} />
+      {/* Find Time is reachable from inside a hangout (When to meet card) — hidden from tab bar */}
+      <Tabs.Screen name="find-time" options={{ href: null }} />
     </Tabs>
   );
 }
