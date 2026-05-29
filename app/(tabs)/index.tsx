@@ -20,7 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useNavigation } from 'expo-router';
-import { Compass, UtensilsCrossed, MapPinned, ChevronRight, Map } from 'lucide-react-native';
+import { Compass, UtensilsCrossed, ChevronRight, Map, Plus } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useMyProfile } from '@/features/profile';
 import { useMyHangouts } from '@/features/hangouts';
@@ -189,26 +189,32 @@ function HomeHeader({
         </Text>
       </View>
 
-      {/* Quick-action tiles */}
-      <View style={styles.tilesRow}>
-        <Tile
-          icon={<Compass size={24} color={theme.colors.accent} strokeWidth={1.5} />}
-          title="What to do"
-          onPress={() => router.push('/hangout/new-activity')}
-          theme={theme}
-        />
-        <Tile
-          icon={<UtensilsCrossed size={24} color={theme.colors.accent} strokeWidth={1.5} />}
-          title="Where to eat"
-          onPress={() => router.push('/hangout/new-food')}
-          theme={theme}
-        />
-        <Tile
-          icon={<MapPinned size={24} color={theme.colors.accent} strokeWidth={1.5} />}
-          title="Plan a day"
-          onPress={() => router.push('/hangout/new')}
-          theme={theme}
-        />
+      {/* Hero: Plan a hangout */}
+      <View style={styles.heroSection}>
+        <HeroPlanCard onPress={() => router.push('/hangout/new')} theme={theme} />
+      </View>
+
+      {/* Quick decisions */}
+      <View style={styles.quickSection}>
+        <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary, fontWeight: '700', letterSpacing: 0.6, marginBottom: 8 }]}>
+          QUICK DECISIONS
+        </Text>
+        <View style={styles.tilesRow}>
+          <Tile
+            icon={<UtensilsCrossed size={22} color="#F59E0B" strokeWidth={1.5} />}
+            iconBg="#F59E0B18"
+            title="Where to eat"
+            onPress={() => router.push('/hangout/new-food')}
+            theme={theme}
+          />
+          <Tile
+            icon={<Compass size={22} color="#3B82F6" strokeWidth={1.5} />}
+            iconBg="#3B82F618"
+            title="What to do"
+            onPress={() => router.push('/hangout/new-activity')}
+            theme={theme}
+          />
+        </View>
       </View>
 
       {/* Upcoming hangouts */}
@@ -316,13 +322,48 @@ function UpcomingRow({
   );
 }
 
+function HeroPlanCard({
+  onPress,
+  theme,
+}: {
+  onPress: () => void;
+  theme: ReturnType<typeof useTheme>;
+}): React.ReactElement {
+  const scale = useSharedValue(1);
+  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return (
+    <Animated.View style={animStyle}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={() => { scale.value = withTiming(0.97, { duration: 80, easing: Easing.out(Easing.cubic) }); }}
+        onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 400 }); }}
+        style={[styles.heroPlanCard, { backgroundColor: theme.colors.accent }]}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={[theme.typography.h2, { color: '#FFFFFF', fontWeight: '800' }]}>
+            Plan a hangout
+          </Text>
+          <Text style={[theme.typography.body, { color: 'rgba(255,255,255,0.75)', marginTop: 4 }]}>
+            Date, place, food, activities — all in one
+          </Text>
+        </View>
+        <View style={styles.heroPlusWrap}>
+          <Plus size={26} color={theme.colors.accent} strokeWidth={2.5} />
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 function Tile({
   icon,
+  iconBg,
   title,
   onPress,
   theme,
 }: {
   icon: React.ReactNode;
+  iconBg: string;
   title: string;
   onPress: () => void;
   theme: ReturnType<typeof useTheme>;
@@ -351,7 +392,7 @@ function Tile({
           },
         ]}
       >
-        <View style={[styles.tileIconWrap, { backgroundColor: theme.colors.accent + '14' }]}>
+        <View style={[styles.tileIconWrap, { backgroundColor: iconBg }]}>
           {icon}
         </View>
         <Text
@@ -394,11 +435,31 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 12,
   },
+  heroSection: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  heroPlanCard: {
+    borderRadius: 18,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  heroPlusWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickSection: {
+    paddingHorizontal: 16,
+    marginBottom: 4,
+  },
   tilesRow: {
     flexDirection: 'row',
     gap: 8,
-    paddingHorizontal: 16,
-    marginBottom: 4,
   },
   tile: {
     flex: 1,
@@ -407,8 +468,8 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   tileIconWrap: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
