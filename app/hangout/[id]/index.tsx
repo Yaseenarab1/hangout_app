@@ -324,51 +324,53 @@ export default function HangoutDetailScreen(): React.ReactElement {
       {/* ── Planning tools (big cards) ── */}
       {(isHost || !!myParticipation) && (
         <>
-          <View style={styles.planningRow}>
+          <View style={styles.planningStack}>
             {/* When to meet */}
             <Pressable
               onPress={canUseWhenToMeet && !isCancelled ? () => router.push(`/hangout/${hangoutId}/when-to-meet` as any) : undefined}
               style={({ pressed }) => [
-                styles.planCard,
+                styles.planBigCard,
                 {
-                  backgroundColor: '#22C55E12',
-                  borderColor: '#22C55E40',
-                  opacity: (canUseWhenToMeet && !isCancelled) ? (pressed ? 0.7 : 1) : 0.45,
+                  backgroundColor: '#16A34A',
+                  shadowColor: '#16A34A',
+                  opacity: (canUseWhenToMeet && !isCancelled) ? (pressed ? 0.82 : 1) : 0.42,
                 },
               ]}
             >
-              <View style={[styles.planCardIcon, { backgroundColor: '#22C55E20' }]}>
-                <Clock size={22} color="#22C55E" strokeWidth={1.8} />
+              <View style={styles.planBigCardIconWrap}>
+                <Clock size={26} color="#fff" strokeWidth={1.8} />
               </View>
-              <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700', marginTop: 10 }]}>
-                When to meet
-              </Text>
-              <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 3 }]}>
-                {canUseWhenToMeet ? 'Find a time' : 'Update RSVP first'}
-              </Text>
+              <View style={{ flex: 1, paddingLeft: 14 }}>
+                <Text style={styles.planBigCardTitle}>When to meet</Text>
+                <Text style={styles.planBigCardSub}>
+                  {canUseWhenToMeet ? 'Poll the group for the best time' : 'Update your RSVP to join'}
+                </Text>
+              </View>
+              <ChevronRight size={18} color="rgba(255,255,255,0.7)" strokeWidth={2} />
             </Pressable>
 
             {/* Itinerary */}
             <Pressable
               onPress={canManage && !isCancelled ? () => router.push(`/hangout/${hangoutId}/dayplan` as any) : undefined}
               style={({ pressed }) => [
-                styles.planCard,
+                styles.planBigCard,
                 {
-                  backgroundColor: '#8B5CF612',
-                  borderColor: '#8B5CF640',
-                  opacity: (canManage && !isCancelled) ? (pressed ? 0.7 : 1) : 0.45,
+                  backgroundColor: '#7C3AED',
+                  shadowColor: '#7C3AED',
+                  opacity: (canManage && !isCancelled) ? (pressed ? 0.82 : 1) : 0.42,
                 },
               ]}
             >
-              <View style={[styles.planCardIcon, { backgroundColor: '#8B5CF620' }]}>
-                <Route size={22} color="#8B5CF6" strokeWidth={1.8} />
+              <View style={styles.planBigCardIconWrap}>
+                <Route size={26} color="#fff" strokeWidth={1.8} />
               </View>
-              <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700', marginTop: 10 }]}>
-                Itinerary
-              </Text>
-              <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 3 }]}>
-                {canManage ? 'Map out the day' : 'Host only'}
-              </Text>
+              <View style={{ flex: 1, paddingLeft: 14 }}>
+                <Text style={styles.planBigCardTitle}>Itinerary</Text>
+                <Text style={styles.planBigCardSub}>
+                  {canManage ? 'Map out every stop for the day' : 'Only the host can edit this'}
+                </Text>
+              </View>
+              <ChevronRight size={18} color="rgba(255,255,255,0.7)" strokeWidth={2} />
             </Pressable>
           </View>
 
@@ -728,25 +730,41 @@ function formatDateTime(iso: string): string {
 }
 
 const styles = StyleSheet.create({
-  planningRow: {
-    flexDirection: 'row',
+  planningStack: {
     gap: 10,
-    marginBottom: 16,
+    marginBottom: 20,
     paddingHorizontal: 16,
   },
-  planCard: {
-    flex: 1,
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 14,
-    minHeight: 110,
+  planBigCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 20,
+    paddingVertical: 18,
+    paddingHorizontal: 18,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    elevation: 7,
   },
-  planCardIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+  planBigCardIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  planBigCardTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  planBigCardSub: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 12,
+    marginTop: 3,
+    lineHeight: 17,
   },
   decisionRow: {
     flexDirection: 'row',
