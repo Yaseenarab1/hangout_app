@@ -4,7 +4,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Calendar as CalIcon, MapPin, Trash2, Share2 } from 'lucide-react-native';
+import { Calendar as CalIcon, MapPin, Trash2, Share2, Check } from 'lucide-react-native';
 import { supabase } from '@/services/supabase/client';
 import { Screen } from '@/components/layout/Screen';
 import { Input, Textarea, Button, Card, SectionHeader } from '@/components/ui';
@@ -21,6 +21,13 @@ import {
   updateHangoutSchema,
   type UpdateHangoutInput,
 } from '@/features/hangouts';
+
+const STATUS_OPTIONS = [
+  { value: 'planning' as const, label: 'Planning', description: 'Still working out the details', color: '#F59E0B' },
+  { value: 'scheduled' as const, label: 'Locked in', description: 'Date, time, and place confirmed', color: '#3B82F6' },
+  { value: 'in_progress' as const, label: 'Happening now', description: "It's on — you're all there", color: '#22C55E' },
+  { value: 'completed' as const, label: 'Wrapped up', description: 'The hangout is done', color: '#6B7280' },
+];
 
 export default function HangoutSettingsScreen(): React.ReactElement {
   const theme = useTheme();
@@ -101,6 +108,7 @@ export default function HangoutSettingsScreen(): React.ReactElement {
       locationAddress: '',
       startTime: undefined,
       endTime: undefined,
+      status: undefined,
     },
   });
 
@@ -114,6 +122,7 @@ export default function HangoutSettingsScreen(): React.ReactElement {
         locationAddress: hangout.data.primary_location_address ?? '',
         startTime: hangout.data.start_time ?? undefined,
         endTime: hangout.data.end_time ?? undefined,
+        status: (hangout.data.status as UpdateHangoutInput['status']) ?? 'planning',
       });
       setAddressText(hangout.data.primary_location_address ?? '');
     }
@@ -330,6 +339,52 @@ export default function HangoutSettingsScreen(): React.ReactElement {
           )}
         />
 
+        {/* Status */}
+        {!isCancelled && (
+          <Controller
+            control={control}
+            name="status"
+            render={({ field: { value, onChange } }) => (
+              <View>
+                <Text style={[theme.typography.bodySmallMedium, { color: theme.colors.text.secondary, marginBottom: 10 }]}>
+                  Status
+                </Text>
+                <View style={{ gap: 8 }}>
+                  {STATUS_OPTIONS.map((opt) => {
+                    const active = value === opt.value;
+                    return (
+                      <Pressable
+                        key={opt.value}
+                        onPress={() => onChange(opt.value)}
+                        style={({ pressed }) => [
+                          styles.statusRow,
+                          {
+                            backgroundColor: active ? opt.color + '14' : theme.colors.bg.surface,
+                            borderColor: active ? opt.color : theme.colors.border.default,
+                            borderWidth: active ? 1.5 : 1,
+                            opacity: pressed ? 0.75 : 1,
+                          },
+                        ]}
+                      >
+                        <View style={[styles.statusDot, { backgroundColor: opt.color }]} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
+                            {opt.label}
+                          </Text>
+                          <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 1 }]}>
+                            {opt.description}
+                          </Text>
+                        </View>
+                        {active && <Check size={16} color={opt.color} strokeWidth={2.5} />}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+          />
+        )}
+
         <Button
           label="Save changes"
           onPress={handleSubmit(onSubmit)}
@@ -398,6 +453,19 @@ function formatDateTime(iso: string): string {
 }
 
 const styles = StyleSheet.create({
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+  },
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
   dateField: {
     flexDirection: 'row',
     alignItems: 'center',

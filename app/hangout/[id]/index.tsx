@@ -234,14 +234,16 @@ export default function HangoutDetailScreen(): React.ReactElement {
     >
       {/* Title + status */}
       <View style={styles.header}>
-        <Text
-          style={[theme.typography.h1, { color: theme.colors.text.primary }]}
-        >
+        <Text style={[theme.typography.h1, { color: theme.colors.text.primary }]}>
           {h.title}
         </Text>
-        {isCancelled ? (
-          <Badge label="Cancelled" variant="danger" style={{ marginTop: 8 }} />
-        ) : null}
+        <Pressable
+          onPress={canManage && !isCancelled ? () => router.push(`/hangout/${hangoutId}/settings` as any) : undefined}
+          style={{ alignSelf: 'flex-start', marginTop: 8 }}
+          hitSlop={8}
+        >
+          <StatusPill status={h.status ?? 'planning'} tappable={canManage && !isCancelled} />
+        </Pressable>
       </View>
 
       {/* Description */}
@@ -567,6 +569,39 @@ function DecisionRow({
       </View>
       {onPress && <ChevronRight size={15} color={theme.colors.text.tertiary} strokeWidth={2} />}
     </Pressable>
+  );
+}
+
+const STATUS_META: Record<string, { label: string; color: string }> = {
+  planning:    { label: 'Planning',       color: '#F59E0B' },
+  scheduled:   { label: 'Locked in',     color: '#3B82F6' },
+  in_progress: { label: 'Happening now', color: '#22C55E' },
+  completed:   { label: 'Wrapped up',    color: '#6B7280' },
+  cancelled:   { label: 'Cancelled',     color: '#EF4444' },
+};
+
+function StatusPill({ status, tappable }: { status: string; tappable: boolean }): React.ReactElement {
+  const meta = STATUS_META[status] ?? { label: 'Planning', color: '#F59E0B' };
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 20,
+        backgroundColor: meta.color + '18',
+        borderWidth: 1,
+        borderColor: meta.color + '55',
+      }}
+    >
+      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: meta.color }} />
+      <Text style={{ fontSize: 12, fontWeight: '600', color: meta.color }}>{meta.label}</Text>
+      {tappable && (
+        <Text style={{ fontSize: 11, color: meta.color + 'AA', marginLeft: 1 }}>✎</Text>
+      )}
+    </View>
   );
 }
 
