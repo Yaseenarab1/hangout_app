@@ -483,40 +483,76 @@ export default function HangoutDetailScreen(): React.ReactElement {
         </Card>
       )}
 
-      {/* ── Together pills ── */}
+      {/* ── Together ── */}
       <View style={{ marginTop: 12 }} />
       <SectionHeader title="Together" />
-      <View style={styles.togetherRow}>
-        <TogetherPill
+      <Card padding="none" style={{ overflow: 'hidden' }}>
+        {/* Chat */}
+        <Pressable
           onPress={() => router.push(`/hangout/${hangoutId}/chat` as any)}
-          theme={theme}
+          style={({ pressed }) => [styles.togetherRow, pressed && { opacity: 0.7 }]}
         >
-          <MessageCircle size={17} color={theme.colors.accent} strokeWidth={1.5} />
-          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>Chat</Text>
+          <View style={[styles.togetherIcon, { backgroundColor: '#6366F118' }]}>
+            <MessageCircle size={20} color="#6366F1" strokeWidth={1.6} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>Chat</Text>
+            <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 1 }]}>
+              Group messages
+            </Text>
+          </View>
           <UnreadBadge hangoutId={hangoutId} />
-        </TogetherPill>
-        <TogetherPill
+          <ChevronRight size={15} color={theme.colors.text.tertiary} strokeWidth={2} style={{ marginLeft: 6 }} />
+        </Pressable>
+
+        <RowDivider theme={theme} />
+
+        {/* Photos */}
+        <Pressable
           onPress={() => router.push(`/hangout/${hangoutId}/photos` as any)}
-          theme={theme}
+          style={({ pressed }) => [styles.togetherRow, pressed && { opacity: 0.7 }]}
         >
-          <Images size={17} color={theme.colors.accent} strokeWidth={1.5} />
-          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
-            {photosSummary.count > 0 ? `${photosSummary.count} Photos` : 'Photos'}
-          </Text>
-        </TogetherPill>
-        <TogetherPill
+          <View style={[styles.togetherIcon, { backgroundColor: '#EC489918' }]}>
+            <Images size={20} color="#EC4899" strokeWidth={1.6} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>Photos</Text>
+            <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 1 }]}>
+              {photosSummary.count > 0 ? `${photosSummary.count} shared` : 'Add memories'}
+            </Text>
+          </View>
+          {photosSummary.count > 0 && (
+            <View style={styles.togetherBadge}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#EC4899' }}>{photosSummary.count}</Text>
+            </View>
+          )}
+          <ChevronRight size={15} color={theme.colors.text.tertiary} strokeWidth={2} style={{ marginLeft: 6 }} />
+        </Pressable>
+
+        <RowDivider theme={theme} />
+
+        {/* Bills */}
+        <Pressable
           onPress={() => router.push(`/hangout/${hangoutId}/bills` as any)}
-          theme={theme}
+          style={({ pressed }) => [styles.togetherRow, pressed && { opacity: 0.7 }]}
         >
-          <Receipt size={17} color={theme.colors.accent} strokeWidth={1.5} />
-          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>Bills</Text>
+          <View style={[styles.togetherIcon, { backgroundColor: '#22C55E18' }]}>
+            <Receipt size={20} color="#22C55E" strokeWidth={1.6} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>Bills</Text>
+            <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 1 }]}>
+              Split expenses
+            </Text>
+          </View>
           {myBalance.data && myBalance.data.net_cents !== 0 && (
-            <Text style={{ fontSize: 12, fontWeight: '700', color: myBalance.data.net_cents > 0 ? '#22C55E' : theme.colors.danger }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: myBalance.data.net_cents > 0 ? '#22C55E' : theme.colors.danger }}>
               {myBalance.data.net_cents > 0 ? `+${formatCents(myBalance.data.net_cents)}` : formatCents(myBalance.data.net_cents)}
             </Text>
           )}
-        </TogetherPill>
-      </View>
+          <ChevronRight size={15} color={theme.colors.text.tertiary} strokeWidth={2} style={{ marginLeft: 6 }} />
+        </Pressable>
+      </Card>
 
       {/* Host: cancel hangout */}
       {isHost && !isCancelled ? (
@@ -611,31 +647,6 @@ function RowDivider({ theme }: { theme: ReturnType<typeof useTheme> }): React.Re
   );
 }
 
-function TogetherPill({
-  children,
-  onPress,
-  theme,
-}: {
-  children: React.ReactNode;
-  onPress: () => void;
-  theme: ReturnType<typeof useTheme>;
-}): React.ReactElement {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.togetherPill,
-        {
-          backgroundColor: theme.colors.bg.surface,
-          borderColor: theme.colors.border.default,
-          opacity: pressed ? 0.7 : 1,
-        },
-      ]}
-    >
-      {children}
-    </Pressable>
-  );
-}
 
 function Fact({
   icon,
@@ -824,17 +835,23 @@ const styles = StyleSheet.create({
   },
   togetherRow: {
     flexDirection: 'row',
-    gap: 8,
-  },
-  togetherPill: {
-    flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 12,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  togetherIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  togetherBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: '#EC489918',
   },
   header: {
     paddingTop: 8,
