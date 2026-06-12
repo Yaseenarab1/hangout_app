@@ -156,7 +156,7 @@ export function AddPollSheet({
 
   function handleCreate() {
     if (!kind) return;
-    const finalDeadline = voteDeadline ?? new Date(Date.now() + 60 * 60 * 1000);
+    const finalDeadline = voteDeadline ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const dbKind = kind === 'venue' ? 'restaurant' : kind;
     const title =
       kind === 'venue'
