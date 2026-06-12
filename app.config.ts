@@ -125,6 +125,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         isAccessMediaLocationEnabled: false,
       },
     ],
+    'expo-video',
   ],
 
   extra: {

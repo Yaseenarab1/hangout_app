@@ -296,13 +296,18 @@ export function PhotoViewer({
             <Text style={styles.headerCount}>
               {currentIdx + 1} / {photos.length}
             </Text>
-            <Pressable
-              onPress={() => setShowMenu((v) => !v)}
-              style={styles.headerBtn}
-              hitSlop={12}
-            >
-              <MoreHorizontal size={22} color="#fff" />
-            </Pressable>
+            <View style={styles.headerRight}>
+              <Pressable onPress={handleSave} style={styles.headerBtn} hitSlop={12}>
+                <Download size={22} color="#fff" />
+              </Pressable>
+              <Pressable
+                onPress={() => setShowMenu((v) => !v)}
+                style={styles.headerBtn}
+                hitSlop={12}
+              >
+                <MoreHorizontal size={22} color="#fff" />
+              </Pressable>
+            </View>
           </View>
 
           {/* Action menu */}
@@ -478,6 +483,10 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   headerCount: {
     color: '#fff',

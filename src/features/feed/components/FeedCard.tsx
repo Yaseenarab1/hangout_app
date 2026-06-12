@@ -23,6 +23,7 @@ import Reanimated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Heart,
@@ -30,6 +31,8 @@ import {
   Share2,
   MoreHorizontal,
   Bookmark,
+  Volume2,
+  VolumeX,
 } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
@@ -65,6 +68,7 @@ export function FeedCard({ post, cardHeight = SCREEN_H }: Props): React.ReactEle
   const isOwn = post.author_id === user?.id;
   const timeAgo = formatTimeAgo(post.created_at);
   const urls = post.image_urls ?? [post.image_url];
+  const isVideo = post.media_type === 'video';
   const isEphemeral = isOwn && post.expires_at != null;
   const expiresIn = isEphemeral ? getExpiresIn(post.expires_at!) : null;
 
@@ -116,7 +120,105 @@ export function FeedCard({ post, cardHeight = SCREEN_H }: Props): React.ReactEle
 
   return (
     <View style={{ height: cardHeight }}>
-      {/* ── Photo carousel (full-height, Reels style) ── */}
+      {/* ── Video / photo carousel (full-height, Reels style) ── */}
+      {isVideo ? (
+        <VideoFeedCard
+          url={urls[0]!}
+          height={cardHeight}
+          isEphemeral={isEphemeral}
+          isPermanentPending={makePermanent.isPending}
+          onDoubleTap={handleHeartTap}
+          onKeepForever={() =>
+            Alert.alert(
+              'Keep on profile?',
+              'This video will stay on your profile permanently instead of disappearing.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Keep forever', onPress: () => makePermanent.mutate(post.id) },
+              ],
+            )
+          }
+        >
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.65)']}
+            locations={[0, 0.5, 1]}
+            style={[StyleSheet.absoluteFill, { top: '35%' }]}
+            pointerEvents="none"
+          />
+          <View style={styles.actionsCol} pointerEvents="box-none">
+            <Pressable
+              onPress={handleHeartTap}
+              onPressIn={() => pressIn(heartScale)}
+              onPressOut={() => pressOut(heartScale)}
+              hitSlop={10}
+              style={styles.actionItem}
+            >
+              <Reanimated.View style={heartAnimStyle}>
+                <Heart size={30} color={liked ? '#EF4444' : '#FFFFFF'} fill={liked ? '#EF4444' : 'transparent'} />
+              </Reanimated.View>
+              {(post.like_count ?? 0) > 0 && (
+                <Text style={styles.actionCount}>{post.like_count}</Text>
+              )}
+            </Pressable>
+            <Pressable
+              onPress={() => setCommentsVisible(true)}
+              onPressIn={() => pressIn(commentScale)}
+              onPressOut={() => pressOut(commentScale)}
+              hitSlop={10}
+              style={styles.actionItem}
+            >
+              <Reanimated.View style={commentAnimStyle}>
+                <MessageCircle size={28} color="#FFFFFF" />
+              </Reanimated.View>
+              {(post.comment_count ?? 0) > 0 && (
+                <Text style={styles.actionCount}>{post.comment_count}</Text>
+              )}
+            </Pressable>
+            <Pressable
+              onPress={handleShare}
+              onPressIn={() => pressIn(shareScale)}
+              onPressOut={() => pressOut(shareScale)}
+              hitSlop={10}
+              style={styles.actionItem}
+            >
+              <Reanimated.View style={shareAnimStyle}>
+                <Share2 size={26} color="#FFFFFF" />
+              </Reanimated.View>
+            </Pressable>
+            {isOwn && (
+              <Pressable
+                onPress={() =>
+                  Alert.alert('Post options', undefined, [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', style: 'destructive', onPress: () => deletePost.mutate(post.id) },
+                  ])
+                }
+                hitSlop={12}
+                style={styles.actionItem}
+              >
+                <MoreHorizontal size={26} color="#FFFFFF" />
+              </Pressable>
+            )}
+          </View>
+          <View style={styles.bottomOverlay} pointerEvents="box-none">
+            <Pressable
+              onPress={() => router.push(`/profile/${post.author_id}`)}
+              style={styles.authorRow}
+              hitSlop={4}
+            >
+              <Avatar id={author?.id ?? ''} displayName={author?.display_name ?? ''} uri={author?.avatar_url ?? null} size="sm" />
+              <View style={{ marginLeft: 8 }}>
+                <Text style={styles.authorName}>{author?.display_name ?? ''}</Text>
+                <Text style={styles.authorTime}>
+                  {timeAgo}
+                  {isEphemeral && expiresIn ? ` · disappears in ${expiresIn}` : ''}
+                </Text>
+              </View>
+            </Pressable>
+            {post.caption ? <Text style={styles.caption} numberOfLines={3}>{post.caption}</Text> : null}
+          </View>
+        </VideoFeedCard>
+      ) : (
       <PhotoCarousel
         urls={urls}
         height={cardHeight}
@@ -251,6 +353,7 @@ export function FeedCard({ post, cardHeight = SCREEN_H }: Props): React.ReactEle
           )}
         </View>
       </PhotoCarousel>
+      )}
 
       {/* ── Comments sheet ── */}
       <Modal
@@ -284,6 +387,75 @@ function getExpiresIn(iso: string): string | null {
   if (hrs >= 1) return `${hrs}h`;
   const mins = Math.floor(msLeft / 60_000);
   return `${mins}m`;
+}
+
+// ── VideoFeedCard ─────────────────────────────────────────────────────────────
+
+type VideoFeedCardProps = {
+  url: string;
+  height: number;
+  isEphemeral: boolean;
+  isPermanentPending: boolean;
+  onDoubleTap: () => void;
+  onKeepForever: () => void;
+  children?: React.ReactNode;
+};
+
+function VideoFeedCard({
+  url,
+  height,
+  isEphemeral,
+  isPermanentPending,
+  onDoubleTap,
+  onKeepForever,
+  children,
+}: VideoFeedCardProps) {
+  const [muted, setMuted] = useState(true);
+  const lastTapAt = useRef(0);
+
+  const player = useVideoPlayer({ uri: url }, (p) => {
+    p.loop = true;
+    p.muted = true;
+    p.play();
+  });
+
+  function handleTap() {
+    const now = Date.now();
+    if (now - lastTapAt.current < 300) {
+      lastTapAt.current = 0;
+      onDoubleTap();
+    } else {
+      lastTapAt.current = now;
+    }
+  }
+
+  function toggleMute() {
+    const next = !muted;
+    setMuted(next);
+    player.muted = next;
+  }
+
+  return (
+    <View style={{ width: SCREEN_W, height, overflow: 'hidden' }}>
+      <VideoView player={player} style={{ width: SCREEN_W, height }} contentFit="cover" nativeControls={false} />
+      {children}
+      {/* Mute toggle */}
+      <Pressable onPress={toggleMute} style={styles.muteBtn} hitSlop={12}>
+        {muted
+          ? <VolumeX size={20} color="#FFFFFF" />
+          : <Volume2 size={20} color="#FFFFFF" />
+        }
+      </Pressable>
+      {/* Keep on profile */}
+      {isEphemeral && (
+        <Pressable onPress={onKeepForever} disabled={isPermanentPending} style={styles.keepOverlay}>
+          <Bookmark size={14} color="#FFFFFF" fill="#FFFFFF" />
+          <Text style={styles.keepText}>{isPermanentPending ? 'Saving…' : 'Keep on profile'}</Text>
+        </Pressable>
+      )}
+      <Pressable onPress={handleTap} style={StyleSheet.absoluteFill} />
+    </View>
+  );
 }
 
 // ── PhotoCarousel ─────────────────────────────────────────────────────────────
@@ -520,6 +692,14 @@ const styles = StyleSheet.create({
   },
   dot: {
     borderRadius: 4,
+  },
+  muteBtn: {
+    position: 'absolute',
+    bottom: 110,
+    left: 14,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+    padding: 8,
   },
   keepOverlay: {
     position: 'absolute',

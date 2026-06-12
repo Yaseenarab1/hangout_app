@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, Image as ImageIcon, Globe, Users, Lock, Plus, X, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { VideoView, useVideoPlayer } from 'expo-video';
+import { Camera, Image as ImageIcon, Globe, Users, Lock, Plus, X, ChevronLeft, ChevronRight, Video } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';
 import { Button, Switch } from '@/components/ui';
 import { useTheme } from '@/hooks/useTheme';
@@ -35,30 +36,44 @@ export default function NewPostScreen(): React.ReactElement {
   const [step, setStep] = useState<Step>('pick');
   const [localUris, setLocalUris] = useState<string[]>([]);
   const [previewIndex, setPreviewIndex] = useState(0);
+  const [mediaType, setMediaType] = useState<'photo' | 'video'>('photo');
+  const [videoDuration, setVideoDuration] = useState<number | undefined>(undefined);
   const [caption, setCaption] = useState('');
   const [visibility, setVisibility] = useState<PostVisibility>('friends');
   const [keepForever, setKeepForever] = useState(false);
 
-  async function pickFrom(source: 'camera' | 'library') {
+  async function pickFrom(source: 'camera' | 'library', type: 'photo' | 'video' = 'photo') {
     const result =
       source === 'camera'
-        ? await ImagePicker.launchCameraAsync({ quality: 0.9, mediaTypes: 'images' })
+        ? await ImagePicker.launchCameraAsync({
+            quality: 0.9,
+            mediaTypes: type === 'video' ? 'videos' : 'images',
+            videoMaxDuration: 60,
+          })
         : await ImagePicker.launchImageLibraryAsync({
             quality: 0.9,
-            mediaTypes: 'images',
-            allowsMultipleSelection: true,
-            selectionLimit: MAX_PHOTOS,
+            mediaTypes: type === 'video' ? 'videos' : 'images',
+            allowsMultipleSelection: type === 'photo',
+            selectionLimit: type === 'photo' ? MAX_PHOTOS : 1,
+            videoMaxDuration: 60,
           });
 
     if (result.canceled || !result.assets?.length) return;
-    const uris = result.assets.map((a) => a.uri).slice(0, MAX_PHOTOS);
+    const asset = result.assets[0]!;
+    const uris = type === 'video'
+      ? [asset.uri]
+      : result.assets.map((a) => a.uri).slice(0, MAX_PHOTOS);
+
     setLocalUris(uris);
+    setMediaType(type);
+    setVideoDuration(type === 'video' ? (asset.duration ?? undefined) : undefined);
     setPreviewIndex(0);
     if (params.hangoutId) setVisibility('hangout');
     setStep('compose');
   }
 
   async function addMore() {
+    if (mediaType === 'video') return;
     const remaining = MAX_PHOTOS - localUris.length;
     if (remaining <= 0) return;
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -95,6 +110,8 @@ export default function NewPostScreen(): React.ReactElement {
     if (!localUris.length) return;
     await createPost.mutateAsync({
       localUris,
+      mediaType,
+      durationMs: videoDuration ? Math.round(videoDuration) : undefined,
       caption: caption.trim() || undefined,
       visibility,
       hangoutId: params.hangoutId,
@@ -111,24 +128,38 @@ export default function NewPostScreen(): React.ReactElement {
         <Text
           style={[
             theme.typography.body,
-            { color: theme.colors.text.secondary, marginBottom: 32 },
+            { color: theme.colors.text.secondary, marginBottom: 24 },
           ]}
         >
-          Share a photo (up to {MAX_PHOTOS})
+          Share a photo or video
         </Text>
         <View style={styles.options}>
           <OptionCard
             icon={<Camera size={28} color={theme.colors.accent} />}
             title="Take a photo"
             subtitle="Use your camera"
-            onPress={() => pickFrom('camera')}
+            onPress={() => pickFrom('camera', 'photo')}
             theme={theme}
           />
           <OptionCard
             icon={<ImageIcon size={28} color={theme.colors.accent} />}
-            title="Choose from library"
+            title="Choose photos"
             subtitle={`Pick up to ${MAX_PHOTOS} photos`}
-            onPress={() => pickFrom('library')}
+            onPress={() => pickFrom('library', 'photo')}
+            theme={theme}
+          />
+          <OptionCard
+            icon={<Video size={28} color={theme.colors.accent} />}
+            title="Record a video"
+            subtitle="Up to 60 seconds"
+            onPress={() => pickFrom('camera', 'video')}
+            theme={theme}
+          />
+          <OptionCard
+            icon={<Video size={28} color={theme.colors.accent} />}
+            title="Choose a video"
+            subtitle="From your library"
+            onPress={() => pickFrom('library', 'video')}
             theme={theme}
           />
         </View>
@@ -166,15 +197,19 @@ export default function NewPostScreen(): React.ReactElement {
         }}
         scroll
       >
-        {/* ── Photo preview ── */}
-        <Image
-          source={{ uri: localUris[previewIndex]! }}
-          style={[styles.preview, { borderRadius: theme.radii.md }]}
-          resizeMode="cover"
-        />
+        {/* ── Photo / video preview ── */}
+        {mediaType === 'video' ? (
+          <VideoPreview uri={localUris[0]!} style={[styles.preview, { borderRadius: theme.radii.md }]} />
+        ) : (
+          <Image
+            source={{ uri: localUris[previewIndex]! }}
+            style={[styles.preview, { borderRadius: theme.radii.md }]}
+            resizeMode="cover"
+          />
+        )}
 
-        {/* ── Thumbnail strip ── */}
-        <ScrollView
+        {/* ── Thumbnail strip (photos only) ── */}
+        {mediaType === 'photo' && <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           style={{ marginBottom: 16 }}
@@ -241,7 +276,7 @@ export default function NewPostScreen(): React.ReactElement {
               </Text>
             </Pressable>
           )}
-        </ScrollView>
+        </ScrollView>}
 
         {/* ── Caption ── */}
         <TextInput
@@ -340,6 +375,23 @@ const VISIBILITY_OPTIONS = [
     icon: (active: boolean) => <Lock size={13} color={active ? '#FFFFFF' : '#8B5CF6'} />,
   },
 ];
+
+function VideoPreview({ uri, style }: { uri: string; style: any }) {
+  const player = useVideoPlayer({ uri }, (p) => {
+    p.loop = true;
+    p.muted = true;
+    p.play();
+  });
+
+  return (
+    <VideoView
+      player={player}
+      style={style}
+      contentFit="cover"
+      nativeControls={false}
+    />
+  );
+}
 
 function OptionCard({
   icon,

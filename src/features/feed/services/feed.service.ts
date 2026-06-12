@@ -1,6 +1,6 @@
 import { supabase } from '@/services/supabase/client';
 import { TABLES, STORAGE_BUCKETS, QUERY_KEYS } from '@/services/supabase/tables';
-import { getSignedUrl, uploadFeedPost } from '@/services/storage';
+import { getSignedUrl, uploadFeedPost, uploadFeedVideo } from '@/services/storage';
 import type { FeedPost, FeedPostWithUrl, FeedPostComment, CreatePostParams, ReactionType } from '../types';
 
 const SIGNED_URL_TTL = 3600; // 1 hour
@@ -99,33 +99,50 @@ export async function getStoryPosts(): Promise<FeedPostWithUrl[]> {
   return results.filter((p): p is FeedPostWithUrl => p !== null);
 }
 
-/** Create a new feed post: upload 1–4 photos then insert row. */
+/** Create a new feed post: upload 1–4 photos (or 1 video) then insert row. */
 export async function createFeedPost(params: CreatePostParams): Promise<FeedPost> {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error('Not authenticated');
   const userId = auth.user.id;
 
   const uris = params.localUris.slice(0, 4);
-  if (uris.length === 0) throw new Error('At least one photo required');
+  if (uris.length === 0) throw new Error('At least one media item required');
 
+  const isVideo = params.mediaType === 'video';
   const postId = generateUUID();
 
-  // Upload sequentially — parallel uploads to the same folder cause a silent
-  // race condition in Supabase Storage where only the first file lands.
-  const uploads: Awaited<ReturnType<typeof uploadFeedPost>>[] = [];
-  for (let i = 0; i < uris.length; i++) {
-    const result = await uploadFeedPost(uris[i]!, userId, postId, i);
-    uploads.push(result);
+  let storagePath: string;
+  let width = 0;
+  let height = 0;
+  let mediaPaths: string[];
+
+  if (isVideo) {
+    const result = await uploadFeedVideo(uris[0]!, userId, postId);
+    storagePath = result.storagePath;
+    mediaPaths = [storagePath];
+  } else {
+    // Upload photos sequentially — parallel uploads to the same folder cause a silent
+    // race condition in Supabase Storage where only the first file lands.
+    const uploads: Awaited<ReturnType<typeof uploadFeedPost>>[] = [];
+    for (let i = 0; i < uris.length; i++) {
+      const result = await uploadFeedPost(uris[i]!, userId, postId, i);
+      uploads.push(result);
+    }
+    storagePath = uploads[0]!.storagePath;
+    width = uploads[0]!.width;
+    height = uploads[0]!.height;
+    mediaPaths = uploads.map((u) => u.storagePath);
   }
 
-  const mediaPaths = uploads.map((u) => u.storagePath);
   const baseRow = {
     id: postId,
     author_id: userId,
-    storage_path: uploads[0]!.storagePath,
+    storage_path: storagePath,
     thumbnail_path: null,
-    width: uploads[0]!.width,
-    height: uploads[0]!.height,
+    media_type: isVideo ? 'video' : 'photo',
+    duration_ms: isVideo ? (params.durationMs ?? null) : null,
+    width,
+    height,
     caption: params.caption ?? null,
     visibility: params.visibility,
     hangout_id: params.hangoutId ?? null,
@@ -135,16 +152,12 @@ export async function createFeedPost(params: CreatePostParams): Promise<FeedPost
         : params.expiresAt,
   };
 
-  console.log('[createFeedPost] mediaPaths:', mediaPaths);
-
   // Try with media_paths first; fall back gracefully if column doesn't exist yet
   let { data, error } = await supabase
     .from(TABLES.feed_posts as any)
     .insert({ ...baseRow, media_paths: mediaPaths })
     .select()
     .single();
-
-  console.log('[createFeedPost] insert result - data.media_paths:', (data as any)?.media_paths, 'error:', error?.code, error?.message);
 
   // 42703 = PostgreSQL "undefined_column" — media_paths not yet in DB schema
   if (error?.code === '42703' || error?.message?.includes('media_paths')) {
@@ -311,27 +324,19 @@ export async function deleteComment(commentId: string): Promise<void> {
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 async function normalizeAndSign(raw: any, viewerId: string): Promise<FeedPostWithUrl | null> {
-  console.log('[feed] post', raw.id, 'media_paths:', raw.media_paths, 'storage_path:', raw.storage_path);
-
   const paths: string[] =
     Array.isArray(raw.media_paths) && raw.media_paths.length > 0
       ? raw.media_paths
       : raw.storage_path ? [raw.storage_path] : [];
 
-  console.log('[feed] resolved paths:', paths);
-
   if (paths.length === 0) return null;
 
   const signed = await Promise.all(
     paths.map((p) =>
-      getSignedUrl(STORAGE_BUCKETS.feedPosts, p, SIGNED_URL_TTL).catch((e) => {
-        console.log('[feed] sign failed for', p, e?.message);
-        return null;
-      }),
+      getSignedUrl(STORAGE_BUCKETS.feedPosts, p, SIGNED_URL_TTL).catch(() => null),
     ),
   );
   const image_urls = signed.filter((u): u is string => u !== null);
-  console.log('[feed] image_urls count:', image_urls.length);
   if (image_urls.length === 0) return null; // file missing or no access — skip post
 
   // all_reactions rows may or may not have reaction_type (depends on migration state)

@@ -1,13 +1,16 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
 import { useLocalSearchParams } from 'expo-router';
-import { Plus } from 'lucide-react-native';
+import { Plus, Download } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';
 import { EmptyState, Skeleton } from '@/components/ui';
 import { Images } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useSession } from '@/features/auth';
+import { toast } from '@/stores/ui.store';
 import {
   usePhotos,
   useUploadPhoto,
@@ -16,6 +19,7 @@ import {
   useUpdateCaption,
   PhotoGrid,
   PhotoViewer,
+  getPhotoSignedUrl,
 } from '@/features/photos';
 import type { HangoutPhoto } from '@/features/photos';
 
@@ -36,11 +40,43 @@ export default function PhotosScreen(): React.ReactElement {
 
   const [viewerIndex, setViewerIndex] = useState(0);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [saveAllProgress, setSaveAllProgress] = useState<{ done: number; total: number } | null>(null);
 
   const openViewer = useCallback((photo: HangoutPhoto, index: number) => {
     setViewerIndex(index);
     setViewerOpen(true);
   }, []);
+
+  const handleSaveAll = useCallback(async () => {
+    if (photos.length === 0) return;
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Allow camera roll access in Settings to save photos.');
+      return;
+    }
+    setSaveAllProgress({ done: 0, total: photos.length });
+    let saved = 0;
+    let failed = 0;
+    for (let i = 0; i < photos.length; i++) {
+      const photo = photos[i]!;
+      try {
+        const url = photo.signedUrl ?? (await getPhotoSignedUrl(photo.storage_path));
+        const localUri = FileSystem.cacheDirectory + `save-all-${photo.id}.jpg`;
+        const { uri } = await FileSystem.downloadAsync(url, localUri);
+        await MediaLibrary.saveToLibraryAsync(uri);
+        saved++;
+      } catch {
+        failed++;
+      }
+      setSaveAllProgress({ done: i + 1, total: photos.length });
+    }
+    setSaveAllProgress(null);
+    if (failed === 0) {
+      toast.success(`Saved ${saved} photo${saved !== 1 ? 's' : ''} to camera roll.`);
+    } else {
+      toast.error(`Saved ${saved}, failed ${failed}.`);
+    }
+  }, [photos]);
 
   const handleAddPhotos = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -91,14 +127,26 @@ export default function PhotosScreen(): React.ReactElement {
   );
 
   const headerRight = (
-    <Pressable
-      onPress={handleAddPhotos}
-      style={styles.addBtn}
-      hitSlop={12}
-      disabled={isPending}
-    >
-      <Plus size={22} color={theme.colors.accent} />
-    </Pressable>
+    <View style={styles.headerBtns}>
+      {photos.length > 0 && (
+        <Pressable
+          onPress={handleSaveAll}
+          style={styles.addBtn}
+          hitSlop={12}
+          disabled={!!saveAllProgress}
+        >
+          <Download size={22} color={theme.colors.accent} />
+        </Pressable>
+      )}
+      <Pressable
+        onPress={handleAddPhotos}
+        style={styles.addBtn}
+        hitSlop={12}
+        disabled={isPending}
+      >
+        <Plus size={22} color={theme.colors.accent} />
+      </Pressable>
+    </View>
   );
 
   return (
@@ -106,17 +154,19 @@ export default function PhotosScreen(): React.ReactElement {
       header={{ title: 'Photos', showBack: true, right: headerRight }}
       contentPadding={0}
     >
-      {/* Upload progress banner */}
-      {isPending && progress && (
+      {/* Upload / save-all progress banner */}
+      {(isPending && progress || saveAllProgress) && (
         <View
           style={[styles.progressBanner, { backgroundColor: theme.colors.bg.surface }]}
         >
           <Text
             style={[theme.typography.bodySmall, { color: theme.colors.text.secondary }]}
           >
-            {progress.phase === 'resizing'
+            {saveAllProgress
+              ? `Saving ${saveAllProgress.done} of ${saveAllProgress.total} to camera roll…`
+              : progress?.phase === 'resizing'
               ? `Processing ${progress.index + 1} of ${progress.total}…`
-              : `Uploading ${progress.index + 1} of ${progress.total}…`}
+              : `Uploading ${progress!.index + 1} of ${progress!.total}…`}
           </Text>
         </View>
       )}
@@ -174,6 +224,11 @@ export default function PhotosScreen(): React.ReactElement {
 }
 
 const styles = StyleSheet.create({
+  headerBtns: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   addBtn: {
     padding: 8,
   },

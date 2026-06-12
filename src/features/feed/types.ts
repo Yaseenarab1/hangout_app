@@ -22,6 +22,8 @@ export interface FeedPost {
   storage_path: string;
   thumbnail_path: string | null;
   media_paths: string[] | null; // all photo paths (1-4); null = single (use storage_path)
+  media_type: 'photo' | 'video';
+  duration_ms: number | null; // video duration; null for photos
   width: number;
   height: number;
   caption: string | null;
@@ -71,7 +73,9 @@ export interface FeedPostComment {
 }
 
 export interface CreatePostParams {
-  localUris: string[];  // 1–4 photos
+  localUris: string[];  // 1–4 photos OR 1 video
+  mediaType?: 'photo' | 'video';
+  durationMs?: number; // only for video
   caption?: string;
   visibility: PostVisibility;
   hangoutId?: string;

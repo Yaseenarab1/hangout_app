@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
-import { ChevronRight, CalendarDays, Navigation } from 'lucide-react-native';
+import { ChevronRight, CalendarDays, Navigation, Play, Tv } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';
 import { Input, Textarea, Button } from '@/components/ui';
 import { SummaryRow } from '@/components/ui/SummaryRow';
@@ -16,7 +16,8 @@ import { StartTimeSheet } from '@/features/polls';
 import { useCreateActivityHangout } from '@/features/polls';
 import { SportPicker, SportVenuePicker, type Sport, type SportVenueOption } from '@/features/sports';
 
-type Step = 'sport' | 'venue' | 'invite' | 'details';
+type Step = 'sport' | 'mode' | 'venue' | 'invite' | 'details';
+type SportMode = 'play' | 'watch';
 
 type FormState = {
   title: string;
@@ -36,6 +37,7 @@ export default function NewSportsScreen(): React.ReactElement {
 
   const [step, setStep] = useState<Step>('sport');
   const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
+  const [sportMode, setSportMode] = useState<SportMode>('play');
   const [showStartTimeSheet, setShowStartTimeSheet] = useState(false);
   const [addressText, setAddressText] = useState('');
   const [locatingMe, setLocatingMe] = useState(false);
@@ -83,6 +85,16 @@ export default function NewSportsScreen(): React.ReactElement {
   function handleSportSelect(sport: Sport): void {
     setSelectedSport(sport);
     setValue('title', `${sport.label} hangout`);
+    setStep('mode');
+  }
+
+  function handleModeSelect(mode: SportMode): void {
+    setSportMode(mode);
+    if (selectedSport) {
+      setValue('title', mode === 'watch'
+        ? `Watch ${selectedSport.label}`
+        : `${selectedSport.label} hangout`);
+    }
     setStep('venue');
   }
 
@@ -136,21 +148,93 @@ export default function NewSportsScreen(): React.ReactElement {
     );
   }
 
+  // ── Step: Mode (play or watch) ──
+  if (step === 'mode' && selectedSport) {
+    return (
+      <Screen
+        header={{ title: `${selectedSport.emoji} ${selectedSport.label}`, showBack: true, onBack: () => setStep('sport') }}
+        scroll
+        contentPadding={16}
+      >
+        <Text style={[theme.typography.h2, { color: theme.colors.text.primary }]}>
+          Play or watch?
+        </Text>
+        <Text style={[theme.typography.body, { color: theme.colors.text.secondary, marginTop: 4, marginBottom: 28 }]}>
+          We'll find the right spots based on your answer.
+        </Text>
+        <View style={styles.modeOptions}>
+          <Pressable
+            onPress={() => handleModeSelect('play')}
+            style={({ pressed }) => [
+              styles.modeCard,
+              {
+                backgroundColor: theme.colors.bg.surface,
+                borderColor: theme.colors.border.default,
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+          >
+            <View style={[styles.modeIcon, { backgroundColor: theme.colors.accent + '18' }]}>
+              <Play size={28} color={theme.colors.accent} fill={theme.colors.accent} />
+            </View>
+            <Text style={[theme.typography.h3, { color: theme.colors.text.primary, marginTop: 12 }]}>
+              Play {selectedSport.emoji}
+            </Text>
+            <Text style={[theme.typography.bodySmall, { color: theme.colors.text.secondary, marginTop: 4, textAlign: 'center' }]}>
+              Find courts, fields & gyms near you
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => handleModeSelect('watch')}
+            style={({ pressed }) => [
+              styles.modeCard,
+              {
+                backgroundColor: theme.colors.bg.surface,
+                borderColor: theme.colors.border.default,
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+          >
+            <View style={[styles.modeIcon, { backgroundColor: theme.colors.accent + '18' }]}>
+              <Tv size={28} color={theme.colors.accent} />
+            </View>
+            <Text style={[theme.typography.h3, { color: theme.colors.text.primary, marginTop: 12 }]}>
+              Watch {selectedSport.emoji}
+            </Text>
+            <Text style={[theme.typography.bodySmall, { color: theme.colors.text.secondary, marginTop: 4, textAlign: 'center' }]}>
+              Find sports bars & watch parties
+            </Text>
+          </Pressable>
+        </View>
+      </Screen>
+    );
+  }
+
   // ── Step: Venue ──
   if (step === 'venue' && selectedSport) {
+    const venueTitle = sportMode === 'watch'
+      ? `📺 Watch ${selectedSport.label}`
+      : `${selectedSport.emoji} ${selectedSport.label} near you`;
+    const watchSport: Sport = {
+      ...selectedSport,
+      query: 'sports bar',
+      freeHint: false,
+    };
+    const activeSport = sportMode === 'watch' ? watchSport : selectedSport;
     return (
       <Screen
         header={{
-          title: `${selectedSport.emoji} ${selectedSport.label} near you`,
+          title: venueTitle,
           showBack: true,
-          onBack: () => setStep('sport'),
+          onBack: () => setStep('mode'),
         }}
         contentPadding={0}
       >
         <View style={{ flex: 1 }}>
           <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: 8 }}>
             <SportVenuePicker
-              sport={selectedSport}
+              sport={activeSport}
               value={venueOptions}
               onChange={(opts) => setValue('venueOptions', opts)}
               min={0}
@@ -314,5 +398,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 6,
     paddingHorizontal: 4,
+  },
+  modeOptions: {
+    flexDirection: 'row',
+    gap: 14,
+  },
+  modeCard: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  modeIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

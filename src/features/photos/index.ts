@@ -6,4 +6,5 @@ export { useUploadPhoto } from './hooks/useUploadPhoto';
 export { useDeletePhoto } from './hooks/useDeletePhoto';
 export { useReactToPhoto } from './hooks/useReactToPhoto';
 export { useUpdateCaption } from './hooks/useUpdateCaption';
+export { getPhotoSignedUrl } from './services/photos.service';
 export type { HangoutPhoto, PhotoReaction } from './types';

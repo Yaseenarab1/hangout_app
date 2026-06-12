@@ -66,6 +66,42 @@ export interface FeedPostUploadResult {
   height: number;
 }
 
+/** Upload one video for a feed post. No transcoding — stored as-is. */
+export async function uploadFeedVideo(
+  localUri: string,
+  userId: string,
+  postId: string,
+): Promise<FeedPostUploadResult> {
+  const path = `${userId}/${postId}_0.mp4`;
+
+  // Videos are uploaded via the Supabase REST API using FileSystem.uploadAsync
+  // so we avoid loading the entire file into memory as base64.
+  const { data: session } = await supabase.auth.getSession();
+  const accessToken = session?.session?.access_token;
+  if (!accessToken) throw new Error('Not authenticated');
+
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+  const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+  const uploadUrl = `${supabaseUrl}/storage/v1/object/${STORAGE_BUCKETS.feedPosts}/${path}`;
+
+  const result = await FileSystem.uploadAsync(uploadUrl, localUri, {
+    httpMethod: 'POST',
+    uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      apikey: anonKey,
+      'Content-Type': 'video/mp4',
+      'x-upsert': 'true',
+    },
+  });
+
+  if (result.status !== 200) {
+    throw new Error(`Video upload failed: ${result.status} ${result.body}`);
+  }
+
+  return { storagePath: path, width: 0, height: 0 };
+}
+
 /** Upload one photo for a feed post (index 0 = primary). Returns storage path + dimensions. */
 export async function uploadFeedPost(
   localUri: string,
