@@ -61,6 +61,9 @@ type Props = {
   hasOlder: boolean;
   onFetchOlder: () => void;
   onPhotoPress: (photo: HangoutPhoto, index: number) => void;
+  onPhotoLongPress?: (photo: HangoutPhoto) => void;
+  selectionMode?: boolean;
+  selectedIds?: Set<string>;
 };
 
 export function PhotoGrid({
@@ -69,6 +72,9 @@ export function PhotoGrid({
   hasOlder,
   onFetchOlder,
   onPhotoPress,
+  onPhotoLongPress,
+  selectionMode = false,
+  selectedIds,
 }: Props): React.ReactElement {
   const theme = useTheme();
   const { width } = useWindowDimensions();
@@ -103,10 +109,13 @@ export function PhotoGrid({
               key={photo.id}
               photo={photo}
               size={tileSize}
+              selectionMode={selectionMode}
+              isSelected={selectedIds?.has(photo.id) ?? false}
               onPress={() => {
                 const globalIndex = photos.indexOf(photo);
                 onPhotoPress(photo, globalIndex >= 0 ? globalIndex : 0);
               }}
+              onLongPress={onPhotoLongPress ? () => onPhotoLongPress(photo) : undefined}
             />
           ) : (
             <View key={`empty-${col}`} style={{ width: tileSize, height: tileSize }} />

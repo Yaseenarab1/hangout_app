@@ -25,6 +25,37 @@ import type { HangoutPhoto } from '@/features/photos';
 
 const MAX_PHOTOS = 10;
 
+async function requestSavePermission(): Promise<boolean> {
+  const { status } = await MediaLibrary.requestPermissionsAsync();
+  if (status !== 'granted') {
+    Alert.alert('Permission required', 'Allow camera roll access in Settings to save photos.');
+    return false;
+  }
+  return true;
+}
+
+async function savePhotos(
+  targets: HangoutPhoto[],
+  onProgress: (done: number, total: number) => void,
+): Promise<{ saved: number; failed: number }> {
+  let saved = 0;
+  let failed = 0;
+  for (let i = 0; i < targets.length; i++) {
+    const photo = targets[i]!;
+    try {
+      const url = photo.signedUrl ?? (await getPhotoSignedUrl(photo.storage_path));
+      const localUri = FileSystem.cacheDirectory + `save-${photo.id}.jpg`;
+      const { uri } = await FileSystem.downloadAsync(url, localUri);
+      await MediaLibrary.saveToLibraryAsync(uri);
+      saved++;
+    } catch {
+      failed++;
+    }
+    onProgress(i + 1, targets.length);
+  }
+  return { saved, failed };
+}
+
 export default function PhotosScreen(): React.ReactElement {
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -40,37 +71,74 @@ export default function PhotosScreen(): React.ReactElement {
 
   const [viewerIndex, setViewerIndex] = useState(0);
   const [viewerOpen, setViewerOpen] = useState(false);
-  const [saveAllProgress, setSaveAllProgress] = useState<{ done: number; total: number } | null>(null);
 
-  const openViewer = useCallback((photo: HangoutPhoto, index: number) => {
-    setViewerIndex(index);
-    setViewerOpen(true);
+  // Selection mode
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [saveProgress, setSaveProgress] = useState<{ done: number; total: number } | null>(null);
+
+  const enterSelectionMode = useCallback((photo: HangoutPhoto) => {
+    setSelectionMode(true);
+    setSelectedIds(new Set([photo.id]));
   }, []);
+
+  const toggleSelected = useCallback((photo: HangoutPhoto) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(photo.id)) next.delete(photo.id);
+      else next.add(photo.id);
+      return next;
+    });
+  }, []);
+
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  const selectAll = useCallback(() => {
+    setSelectedIds(new Set(photos.map((p) => p.id)));
+  }, [photos]);
+
+  const allSelected = photos.length > 0 && selectedIds.size === photos.length;
+
+  const handlePhotoPress = useCallback(
+    (photo: HangoutPhoto, index: number) => {
+      if (selectionMode) {
+        toggleSelected(photo);
+      } else {
+        setViewerIndex(index);
+        setViewerOpen(true);
+      }
+    },
+    [selectionMode, toggleSelected],
+  );
+
+  const handleSaveSelected = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    if (!(await requestSavePermission())) return;
+    const targets = photos.filter((p) => selectedIds.has(p.id));
+    setSaveProgress({ done: 0, total: targets.length });
+    const { saved, failed } = await savePhotos(targets, (done, total) =>
+      setSaveProgress({ done, total }),
+    );
+    setSaveProgress(null);
+    exitSelectionMode();
+    if (failed === 0) {
+      toast.success(`Saved ${saved} photo${saved !== 1 ? 's' : ''} to camera roll.`);
+    } else {
+      toast.error(`Saved ${saved}, failed ${failed}.`);
+    }
+  }, [selectedIds, photos, exitSelectionMode]);
 
   const handleSaveAll = useCallback(async () => {
     if (photos.length === 0) return;
-    const { status } = await MediaLibrary.requestPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Allow camera roll access in Settings to save photos.');
-      return;
-    }
-    setSaveAllProgress({ done: 0, total: photos.length });
-    let saved = 0;
-    let failed = 0;
-    for (let i = 0; i < photos.length; i++) {
-      const photo = photos[i]!;
-      try {
-        const url = photo.signedUrl ?? (await getPhotoSignedUrl(photo.storage_path));
-        const localUri = FileSystem.cacheDirectory + `save-all-${photo.id}.jpg`;
-        const { uri } = await FileSystem.downloadAsync(url, localUri);
-        await MediaLibrary.saveToLibraryAsync(uri);
-        saved++;
-      } catch {
-        failed++;
-      }
-      setSaveAllProgress({ done: i + 1, total: photos.length });
-    }
-    setSaveAllProgress(null);
+    if (!(await requestSavePermission())) return;
+    setSaveProgress({ done: 0, total: photos.length });
+    const { saved, failed } = await savePhotos(photos, (done, total) =>
+      setSaveProgress({ done, total }),
+    );
+    setSaveProgress(null);
     if (failed === 0) {
       toast.success(`Saved ${saved} photo${saved !== 1 ? 's' : ''} to camera roll.`);
     } else {
@@ -126,21 +194,29 @@ export default function PhotosScreen(): React.ReactElement {
     [updateCaption],
   );
 
-  const headerRight = (
+  // ── Header ──────────────────────────────────────────────────────────────────
+
+  const headerRight = selectionMode ? (
+    <Pressable onPress={exitSelectionMode} hitSlop={12} style={styles.headerBtn}>
+      <Text style={[theme.typography.bodyMedium, { color: theme.colors.accent }]}>
+        Cancel
+      </Text>
+    </Pressable>
+  ) : (
     <View style={styles.headerBtns}>
       {photos.length > 0 && (
         <Pressable
           onPress={handleSaveAll}
-          style={styles.addBtn}
+          style={styles.headerBtn}
           hitSlop={12}
-          disabled={!!saveAllProgress}
+          disabled={!!saveProgress}
         >
           <Download size={22} color={theme.colors.accent} />
         </Pressable>
       )}
       <Pressable
         onPress={handleAddPhotos}
-        style={styles.addBtn}
+        style={styles.headerBtn}
         hitSlop={12}
         disabled={isPending}
       >
@@ -149,21 +225,25 @@ export default function PhotosScreen(): React.ReactElement {
     </View>
   );
 
+  const headerTitle = selectionMode
+    ? selectedIds.size === 0
+      ? 'Select photos'
+      : `${selectedIds.size} selected`
+    : 'Photos';
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+
   return (
     <Screen
-      header={{ title: 'Photos', showBack: true, right: headerRight }}
+      header={{ title: headerTitle, showBack: !selectionMode, right: headerRight }}
       contentPadding={0}
     >
-      {/* Upload / save-all progress banner */}
-      {(isPending && progress || saveAllProgress) && (
-        <View
-          style={[styles.progressBanner, { backgroundColor: theme.colors.bg.surface }]}
-        >
-          <Text
-            style={[theme.typography.bodySmall, { color: theme.colors.text.secondary }]}
-          >
-            {saveAllProgress
-              ? `Saving ${saveAllProgress.done} of ${saveAllProgress.total} to camera roll…`
+      {/* Progress banner */}
+      {((isPending && progress) || saveProgress) && (
+        <View style={[styles.progressBanner, { backgroundColor: theme.colors.bg.surface }]}>
+          <Text style={[theme.typography.bodySmall, { color: theme.colors.text.secondary }]}>
+            {saveProgress
+              ? `Saving ${saveProgress.done} of ${saveProgress.total} to camera roll…`
               : progress?.phase === 'resizing'
               ? `Processing ${progress.index + 1} of ${progress.total}…`
               : `Uploading ${progress!.index + 1} of ${progress!.total}…`}
@@ -188,7 +268,7 @@ export default function PhotosScreen(): React.ReactElement {
         />
       )}
 
-      {/* Empty state */}
+      {/* Empty */}
       {!isLoading && !isError && photos.length === 0 && (
         <EmptyState
           icon={<Images size={42} color={theme.colors.text.tertiary} strokeWidth={1.5} />}
@@ -204,8 +284,52 @@ export default function PhotosScreen(): React.ReactElement {
           isFetchingOlder={isFetchingOlder}
           hasOlder={hasOlder ?? false}
           onFetchOlder={fetchOlder}
-          onPhotoPress={openViewer}
+          onPhotoPress={handlePhotoPress}
+          onPhotoLongPress={selectionMode ? undefined : enterSelectionMode}
+          selectionMode={selectionMode}
+          selectedIds={selectedIds}
         />
+      )}
+
+      {/* Selection toolbar */}
+      {selectionMode && (
+        <View
+          style={[
+            styles.selectionBar,
+            {
+              backgroundColor: theme.colors.bg.canvas,
+              borderTopColor: theme.colors.border.default,
+            },
+          ]}
+        >
+          <Pressable
+            onPress={allSelected ? exitSelectionMode : selectAll}
+            hitSlop={8}
+          >
+            <Text style={[theme.typography.bodySmall, { color: theme.colors.accent }]}>
+              {allSelected ? 'Deselect all' : 'Select all'}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={handleSaveSelected}
+            disabled={selectedIds.size === 0 || !!saveProgress}
+            style={[
+              styles.saveBtn,
+              {
+                backgroundColor:
+                  selectedIds.size === 0 ? theme.colors.bg.subtle : theme.colors.accent,
+              },
+            ]}
+          >
+            <Download size={16} color="#fff" />
+            <Text style={styles.saveBtnText}>
+              {selectedIds.size === 0
+                ? 'Save'
+                : `Save ${selectedIds.size} photo${selectedIds.size !== 1 ? 's' : ''}`}
+            </Text>
+          </Pressable>
+        </View>
       )}
 
       {/* Full-screen viewer */}
@@ -229,7 +353,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  addBtn: {
+  headerBtn: {
     padding: 8,
   },
   progressBanner: {
@@ -242,6 +366,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 2,
-    padding: 0,
+  },
+  selectionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    paddingBottom: 32,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  saveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    borderRadius: 24,
+  },
+  saveBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
