@@ -7,11 +7,15 @@ import {
   deleteRating,
   fetchFriendRatings,
   fetchHangoutRestaurants,
+  fetchMyMediaRatings,
+  upsertMediaRating,
+  deleteMediaRating,
 } from '../services/ratings.service';
-import type { RestaurantRating, UpsertRatingInput, PlaceCompatibility } from '../types';
+import type { RestaurantRating, UpsertRatingInput, PlaceCompatibility, MediaRating, UpsertMediaRatingInput } from '../types';
 
 export const ratingsKeys = {
   mine: ['ratings', 'mine'] as const,
+  myMedia: ['ratings', 'media', 'mine'] as const,
   friendsForPlaces: (placeIds: string[], friendIds: string[]) =>
     ['ratings', 'friends', [...placeIds].sort().join(','), [...friendIds].sort().join(',')] as const,
 };
@@ -83,6 +87,76 @@ export function useDeleteRating() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ratingsKeys.mine });
+    },
+  });
+}
+
+export function useMyMediaRatings() {
+  return useQuery({
+    queryKey: ratingsKeys.myMedia,
+    queryFn: fetchMyMediaRatings,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useUpsertMediaRating() {
+  const qc = useQueryClient();
+  const { user } = useSession();
+
+  return useMutation({
+    mutationFn: upsertMediaRating,
+    onMutate: async (input: UpsertMediaRatingInput) => {
+      await qc.cancelQueries({ queryKey: ratingsKeys.myMedia });
+      const prev = qc.getQueryData<MediaRating[]>(ratingsKeys.myMedia);
+      const optimistic: MediaRating = {
+        id: `optimistic-${Date.now()}`,
+        user_id: user?.id ?? '',
+        tmdb_id: input.tmdb_id,
+        media_type: input.media_type,
+        title: input.title,
+        poster_url: input.poster_url ?? null,
+        year: input.year ?? null,
+        genre: input.genre ?? null,
+        rating: input.rating,
+        notes: input.notes ?? null,
+        watched_at: input.watched_at ?? new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      qc.setQueryData<MediaRating[]>(ratingsKeys.myMedia, (old) => {
+        const filtered = (old ?? []).filter(
+          (r) => !(r.tmdb_id === input.tmdb_id && r.media_type === input.media_type),
+        );
+        return [optimistic, ...filtered];
+      });
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(ratingsKeys.myMedia, ctx.prev);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ratingsKeys.myMedia });
+    },
+  });
+}
+
+export function useDeleteMediaRating() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deleteMediaRating,
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: ratingsKeys.myMedia });
+      const prev = qc.getQueryData<MediaRating[]>(ratingsKeys.myMedia);
+      qc.setQueryData<MediaRating[]>(ratingsKeys.myMedia, (old) =>
+        (old ?? []).filter((r) => r.id !== id),
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(ratingsKeys.myMedia, ctx.prev);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ratingsKeys.myMedia });
     },
   });
 }

@@ -25,10 +25,14 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { searchPlaces, getPlacePhotoUrl } from '@/features/places';
 import { useSearchLocation } from '@/features/places/hooks/useSearchLocation';
 import { useQuery } from '@tanstack/react-query';
-import { useUpsertRating, useHangoutPlaces } from '../hooks/useRatings';
+import { useUpsertRating, useHangoutPlaces, useUpsertMediaRating } from '../hooks/useRatings';
+import { searchMovies } from '@/features/movies/services/movies.service';
 import { toast } from '@/stores/ui.store';
 import { STAR_LABELS } from '../types';
-import type { RatablePlace, HangoutPlace } from '../types';
+import type { RatablePlace, HangoutPlace, UpsertMediaRatingInput } from '../types';
+import type { MovieOption } from '@/features/movies/types';
+
+type RatingCategory = 'place' | 'media';
 
 type Props = {
   visible: boolean;
@@ -43,11 +47,14 @@ type Step = 'search' | 'rate';
 export function RateRestaurantSheet({ visible, onClose, onSaved, initialPlace, hangoutId }: Props): React.ReactElement {
   const theme = useTheme();
   const upsert = useUpsertRating();
+  const upsertMedia = useUpsertMediaRating();
   const searchLoc = useSearchLocation();
   const hangoutPlaces = useHangoutPlaces(hangoutId);
 
+  const [category, setCategory] = useState<RatingCategory>('place');
   const [step, setStep] = useState<Step>(initialPlace ? 'rate' : 'search');
   const [place, setPlace] = useState<RatablePlace | null>(initialPlace ?? null);
+  const [movie, setMovie] = useState<MovieOption | null>(null);
   const [query, setQuery] = useState('');
   const [showManual, setShowManual] = useState(false);
   const [manualName, setManualName] = useState('');
@@ -71,9 +78,11 @@ export function RateRestaurantSheet({ visible, onClose, onSaved, initialPlace, h
       if (initialPlace) {
         setPlace(initialPlace);
         setStep('rate');
+        setCategory('place');
       } else {
         setStep('search');
         setPlace(null);
+        setMovie(null);
       }
       setQuery('');
       setRating(0);
@@ -86,6 +95,15 @@ export function RateRestaurantSheet({ visible, onClose, onSaved, initialPlace, h
 
   const handleSelectPlace = (p: RatablePlace) => {
     setPlace(p);
+    setMovie(null);
+    setStep('rate');
+    setQuery('');
+    Keyboard.dismiss();
+  };
+
+  const handleSelectMovie = (m: MovieOption) => {
+    setMovie(m);
+    setPlace(null);
     setStep('rate');
     setQuery('');
     Keyboard.dismiss();
@@ -102,32 +120,53 @@ export function RateRestaurantSheet({ visible, onClose, onSaved, initialPlace, h
     });
   };
 
+  const isSaving = upsert.isPending || upsertMedia.isPending;
+
   const handleSave = () => {
-    if (!place || rating === 0) return;
-    upsert.mutate(
-      {
-        place_id: place.place_id,
-        place_name: place.place_name,
-        place_address: place.place_address,
-        place_photo: place.place_photo,
-        place_type: place.place_type,
-        rating: rating as 1 | 2 | 3 | 4 | 5,
-        notes: notes.trim() || null,
-      },
-      {
-        onSuccess: () => {
-          onClose();
-          onSaved?.();
+    if (rating === 0) return;
+
+    const onSuccess = () => { onClose(); onSaved?.(); };
+    const onError = (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : 'Failed to save rating');
+    };
+
+    if (category === 'media' && movie) {
+      upsertMedia.mutate(
+        {
+          tmdb_id: movie.tmdbId,
+          media_type: movie.mediaType,
+          title: movie.title,
+          poster_url: movie.posterUrl,
+          year: movie.year,
+          genre: movie.genres[0] ?? null,
+          rating: rating as 1 | 2 | 3 | 4 | 5,
+          notes: notes.trim() || null,
+        } satisfies UpsertMediaRatingInput,
+        { onSuccess, onError },
+      );
+    } else if (place) {
+      upsert.mutate(
+        {
+          place_id: place.place_id,
+          place_name: place.place_name,
+          place_address: place.place_address,
+          place_photo: place.place_photo,
+          place_type: place.place_type,
+          rating: rating as 1 | 2 | 3 | 4 | 5,
+          notes: notes.trim() || null,
         },
-        onError: (err: unknown) => {
-          const msg = err instanceof Error ? err.message : 'Failed to save rating';
-          toast.error(msg);
-        },
-      },
-    );
+        { onSuccess, onError },
+      );
+    }
   };
 
   const photoUrl = place?.place_photo ? getPlacePhotoUrl(place.place_photo, 800) : null;
+  const posterUrl = movie?.posterUrl ?? null;
+  const rateSubject = category === 'media' && movie
+    ? { name: movie.title, type: movie.mediaType === 'tv' ? 'TV Show' : 'Movie', photo: posterUrl, isPoster: true }
+    : place
+    ? { name: place.place_name, type: place.place_type ?? null, photo: photoUrl, isPoster: false }
+    : null;
 
   return (
     <Modal
@@ -147,41 +186,76 @@ export function RateRestaurantSheet({ visible, onClose, onSaved, initialPlace, h
             <View style={styles.headerBtn} />
           )}
           <Text style={[theme.typography.h3, { color: theme.colors.text.primary }]}>
-            {step === 'search' ? 'Rate a restaurant' : 'Your rating'}
+            {step === 'search' ? 'Add a rating' : 'Your rating'}
           </Text>
           <Pressable onPress={onClose} hitSlop={12} style={styles.headerBtn}>
             <X size={20} color={theme.colors.text.secondary} strokeWidth={2} />
           </Pressable>
         </View>
 
+        {/* Category pill — only in search step, only when no initialPlace */}
+        {step === 'search' && !initialPlace && (
+          <View style={[styles.categoryRow, { borderBottomColor: theme.colors.border.default }]}>
+            {(['place', 'media'] as RatingCategory[]).map((cat) => (
+              <Pressable
+                key={cat}
+                onPress={() => { setCategory(cat); setQuery(''); }}
+                style={[
+                  styles.categoryPill,
+                  category === cat && { backgroundColor: '#8B5CF6' },
+                  category !== cat && { backgroundColor: theme.colors.bg.subtle },
+                ]}
+              >
+                <Text style={[
+                  theme.typography.bodySmall,
+                  { fontWeight: '600', color: category === cat ? '#fff' : theme.colors.text.secondary },
+                ]}>
+                  {cat === 'place' ? '🍽️  Places' : '🎬  Movies & Shows'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
         {step === 'search' ? (
-          <SearchStep
-            query={query}
-            setQuery={setQuery}
-            results={search.data}
-            isLoading={search.isLoading}
-            showManual={showManual}
-            setShowManual={setShowManual}
-            manualName={manualName}
-            setManualName={setManualName}
-            manualAddress={manualAddress}
-            setManualAddress={setManualAddress}
-            onSelectPlace={handleSelectPlace}
-            onManualAdd={handleManualAdd}
-            hangoutPlaces={hangoutPlaces.data ?? []}
-            hangoutId={hangoutId}
-            theme={theme}
-          />
+          category === 'place' ? (
+            <SearchStep
+              query={query}
+              setQuery={setQuery}
+              results={search.data}
+              isLoading={search.isLoading}
+              showManual={showManual}
+              setShowManual={setShowManual}
+              manualName={manualName}
+              setManualName={setManualName}
+              manualAddress={manualAddress}
+              setManualAddress={setManualAddress}
+              onSelectPlace={handleSelectPlace}
+              onManualAdd={handleManualAdd}
+              hangoutPlaces={hangoutPlaces.data ?? []}
+              hangoutId={hangoutId}
+              theme={theme}
+            />
+          ) : (
+            <MovieSearchStep
+              query={query}
+              setQuery={setQuery}
+              onSelectMovie={handleSelectMovie}
+              theme={theme}
+            />
+          )
         ) : (
           <RateStep
-            place={place!}
-            photoUrl={photoUrl}
+            name={rateSubject?.name ?? ''}
+            type={rateSubject?.type ?? null}
+            photoUrl={rateSubject?.photo ?? null}
+            isPoster={rateSubject?.isPoster ?? false}
             rating={rating}
             setRating={setRating}
             notes={notes}
             setNotes={setNotes}
             onSave={handleSave}
-            isSaving={upsert.isPending}
+            isSaving={isSaving}
             theme={theme}
           />
         )}
@@ -401,16 +475,103 @@ function SearchStep({
   );
 }
 
+// ── Movie search step ─────────────────────────────────────────────────────────
+
+function MovieSearchStep({
+  query, setQuery, onSelectMovie, theme,
+}: {
+  query: string; setQuery: (v: string) => void;
+  onSelectMovie: (m: MovieOption) => void;
+  theme: ReturnType<typeof useTheme>;
+}): React.ReactElement {
+  const debouncedQuery = useDebounce(query, 400);
+  const search = useQuery({
+    queryKey: ['movie-search-rate', debouncedQuery],
+    queryFn: () => searchMovies(debouncedQuery),
+    enabled: debouncedQuery.trim().length >= 2,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  return (
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+      <View style={[styles.searchBar, { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default }]}>
+        <Search size={16} color={theme.colors.text.tertiary} strokeWidth={2} />
+        <TextInput
+          style={[styles.searchInput, { color: theme.colors.text.primary }]}
+          placeholder="Search movies & shows…"
+          placeholderTextColor={theme.colors.text.tertiary}
+          value={query}
+          onChangeText={setQuery}
+          autoFocus
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {query.length > 0 && (
+          <Pressable onPress={() => setQuery('')} hitSlop={8}>
+            <X size={14} color={theme.colors.text.tertiary} />
+          </Pressable>
+        )}
+      </View>
+
+      {search.isLoading ? (
+        <View style={styles.centered}><ActivityIndicator color={theme.colors.accent} /></View>
+      ) : query.length < 2 ? (
+        <View style={styles.centered}>
+          <Text style={[theme.typography.bodySmall, { color: theme.colors.text.tertiary, textAlign: 'center' }]}>
+            Search for a movie or TV show
+          </Text>
+        </View>
+      ) : (search.data ?? []).length > 0 ? (
+        <View style={{ gap: 8, marginTop: 12 }}>
+          {(search.data ?? []).slice(0, 12).map((m) => (
+            <Pressable
+              key={m.id}
+              onPress={() => onSelectMovie(m)}
+              style={({ pressed }) => [
+                styles.resultRow,
+                { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default },
+                pressed && { opacity: 0.7 },
+              ]}
+            >
+              {m.posterUrl ? (
+                <Image source={{ uri: m.posterUrl }} style={styles.moviePoster} contentFit="cover" />
+              ) : (
+                <View style={[styles.moviePoster, { backgroundColor: theme.colors.bg.subtle, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={{ fontSize: 20 }}>🎬</Text>
+                </View>
+              )}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[theme.typography.bodySmall, { color: theme.colors.text.primary, fontWeight: '600' }]} numberOfLines={1}>{m.title}</Text>
+                <View style={{ flexDirection: 'row', gap: 6, marginTop: 2, alignItems: 'center' }}>
+                  {m.year ? <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>{m.year}</Text> : null}
+                  <View style={{ paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, backgroundColor: m.mediaType === 'tv' ? '#3B82F620' : '#F59E0B20' }}>
+                    <Text style={{ fontSize: 10, fontWeight: '600', color: m.mediaType === 'tv' ? '#3B82F6' : '#F59E0B' }}>{m.mediaType === 'tv' ? 'TV' : 'Film'}</Text>
+                  </View>
+                </View>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      ) : (
+        <View style={styles.centered}>
+          <Text style={[theme.typography.bodySmall, { color: theme.colors.text.tertiary, textAlign: 'center' }]}>No results found.</Text>
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
 // ── Rate step ─────────────────────────────────────────────────────────────────
 
 function RateStep({
-  place, photoUrl,
+  name, type, photoUrl, isPoster,
   rating, setRating,
   notes, setNotes,
   onSave, isSaving,
   theme,
 }: {
-  place: RatablePlace; photoUrl: string | null;
+  name: string; type: string | null;
+  photoUrl: string | null; isPoster: boolean;
   rating: 0|1|2|3|4|5; setRating: (v: 0|1|2|3|4|5) => void;
   notes: string; setNotes: (v: string) => void;
   onSave: () => void; isSaving: boolean;
@@ -423,25 +584,25 @@ function RateStep({
       keyboardShouldPersistTaps="handled"
     >
       {/* Photo banner */}
-      <View style={styles.photoBanner}>
+      <View style={[styles.photoBanner, isPoster && styles.posterBanner]}>
         {photoUrl ? (
-          <Image source={{ uri: photoUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          <Image source={{ uri: photoUrl }} style={StyleSheet.absoluteFill} contentFit={isPoster ? 'contain' : 'cover'} />
         ) : (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.bg.subtle, alignItems: 'center', justifyContent: 'center' }]}>
-            <Text style={{ fontSize: 48 }}>🍽️</Text>
+            <Text style={{ fontSize: 48 }}>{isPoster ? '🎬' : '🍽️'}</Text>
           </View>
         )}
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.35)' }]} />
-        <View style={styles.bannerText}>
-          <Text style={styles.bannerName} numberOfLines={2}>{place.place_name}</Text>
-          {place.place_type ? (
-            <Text style={styles.bannerType}>{place.place_type}</Text>
+        {!isPoster && <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.35)' }]} />}
+        <View style={[styles.bannerText, isPoster && { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 8, margin: 12 }]}>
+          <Text style={styles.bannerName} numberOfLines={2}>{name}</Text>
+          {type ? (
+            <Text style={styles.bannerType}>{type}</Text>
           ) : null}
         </View>
       </View>
 
       {/* Stars */}
-      <View style={{ paddingHorizontal: 24, paddingTop: 28, paddingBottom: 8 }}>
+      <View style={{ paddingHorizontal: 24, paddingTop: isPoster ? 16 : 28, paddingBottom: 8 }}>
         <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.secondary, textAlign: 'center', marginBottom: 20 }]}>
           How was it?
         </Text>
@@ -597,10 +758,34 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     flexShrink: 0,
   },
+  categoryRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  categoryPill: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  moviePoster: {
+    width: 40,
+    height: 56,
+    borderRadius: 6,
+    flexShrink: 0,
+  },
   photoBanner: {
     height: 220,
     position: 'relative',
     overflow: 'hidden',
+    justifyContent: 'flex-end',
+  },
+  posterBanner: {
+    height: 280,
+    backgroundColor: '#111',
     justifyContent: 'flex-end',
   },
   bannerText: {

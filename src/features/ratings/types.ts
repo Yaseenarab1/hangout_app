@@ -39,6 +39,34 @@ export type PlaceCompatibility = {
   myRating: number | null;
 };
 
+export type MediaRating = {
+  id: string;
+  user_id: string;
+  tmdb_id: number;
+  media_type: 'movie' | 'tv';
+  title: string;
+  poster_url: string | null;
+  year: string | null;
+  genre: string | null;
+  rating: 1 | 2 | 3 | 4 | 5;
+  notes: string | null;
+  watched_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type UpsertMediaRatingInput = {
+  tmdb_id: number;
+  media_type: 'movie' | 'tv';
+  title: string;
+  poster_url?: string | null;
+  year?: string | null;
+  genre?: string | null;
+  rating: 1 | 2 | 3 | 4 | 5;
+  notes?: string | null;
+  watched_at?: string;
+};
+
 export type HangoutPlace = {
   name: string;
   place_id: string | null;

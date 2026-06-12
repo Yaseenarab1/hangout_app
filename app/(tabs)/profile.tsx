@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -35,7 +35,8 @@ import { useFriends } from '@/features/friends';
 import { useMyHangouts } from '@/features/hangouts';
 import { useAuthorAllPosts } from '@/features/feed/hooks/useFeedPosts';
 import { FeedCard } from '@/features/feed/components/FeedCard';
-import { useMyRatings, RateRestaurantSheet, RestaurantRatingCard } from '@/features/ratings';
+import { useMyRatings, useMyMediaRatings, RateRestaurantSheet, RestaurantRatingCard, MediaRatingCard } from '@/features/ratings';
+import type { RestaurantRating, MediaRating } from '@/features/ratings';
 import type { FeedPostWithUrl } from '@/features/feed';
 
 const CELL_SIZE = Math.floor(Dimensions.get('window').width / 3);
@@ -52,6 +53,16 @@ export default function ProfileTab(): React.ReactElement {
   const [showRateSheet, setShowRateSheet] = useState(false);
   const listRef = useRef<FlatList<FeedPostWithUrl>>(null);
   const myRatings = useMyRatings();
+  const myMediaRatings = useMyMediaRatings();
+
+  // Merge place + media ratings sorted by date
+  const allRatings = useMemo(() => {
+    const places = (myRatings.data ?? []).map((r) => ({ ...r, _kind: 'place' as const }));
+    const media = (myMediaRatings.data ?? []).map((r) => ({ ...r, _kind: 'media' as const }));
+    return [...places, ...media].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+  }, [myRatings.data, myMediaRatings.data]);
 
   const p = profile.data;
   const allPosts = authorAllPosts.data ?? [];
@@ -210,34 +221,35 @@ export default function ProfileTab(): React.ReactElement {
             style={({ pressed }) => [styles.ratingsAction, { opacity: pressed ? 0.6 : 1 }]}
           >
             <Text style={[theme.typography.caption, { color: '#8B5CF6', fontWeight: '600' }]}>
-              Rate a place →
+              Add a rating →
             </Text>
           </Pressable>
         </View>
 
-        {/* Horizontal list */}
-        {myRatings.isLoading ? (
+        {/* Horizontal list — places + movies combined */}
+        {(myRatings.isLoading || myMediaRatings.isLoading) ? (
           <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
             <Skeleton width={260} height={80} radius={16} />
           </View>
-        ) : myRatings.data && myRatings.data.length > 0 ? (
+        ) : allRatings.length > 0 ? (
           <>
             <FlatList
               horizontal
-              data={myRatings.data.slice(0, 20)}
+              data={allRatings.slice(0, 20)}
               keyExtractor={(item) => item.id}
-              renderItem={({ item }) => <RestaurantRatingCard rating={item} />}
+              renderItem={({ item }) =>
+                item._kind === 'media'
+                  ? <MediaRatingCard rating={item as MediaRating} />
+                  : <RestaurantRatingCard rating={item as RestaurantRating} />
+              }
+              ItemSeparatorComponent={() => <View style={{ width: 8 }} />}
               contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8 }}
               showsHorizontalScrollIndicator={false}
             />
-            {myRatings.data.length > 3 && (
-              <Pressable
-                onPress={() => router.push('/ratings')}
-                hitSlop={8}
-                style={{ paddingHorizontal: 16, paddingTop: 8 }}
-              >
+            {allRatings.length > 3 && (
+              <Pressable onPress={() => router.push('/ratings')} hitSlop={8} style={{ paddingHorizontal: 16, paddingTop: 8 }}>
                 <Text style={[theme.typography.caption, { color: '#8B5CF6', fontWeight: '600' }]}>
-                  See all {myRatings.data.length} →
+                  See all {allRatings.length} →
                 </Text>
               </Pressable>
             )}
@@ -247,20 +259,15 @@ export default function ProfileTab(): React.ReactElement {
             onPress={() => setShowRateSheet(true)}
             style={({ pressed }) => [
               styles.ratingsEmpty,
-              {
-                marginHorizontal: 16,
-                backgroundColor: '#EDE9FE',
-                borderRadius: 14,
-                opacity: pressed ? 0.75 : 1,
-              },
+              { marginHorizontal: 16, backgroundColor: '#EDE9FE', borderRadius: 14, opacity: pressed ? 0.75 : 1 },
             ]}
           >
-            <Text style={{ fontSize: 24 }}>🍽️</Text>
+            <Text style={{ fontSize: 24 }}>⭐</Text>
             <Text style={[theme.typography.body, { color: '#8B5CF6', marginTop: 6, fontWeight: '600' }]}>
-              Rate your first restaurant
+              Rate places & movies
             </Text>
             <Text style={[theme.typography.caption, { color: '#6D28D9', marginTop: 2 }]}>
-              Track places you've been so friends know what to book
+              Track what you love so friends know what to pick
             </Text>
           </Pressable>
         )}

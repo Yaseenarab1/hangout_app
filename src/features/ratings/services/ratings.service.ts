@@ -1,6 +1,6 @@
 import { supabase } from '@/services/supabase/client';
 import { TABLES } from '@/services/supabase/tables';
-import type { RestaurantRating, UpsertRatingInput, HangoutPlace } from '../types';
+import type { RestaurantRating, UpsertRatingInput, HangoutPlace, MediaRating, UpsertMediaRatingInput } from '../types';
 
 const SELECT = `
   id, user_id, place_id, place_name, place_address,
@@ -108,6 +108,56 @@ export async function fetchHangoutRestaurants(hangoutId?: string): Promise<Hango
       } satisfies HangoutPlace;
     })
     .filter((p: HangoutPlace) => p.name.trim().length > 0);
+}
+
+const MEDIA_SELECT = `
+  id, user_id, tmdb_id, media_type, title, poster_url,
+  year, genre, rating, notes, watched_at, created_at, updated_at
+`.trim();
+
+export async function fetchMyMediaRatings(): Promise<MediaRating[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await (supabase as any)
+    .from('media_ratings')
+    .select(MEDIA_SELECT)
+    .eq('user_id', user.id)
+    .order('watched_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as MediaRating[];
+}
+
+export async function upsertMediaRating(input: UpsertMediaRatingInput): Promise<MediaRating> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  const payload = {
+    user_id: user.id,
+    tmdb_id: input.tmdb_id,
+    media_type: input.media_type,
+    title: input.title,
+    poster_url: input.poster_url ?? null,
+    year: input.year ?? null,
+    genre: input.genre ?? null,
+    rating: input.rating,
+    notes: input.notes?.trim() || null,
+    watched_at: input.watched_at ?? new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  const { data, error } = await (supabase as any)
+    .from('media_ratings')
+    .upsert(payload, { onConflict: 'user_id,tmdb_id,media_type' })
+    .select(MEDIA_SELECT)
+    .single();
+  if (error) throw error;
+  return data as unknown as MediaRating;
+}
+
+export async function deleteMediaRating(id: string): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('media_ratings')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
 }
 
 export async function fetchFriendRatings(
