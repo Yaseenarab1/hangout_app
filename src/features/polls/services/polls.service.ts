@@ -88,9 +88,38 @@ export async function createActivityPoll(
   return poll as Poll;
 }
 
+export async function createVenueHangout(input: {
+  hangout: {
+    title: string;
+    description?: string;
+    startTime?: string;
+    locationName?: string;
+    locationAddress?: string;
+    inviteUserIds: string[];
+  };
+  poll: {
+    title: string;
+    votingMethod: 'simple' | 'ranked';
+    voteDeadline: string;
+    options: Array<{ label: string; metadata: Record<string, unknown> }>;
+  } | null;
+}): Promise<{ hangoutId: string; pollId: string | null }> {
+  const hangout = await createHangout(input.hangout);
+  if (!input.poll) return { hangoutId: hangout.id, pollId: null };
+  const poll = await createPollOnHangout({
+    hangoutId: hangout.id,
+    kind: 'venue',
+    votingMethod: input.poll.votingMethod,
+    voteDeadline: input.poll.voteDeadline,
+    options: input.poll.options,
+    title: input.poll.title,
+  });
+  return { hangoutId: hangout.id, pollId: poll.id };
+}
+
 export async function createPollOnHangout(input: {
   hangoutId: string;
-  kind: 'activity' | 'cuisine' | 'restaurant';
+  kind: 'activity' | 'cuisine' | 'restaurant' | 'venue';
   votingMethod: 'simple' | 'ranked';
   voteDeadline: string;
   options: Array<{ label: string; metadata?: Record<string, unknown> }>;
@@ -99,10 +128,11 @@ export async function createPollOnHangout(input: {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error('Not authenticated');
 
-  const titles = {
+  const titles: Record<string, string> = {
     activity: 'What should we do?',
     cuisine: 'What kind of food?',
     restaurant: 'Which restaurant?',
+    venue: 'Where should we go?',
   };
 
   const { data: poll, error } = await supabase

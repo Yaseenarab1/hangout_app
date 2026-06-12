@@ -157,15 +157,14 @@ export function AddPollSheet({
   function handleCreate() {
     if (!kind) return;
     const finalDeadline = voteDeadline ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    const dbKind = kind === 'venue' ? 'restaurant' : kind;
     const title =
       kind === 'venue'
-        ? `Where should we ${venueLabel.trim() ? venueLabel.trim().toLowerCase() : 'go'}?`
+        ? `Where should we go for ${venueLabel.trim() ? venueLabel.trim().toLowerCase() : 'this activity'}?`
         : undefined;
 
     createPoll.mutate(
       {
-        kind: dbKind,
+        kind,
         votingMethod,
         voteDeadline: finalDeadline.toISOString(),
         options: buildOptions(),

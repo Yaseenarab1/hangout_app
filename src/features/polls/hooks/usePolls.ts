@@ -4,6 +4,7 @@ import { toast } from '@/stores/ui.store';
 import { hangoutKeys } from '@/features/hangouts';
 import {
   createActivityHangout,
+  createVenueHangout,
   createActivityPoll,
   createPollOnHangout,
   listPollsByHangout,
@@ -66,6 +67,23 @@ export function useCreateActivityHangout() {
     },
     onError: (error) => {
       logError(error, { where: 'createActivityHangout' });
+      toast.error(friendlyErrorMessage(error));
+    },
+  });
+}
+
+export function useCreateVenueHangout() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof createVenueHangout>[0]) => createVenueHangout(input),
+    onSuccess: ({ hangoutId }) => {
+      qc.invalidateQueries({ queryKey: hangoutKeys.list() });
+      qc.invalidateQueries({ queryKey: hangoutKeys.detail(hangoutId) });
+      qc.invalidateQueries({ queryKey: pollKeys.byHangout(hangoutId) });
+      toast.success('Hangout created!');
+    },
+    onError: (error) => {
+      logError(error, { where: 'createVenueHangout' });
       toast.error(friendlyErrorMessage(error));
     },
   });
@@ -285,7 +303,7 @@ export function useCreatePollOnHangout(hangoutId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: {
-      kind: 'activity' | 'cuisine' | 'restaurant';
+      kind: 'activity' | 'cuisine' | 'restaurant' | 'venue';
       votingMethod: 'simple' | 'ranked';
       voteDeadline: string;
       options: Array<{ label: string; metadata?: Record<string, unknown> }>;

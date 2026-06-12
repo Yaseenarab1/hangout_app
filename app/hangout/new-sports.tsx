@@ -13,7 +13,7 @@ import { AddressAutocomplete } from '@/features/places';
 import { useSaveSearchLocation } from '@/features/places/hooks/useSearchLocation';
 import type { PlaceDetails } from '@/features/places';
 import { StartTimeSheet } from '@/features/polls';
-import { useCreateActivityHangout } from '@/features/polls';
+import { useCreateVenueHangout } from '@/features/polls';
 import { SportPicker, SportVenuePicker, type Sport, type SportVenueOption } from '@/features/sports';
 
 type Step = 'sport' | 'mode' | 'venue' | 'invite' | 'details';
@@ -32,7 +32,7 @@ type FormState = {
 export default function NewSportsScreen(): React.ReactElement {
   const theme = useTheme();
   const { prefilledTitle } = useLocalSearchParams<{ prefilledTitle?: string }>();
-  const createMutation = useCreateActivityHangout();
+  const createMutation = useCreateVenueHangout();
   const saveSearchLocation = useSaveSearchLocation();
 
   const [step, setStep] = useState<Step>('sport');
@@ -105,8 +105,20 @@ export default function NewSportsScreen(): React.ReactElement {
     const finalDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     const pollOptions = v.venueOptions.map((u) => ({
       label: u.name,
-      emoji: selectedSport.emoji,
+      metadata: {
+        placeId: u.placeId ?? null,
+        address: u.address ?? null,
+        rating: u.rating ?? null,
+        priceLevel: u.priceLevel ?? null,
+        primaryType: u.primaryType ?? null,
+        mapsUrl: u.mapsUrl ?? null,
+        isCustom: false,
+      },
     }));
+
+    const pollTitle = sportMode === 'watch'
+      ? `Where should we watch ${selectedSport.label.toLowerCase()}?`
+      : `Where should we play ${selectedSport.label.toLowerCase()}?`;
 
     createMutation.mutate(
       {
@@ -120,7 +132,7 @@ export default function NewSportsScreen(): React.ReactElement {
         },
         poll: pollOptions.length >= 1
           ? {
-              mode: 'simple_vote',
+              title: pollTitle,
               votingMethod: 'simple',
               voteDeadline: finalDeadline,
               options: pollOptions,

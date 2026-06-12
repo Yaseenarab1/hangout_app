@@ -4,6 +4,7 @@ import { X } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/ui';
 import { ActivityOptionPicker, type ActivityOption } from './ActivityOptionPicker';
+import { ActivityVenuePicker, type ActivityVenueOption } from './ActivityVenuePicker';
 import { CuisineOptionPicker } from '@/features/food/components/CuisineOptionPicker';
 import { RestaurantSearchPicker } from '@/features/food/components/RestaurantSearchPicker';
 import type { CuisineOption } from '@/features/food/types';
@@ -102,17 +103,47 @@ export function ManagePollOptionsSheet({
     [existing],
   );
 
+  const initialVenue = useMemo(
+    () =>
+      existing.map((o): ActivityVenueOption & { __originalId: string } => {
+        const m = o.metadata as {
+          placeId?: string;
+          address?: string | null;
+          rating?: number | null;
+          priceLevel?: number | null;
+          primaryType?: string | null;
+          mapsUrl?: string | null;
+          isCustom?: boolean;
+        };
+        return {
+          id: m.placeId ? `place:${m.placeId}` : `existing:${o.id}`,
+          name: o.label,
+          address: m.address ?? null,
+          placeId: m.placeId,
+          rating: m.rating ?? null,
+          priceLevel: m.priceLevel ?? null,
+          primaryType: m.primaryType ?? null,
+          mapsUrl: m.mapsUrl ?? null,
+          isCustom: m.isCustom ?? false,
+          __originalId: o.id,
+        };
+      }),
+    [existing],
+  );
+
   const [activityValue, setActivityValue] = useState(initialActivity);
   const [cuisineValue, setCuisineValue] = useState(initialCuisine);
   const [restaurantValue, setRestaurantValue] = useState(initialRestaurant);
+  const [venueValue, setVenueValue] = useState(initialVenue);
 
   useEffect(() => {
     if (visible) {
       setActivityValue(initialActivity);
       setCuisineValue(initialCuisine);
       setRestaurantValue(initialRestaurant);
+      setVenueValue(initialVenue);
     }
-  }, [visible, initialActivity, initialCuisine, initialRestaurant]);
+  }, [visible, initialActivity, initialCuisine, initialRestaurant, initialVenue]);
 
   const computeChanges = () => {
     const removeOptionIds: string[] = [];
@@ -156,6 +187,19 @@ export function ManagePollOptionsSheet({
           isCustom: v.isCustom ?? false,
         },
       }));
+    } else if (pollKind === 'venue') {
+      handleArray(venueValue, (v) => ({
+        label: v.name,
+        metadata: {
+          placeId: v.placeId ?? null,
+          address: v.address ?? null,
+          rating: v.rating ?? null,
+          priceLevel: v.priceLevel ?? null,
+          primaryType: v.primaryType ?? null,
+          mapsUrl: v.mapsUrl ?? null,
+          isCustom: v.isCustom ?? false,
+        },
+      }));
     }
 
     return { removeOptionIds, addOptions };
@@ -170,7 +214,9 @@ export function ManagePollOptionsSheet({
       ? 'Manage activities'
       : pollKind === 'cuisine'
         ? 'Manage cuisines'
-        : 'Manage options';
+        : pollKind === 'venue'
+          ? 'Manage venues'
+          : 'Manage options';
 
   const saveLabel = (() => {
     if (!hasChanges) return 'No changes yet';
@@ -220,6 +266,15 @@ export function ManagePollOptionsSheet({
             <CuisineOptionPicker
               value={cuisineValue}
               onChange={setCuisineValue as (v: CuisineOption[]) => void}
+              min={1}
+              max={15}
+            />
+          ) : pollKind === 'venue' ? (
+            <ActivityVenuePicker
+              value={venueValue}
+              onChange={setVenueValue as (v: ActivityVenueOption[]) => void}
+              activityQuery=""
+              activityLabel="venue"
               min={1}
               max={15}
             />

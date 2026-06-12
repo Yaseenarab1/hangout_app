@@ -2,7 +2,7 @@
  * Poll types — updated for 2C.1 with ranked-choice support.
  */
 
-export type PollKind = 'activity' | 'cuisine' | 'restaurant';
+export type PollKind = 'activity' | 'cuisine' | 'restaurant' | 'venue';
 export type PollMode = 'simple_vote' | 'suggest_then_vote';
 export type PollPhase = 'suggesting' | 'voting' | 'closed';
 export type VotingMethod = 'simple' | 'ranked';

@@ -9,6 +9,7 @@ import { RestaurantSearchPicker } from '@/features/food/components/RestaurantSea
 import type { CuisineOption } from '@/features/food/types';
 import type { RestaurantOption } from '@/features/food/types';
 import { ActivityOptionPicker, type ActivityOption } from './ActivityOptionPicker';
+import { ActivityVenuePicker, type ActivityVenueOption } from './ActivityVenuePicker';
 import { useAddOptionsBatch } from '../hooks/usePolls';
 import type { ExistingOption } from './ManagePollOptionsSheet';
 import type { PollKind } from '../types';
@@ -34,12 +35,14 @@ export function SuggestOptionSheet({
   const [activityValue, setActivityValue] = useState<ActivityOption[]>([]);
   const [cuisineValue, setCuisineValue] = useState<CuisineOption[]>([]);
   const [restaurantValue, setRestaurantValue] = useState<RestaurantOption[]>([]);
+  const [venueValue, setVenueValue] = useState<ActivityVenueOption[]>([]);
 
   useEffect(() => {
     if (visible) {
       setActivityValue([]);
       setCuisineValue([]);
       setRestaurantValue([]);
+      setVenueValue([]);
     }
   }, [visible]);
 
@@ -74,6 +77,30 @@ export function SuggestOptionSheet({
         .map((v) => ({
           label: v.label,
           metadata: { emoji: v.emoji ?? null, catalogId: v.catalogId ?? null },
+        }));
+    }
+    if (pollKind === 'venue') {
+      const existingPlaceIds = new Set(
+        existing.map((e) => (e.metadata as { placeId?: string }).placeId).filter(Boolean),
+      );
+      const existingLabels = new Set(existing.map((e) => e.label.toLowerCase()));
+      return venueValue
+        .filter((v) => {
+          if (v.placeId && existingPlaceIds.has(v.placeId)) return false;
+          if (!v.placeId && existingLabels.has(v.name.toLowerCase())) return false;
+          return true;
+        })
+        .map((v) => ({
+          label: v.name,
+          metadata: {
+            placeId: v.placeId ?? null,
+            address: v.address ?? null,
+            rating: v.rating ?? null,
+            priceLevel: v.priceLevel ?? null,
+            primaryType: v.primaryType ?? null,
+            mapsUrl: v.mapsUrl ?? null,
+            isCustom: v.isCustom ?? false,
+          },
         }));
     }
     // restaurant
@@ -115,14 +142,18 @@ export function SuggestOptionSheet({
       ? activityValue.length
       : pollKind === 'cuisine'
         ? cuisineValue.length
-        : restaurantValue.length;
+        : pollKind === 'venue'
+          ? venueValue.length
+          : restaurantValue.length;
 
   const title =
     pollKind === 'activity'
       ? 'Suggest an activity'
       : pollKind === 'cuisine'
         ? 'Suggest a cuisine'
-        : 'Suggest a restaurant';
+        : pollKind === 'venue'
+          ? 'Suggest a venue'
+          : 'Suggest a restaurant';
 
   return (
     <Modal
@@ -163,6 +194,15 @@ export function SuggestOptionSheet({
             <CuisineOptionPicker
               value={cuisineValue}
               onChange={setCuisineValue}
+              min={0}
+              max={5}
+            />
+          ) : pollKind === 'venue' ? (
+            <ActivityVenuePicker
+              value={venueValue}
+              onChange={setVenueValue}
+              activityQuery=""
+              activityLabel="venue"
               min={0}
               max={5}
             />
