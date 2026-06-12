@@ -111,6 +111,7 @@ export type BillParticipant =
   | { type: 'guest'; tempId: string; name: string };
 
 export type BillDraft = {
+  billId?: string;
   mode: BillMode;
   hangoutId?: string;
   payerId: string;

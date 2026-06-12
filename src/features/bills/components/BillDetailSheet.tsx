@@ -11,11 +11,12 @@ import {
   Share,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { X, CalendarCheck, ChevronRight, UtensilsCrossed, Package, Share2 } from 'lucide-react-native';
+import { X, CalendarCheck, ChevronRight, UtensilsCrossed, Package, Share2, Pencil } from 'lucide-react-native';
 import { supabase } from '@/services/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
+import { useBillDraft } from '../context/BillDraftContext';
 import { useBill } from '../hooks/useBill';
 import { useSettleShare } from '../hooks/useSettleShare';
 import { useVoidBill } from '../hooks/useVoidBill';
@@ -40,6 +41,7 @@ export function BillDetailSheet({
 }: Props): React.ReactElement | null {
   const theme = useTheme();
   const qc = useQueryClient();
+  const { loadFromBill } = useBillDraft();
   const bill = useBill(billId);
   const settle = useSettleShare(hangoutId ?? '');
   const voidBillMut = useVoidBill(hangoutId ?? '');
@@ -313,6 +315,23 @@ export function BillDetailSheet({
               })}
             </View>
 
+            {/* Edit bill */}
+            {isCreator && !b.voided_at && !hasSettledShares && (
+              <Pressable
+                onPress={() => {
+                  loadFromBill(b);
+                  onClose();
+                  setTimeout(() => router.push('/bill/review-items' as any), 300);
+                }}
+                style={[styles.editBtn, { borderColor: theme.colors.accent }]}
+              >
+                <Pencil size={15} color={theme.colors.accent} />
+                <Text style={{ color: theme.colors.accent, fontSize: 14, fontWeight: '600' }}>
+                  Edit bill
+                </Text>
+              </Pressable>
+            )}
+
             {/* Share bill */}
             {!b.voided_at && (
               <Pressable
@@ -446,7 +465,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  shareBtn: {
+  editBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -455,6 +474,16 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 14,
     marginTop: 20,
+  },
+  shareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 14,
+    marginTop: 10,
   },
   voidBtn: {
     borderWidth: 1,

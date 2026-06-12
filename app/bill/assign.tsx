@@ -16,6 +16,7 @@ import { Button, Avatar } from '@/components/ui';
 import { useTheme } from '@/hooks/useTheme';
 import { useBillDraft } from '@/features/bills/context/BillDraftContext';
 import { useCreateItemizedBill } from '@/features/bills/hooks/useCreateItemizedBill';
+import { useUpdateItemizedBill } from '@/features/bills/hooks/useUpdateItemizedBill';
 import { computeItemShares, type ItemAssignment } from '@/features/bills/utils/compute-item-shares';
 import type { BillItem, BillParticipant } from '@/features/bills/types';
 
@@ -37,6 +38,8 @@ export default function AssignScreen() {
   const theme = useTheme();
   const { draft, setItemAssignees, setField } = useBillDraft();
   const createBill = useCreateItemizedBill(draft.hangoutId);
+  const updateBill = useUpdateItemizedBill(draft.hangoutId);
+  const isPending = createBill.isPending || updateBill.isPending;
   const [viewMode, setViewMode] = useState<ViewMode>('item');
   const [description, setDescription] = useState(draft.description || '');
 
@@ -95,30 +98,34 @@ export default function AssignScreen() {
         : { guest_name: p.name, amount_cents: amount };
     });
 
-    createBill.mutate(
-      {
-        hangout_id: draft.hangoutId,
-        payer_id: draft.payerId,
-        description: desc,
-        paid_at: draft.paidAt,
-        tax_cents: draft.taxCents,
-        tip_cents: draft.tipCents,
-        items: draft.items,
-        shares,
-      },
-      {
-        onSuccess() {
-          if (draft.hangoutId) {
-            router.dismissAll();
-          } else {
-            router.replace('/profile/bills');
-          }
-        },
-        onError(err) {
-          Alert.alert('Error', err.message);
-        },
-      },
-    );
+    const billParams = {
+      hangout_id: draft.hangoutId,
+      payer_id: draft.payerId,
+      description: desc,
+      paid_at: draft.paidAt,
+      tax_cents: draft.taxCents,
+      tip_cents: draft.tipCents,
+      items: draft.items,
+      shares,
+    };
+
+    function onSuccess() {
+      const hangoutId = draft.hangoutId;
+      if (hangoutId) {
+        router.navigate(`/hangout/${hangoutId}/bills` as any);
+      } else {
+        router.navigate('/profile/bills' as any);
+      }
+    }
+    function onError(err: Error) {
+      Alert.alert('Error', err.message);
+    }
+
+    if (draft.billId) {
+      updateBill.mutate({ billId: draft.billId, params: billParams }, { onSuccess, onError });
+    } else {
+      createBill.mutate(billParams, { onSuccess, onError });
+    }
   }
 
   const tabs: Array<{ id: ViewMode; label: string }> = [
@@ -197,8 +204,8 @@ export default function AssignScreen() {
         </View>
       </View>
 
-      <Button label="Save bill" variant="primary" loading={createBill.isPending} onPress={handleSave} />
-      <Button label="Cancel" variant="secondary" onPress={() => router.dismissAll()} style={{ marginBottom: 40 }} />
+      <Button label={draft.billId ? 'Update bill' : 'Save bill'} variant="primary" loading={isPending} onPress={handleSave} />
+      <Button label="Cancel" variant="secondary" onPress={() => router.back()} style={{ marginBottom: 40 }} />
     </View>
   );
 

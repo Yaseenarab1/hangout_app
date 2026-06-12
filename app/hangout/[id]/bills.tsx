@@ -84,7 +84,7 @@ export default function BillsScreen(): React.ReactElement {
         showBack: true,
         right: (
           <Pressable
-            onPress={() => router.push(`/hangout/${hangoutId}/bills-new` as any)}
+            onPress={() => router.push({ pathname: '/bill/new', params: { hangoutId } } as any)}
             hitSlop={12}
             style={{ padding: 8 }}
             accessibilityLabel="Add bill"

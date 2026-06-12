@@ -20,8 +20,9 @@ export function useComments(postId: string | undefined) {
   // Realtime: merge new comments into cache
   useEffect(() => {
     if (!postId) return;
+    const uid = Math.random().toString(36).slice(2, 8);
     const channel = supabase
-      .channel(`post:${postId}:comments`)
+      .channel(`post:${postId}:comments:${uid}`)
       .on(
         'postgres_changes',
         {
@@ -40,10 +41,7 @@ export function useComments(postId: string | undefined) {
       )
       .subscribe();
 
-    return () => {
-      supabase.realtime.channels = supabase.realtime.channels.filter((c) => c !== channel);
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [postId, qc]);
 
   return query;

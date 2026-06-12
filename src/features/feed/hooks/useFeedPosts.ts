@@ -20,8 +20,9 @@ export function useFeedPosts() {
   // Realtime: invalidate when a new post is inserted into feed_posts
   useEffect(() => {
     if (!user) return;
+    const uid = Math.random().toString(36).slice(2, 8);
     const channel = supabase
-      .channel(`feed:${user.id}`)
+      .channel(`feed:${user.id}:${uid}`)
       .on(
         'postgres_changes',
         {
@@ -35,15 +36,7 @@ export function useFeedPosts() {
       )
       .subscribe();
 
-    return () => {
-      // Synchronously evict from the channels array so the next effect invocation
-      // doesn't receive this channel back from supabase.channel() while it's still
-      // in JOINING/JOINED state (which would throw "on() after subscribe()").
-      // removeChannel() is async so the channel stays in the array until the server
-      // responds — this filter prevents that race.
-      supabase.realtime.channels = supabase.realtime.channels.filter((c) => c !== channel);
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [user, qc]);
 
   return query;

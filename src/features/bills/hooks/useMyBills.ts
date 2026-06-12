@@ -19,18 +19,16 @@ export function useMyBills() {
 
   useEffect(() => {
     if (!user) return;
+    const uid = Math.random().toString(36).slice(2, 8);
     const channel = supabase
-      .channel('my-bills-changes')
+      .channel(`my-bills-changes:${uid}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'bills', filter: `created_by=eq.${user.id}` },
         () => { qc.invalidateQueries({ queryKey: myBillsKey() }); },
       )
       .subscribe();
-    return () => {
-      supabase.realtime.channels = supabase.realtime.channels.filter((c) => c !== channel);
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [user, qc]);
 
   return query;

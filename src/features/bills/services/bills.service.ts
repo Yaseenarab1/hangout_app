@@ -298,6 +298,64 @@ export async function fetchMyBills(): Promise<Bill[]> {
   return all.slice(0, 80);
 }
 
+export async function updateItemizedBill(
+  billId: string,
+  params: CreateItemizedBillParams,
+): Promise<Bill> {
+  const subtotalCents = params.items.reduce((s, i) => s + i.amount_cents * i.quantity, 0);
+  const totalCents = subtotalCents + params.tax_cents + params.tip_cents;
+
+  const { error: billErr } = await db().from('bills').update({
+    payer_id: params.payer_id,
+    amount_cents: totalCents,
+    subtotal_cents: subtotalCents,
+    tax_cents: params.tax_cents,
+    tip_cents: params.tip_cents,
+    description: params.description,
+  }).eq('id', billId);
+  if (billErr) throw billErr;
+
+  const { error: itemsDelErr } = await db().from('bill_items').delete().eq('bill_id', billId);
+  if (itemsDelErr) throw itemsDelErr;
+
+  if (params.items.length > 0) {
+    const itemsPayload = params.items.map((item, i) => ({
+      bill_id: billId,
+      description: item.description,
+      amount_cents: item.amount_cents,
+      quantity: item.quantity,
+      source: item.source ?? 'manual',
+      position: i,
+    }));
+    const { error: itemsInsErr } = await db().from('bill_items').insert(itemsPayload);
+    if (itemsInsErr) throw itemsInsErr;
+  }
+
+  // Delete all shares — edit is only reachable when no shares are settled,
+  // so this is safe. Deleting all avoids conflicts with the unique index.
+  const { error: sharesDelErr } = await db()
+    .from('bill_shares').delete().eq('bill_id', billId);
+  if (sharesDelErr) throw sharesDelErr;
+
+  const newShareRows: Array<Record<string, unknown>> = [];
+  for (const s of params.shares) {
+    if (s.user_id) {
+      newShareRows.push({ bill_id: billId, user_id: s.user_id, amount_cents: s.amount_cents, split_method: 'exact' });
+    } else if (s.guest_name) {
+      const { data: guest, error: guestErr } = await db()
+        .from('bill_guest_participants').insert({ bill_id: billId, name: s.guest_name }).select('id').single();
+      if (guestErr) throw guestErr;
+      newShareRows.push({ bill_id: billId, guest_participant_id: guest.id, amount_cents: s.amount_cents, split_method: 'exact' });
+    }
+  }
+  if (newShareRows.length > 0) {
+    const { error: sharesInsErr } = await db().from('bill_shares').insert(newShareRows);
+    if (sharesInsErr) throw sharesInsErr;
+  }
+
+  return fetchBill(billId);
+}
+
 export async function createItemizedBill(params: CreateItemizedBillParams): Promise<Bill> {
   const subtotalCents = params.items.reduce(
     (s, i) => s + i.amount_cents * i.quantity,

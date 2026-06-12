@@ -16,8 +16,10 @@ export function useBills(hangoutId: string) {
   });
 
   useEffect(() => {
+    if (!hangoutId) return;
+    const uid = Math.random().toString(36).slice(2, 8);
     const channel = supabase
-      .channel(`hangout:${hangoutId}:bills`)
+      .channel(`hangout:${hangoutId}:bills:${uid}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'bills', filter: `hangout_id=eq.${hangoutId}` },
@@ -30,10 +32,7 @@ export function useBills(hangoutId: string) {
       )
       .subscribe();
 
-    return () => {
-      supabase.realtime.channels = supabase.realtime.channels.filter((c) => c !== channel);
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [hangoutId, qc]);
 
   return query;

@@ -29,11 +29,12 @@ export function useRealtimeChannel<T>(config: Config<T>): void {
   } = config;
 
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const uidRef = useRef(Math.random().toString(36).slice(2, 8));
 
   const subscribe = () => {
     if (!enabled) return;
 
-    const ch = supabase.channel(channelName);
+    const ch = supabase.channel(`${channelName}:${uidRef.current}`);
 
     ch.on(
       'postgres_changes' as any,
@@ -62,10 +63,8 @@ export function useRealtimeChannel<T>(config: Config<T>): void {
     if (channelRef.current) {
       const ch = channelRef.current;
       channelRef.current = null;
-      // Synchronously evict from the channels array before the async removeChannel
-      // resolves, preventing supabase.channel() from returning a stale subscribed
-      // channel on the next subscribe() call.
-      supabase.realtime.channels = supabase.realtime.channels.filter((c) => c !== ch);
+      // Rotate the uid so the next subscribe() gets a fresh channel name.
+      uidRef.current = Math.random().toString(36).slice(2, 8);
       supabase.removeChannel(ch);
     }
   };
