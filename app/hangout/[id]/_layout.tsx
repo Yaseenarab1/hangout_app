@@ -1,9 +1,6 @@
+import React from 'react';
 import { Stack } from 'expo-router';
 
-/**
- * Hangout subroute layout. Each subroute (index, participants, settings)
- * has its own header so we don't render one here — just a transparent stack.
- */
 export default function HangoutLayout(): React.ReactElement {
   return (
     <Stack
@@ -12,6 +9,10 @@ export default function HangoutLayout(): React.ReactElement {
         animation: 'slide_from_right',
         contentStyle: { backgroundColor: 'transparent' },
       }}
-    />
+    >
+      <Stack.Screen name="bills-new" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="follow-up-restaurant" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="follow-up-venue" options={{ presentation: 'modal' }} />
+    </Stack>
   );
 }

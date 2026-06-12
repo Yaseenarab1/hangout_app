@@ -11,6 +11,7 @@ import {
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from 'react-native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -26,14 +27,12 @@ import { useTheme } from '@/hooks/useTheme';
 import { useMyProfile } from '@/features/profile';
 import { useMyHangouts } from '@/features/hangouts';
 import { SectionHeader } from '@/components/ui';
-import { HomeFab } from '@/components/HomeFab';
 import { useFeedPosts } from '@/features/feed/hooks/useFeedPosts';
 import { FeedCard } from '@/features/feed/components/FeedCard';
 import type { Hangout } from '@/features/hangouts';
 import type { FeedPostWithUrl } from '@/features/feed';
 
 const { height: SCREEN_H } = Dimensions.get('window');
-const REELS_HEIGHT = Math.floor(SCREEN_H * 0.78);
 
 export default function HomeTab(): React.ReactElement {
   const theme = useTheme();
@@ -51,20 +50,22 @@ export default function HomeTab(): React.ReactElement {
   useScrollToTop(listRef as any);
 
   const lastScrollY = useRef(0);
-  const [fabVisible, setFabVisible] = useState(true);
   const [headerHeight, setHeaderHeight] = useState(0);
-  const [listHeight, setListHeight] = useState(0);
+  const [navBarHeight, setNavBarHeight] = useState(0);
+  const tabBarHeight = useBottomTabBarHeight();
+
+  // Card fills exactly the visible area: screen minus our nav bar at top and the tab bar at bottom.
+  const cardHeight = navBarHeight > 0 ? SCREEN_H - navBarHeight - tabBarHeight : SCREEN_H;
 
   const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y;
-    lastScrollY.current = y;
-    setFabVisible(y < 10);
+    lastScrollY.current = e.nativeEvent.contentOffset.y;
   }, []);
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.bg.canvas }]}>
       {/* Nav header */}
       <View
+        onLayout={(e) => setNavBarHeight(e.nativeEvent.layout.height)}
         style={[
           styles.navBar,
           {
@@ -89,10 +90,11 @@ export default function HomeTab(): React.ReactElement {
       {/* Main feed */}
       <FlatList<FeedPostWithUrl>
         ref={listRef}
+        style={{ flex: 1 }}
         data={feedPosts.data ?? []}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <FeedCard post={item} cardHeight={listHeight || REELS_HEIGHT} />
+          <FeedCard post={item} cardHeight={cardHeight} />
         )}
         ListHeaderComponent={
           <View onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}>
@@ -120,11 +122,10 @@ export default function HomeTab(): React.ReactElement {
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
-        onLayout={(e) => setListHeight(e.nativeEvent.layout.height)}
         snapToOffsets={
-          headerHeight > 0 && listHeight > 0 && (feedPosts.data?.length ?? 0) > 0
+          headerHeight > 0 && navBarHeight > 0 && (feedPosts.data?.length ?? 0) > 0
             ? Array.from({ length: (feedPosts.data?.length ?? 0) + 1 }, (_, i) =>
-                i === 0 ? 0 : headerHeight + (i - 1) * listHeight,
+                i === 0 ? 0 : headerHeight + (i - 1) * cardHeight,
               )
             : undefined
         }
@@ -139,7 +140,6 @@ export default function HomeTab(): React.ReactElement {
         }
       />
 
-      <HomeFab visible={fabVisible} />
     </View>
   );
 }

@@ -44,7 +44,6 @@ import { CommentsSheet } from './CommentsSheet';
 import type { FeedPostWithUrl } from '../types';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
-const REELS_HEIGHT = Math.floor(SCREEN_H * 0.78);
 const HEART_SIZE = 90;
 const POST_LINK_BASE = 'hangoutplanner://post';
 
@@ -53,7 +52,7 @@ interface Props {
   cardHeight?: number;
 }
 
-export function FeedCard({ post, cardHeight = REELS_HEIGHT }: Props): React.ReactElement {
+export function FeedCard({ post, cardHeight = SCREEN_H }: Props): React.ReactElement {
   const theme = useTheme();
   const { user } = useSession();
   const deletePost = useDeletePost();

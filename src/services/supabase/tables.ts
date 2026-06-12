@@ -41,6 +41,7 @@ export const TABLES = {
   feed_post_comments: 'feed_post_comments',
   feed_post_mentions: 'feed_post_mentions',
   feed_comment_reactions: 'feed_comment_reactions',
+  restaurant_ratings: 'restaurant_ratings',
 } as const;
 
 export const STORAGE_BUCKETS = {

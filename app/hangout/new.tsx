@@ -38,7 +38,7 @@ type HangoutType = {
 };
 
 const HANGOUT_TYPES: HangoutType[] = [
-  { emoji: '🍽', label: 'Dinner', category: 'food' },
+  { emoji: '🍽️', label: 'Dinner', category: 'food' },
   { emoji: '🥂', label: 'Drinks', category: 'food' },
   { emoji: '☕', label: 'Brunch', category: 'food' },
   { emoji: '🎉', label: 'Night out', category: 'food' },
@@ -179,7 +179,11 @@ export default function NewHangoutScreen(): React.ReactElement {
               <Pressable
                 key={t.label}
                 onPress={() => {
-                  if (t.category === 'food') {
+                  if (t.label === 'Movie night') {
+                    router.push({ pathname: '/hangout/new-movie', params: { prefilledTitle: t.label } });
+                  } else if (t.label === 'Sports') {
+                    router.push({ pathname: '/hangout/new-sports', params: { prefilledTitle: t.label } });
+                  } else if (t.category === 'food') {
                     router.push({ pathname: '/hangout/new-food', params: { prefilledTitle: t.label } });
                   } else if (t.category === 'activity') {
                     router.push({ pathname: '/hangout/new-activity', params: { prefilledTitle: t.label } });

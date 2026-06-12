@@ -47,6 +47,8 @@ export type ActivityVenuePickerProps = {
   activityQuery: string;
   /** Display name (used in headers/titles). */
   activityLabel: string;
+  /** Optional Google Places type filter (e.g. ['movie_theater']). */
+  includedTypes?: string[];
   min?: number;
   max?: number;
 };
@@ -82,6 +84,7 @@ export function ActivityVenuePicker({
   onChange,
   activityQuery,
   activityLabel,
+  includedTypes,
   min = 2,
   max = 8,
 }: ActivityVenuePickerProps): React.ReactElement {
@@ -113,6 +116,7 @@ export function ActivityVenuePicker({
       minRating,
       minPrice,
       maxPrice,
+      includedTypes,
       location,
     ],
     queryFn: () =>
@@ -123,6 +127,7 @@ export function ActivityVenuePicker({
         minPriceLevel: minPrice,
         maxPriceLevel: maxPrice,
         minRating: minRating > 0 ? minRating : undefined,
+        includedTypes,
       }),
     enabled: searchEnabled,
     staleTime: 5 * 60 * 1000,

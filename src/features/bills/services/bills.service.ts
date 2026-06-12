@@ -1,4 +1,5 @@
 import { supabase } from '@/services/supabase/client';
+import { invokeFn } from '@/services/supabase/invoke';
 import type {
   Bill,
   BillShare,
@@ -235,12 +236,7 @@ export async function uploadReceipt(
 }
 
 export async function scanReceiptImage(imageBase64: string): Promise<ParsedReceiptResult> {
-  const { data, error } = await supabase.functions.invoke('scan-receipt', {
-    body: { imageBase64 },
-  });
-  if (error) throw error;
-  if (data?.error) throw new Error(data.error as string);
-  return data as ParsedReceiptResult;
+  return invokeFn<ParsedReceiptResult>('scan-receipt', { imageBase64 });
 }
 
 export interface CrossHangoutBalance {

@@ -323,65 +323,89 @@ export default function HangoutDetailScreen(): React.ReactElement {
         </View>
       ) : null}
 
-      {/* ── Planning tools (big cards) ── */}
-      {(isHost || !!myParticipation) && (
+      {/* ── When are we meeting? ── */}
+      {(isHost || !!myParticipation) && !isCancelled && (
         <>
-          <View style={styles.planningStack}>
-            {/* When to meet */}
+          <SectionHeader title="When are we meeting?" />
+          <View style={styles.planChoiceStack}>
+            {/* Find a time together */}
             <Pressable
-              onPress={canUseWhenToMeet && !isCancelled ? () => router.push(`/hangout/${hangoutId}/when-to-meet` as any) : undefined}
+              onPress={canUseWhenToMeet ? () => router.push(`/hangout/${hangoutId}/when-to-meet` as any) : undefined}
               style={({ pressed }) => [
-                styles.planBigCard,
+                styles.planChoice,
                 {
-                  backgroundColor: '#16A34A',
-                  shadowColor: '#16A34A',
-                  opacity: (canUseWhenToMeet && !isCancelled) ? (pressed ? 0.82 : 1) : 0.42,
+                  backgroundColor: theme.colors.bg.surface,
+                  borderColor: theme.colors.border.default,
+                  opacity: canUseWhenToMeet ? (pressed ? 0.7 : 1) : 0.45,
                 },
               ]}
             >
-              <View style={styles.planBigCardIconWrap}>
-                <Clock size={26} color="#fff" strokeWidth={1.8} />
+              <View style={[styles.planChoiceIcon, { backgroundColor: '#22C55E18' }]}>
+                <Clock size={24} color="#22C55E" strokeWidth={1.8} />
               </View>
-              <View style={{ flex: 1, paddingLeft: 14 }}>
-                <Text style={styles.planBigCardTitle}>When to meet</Text>
-                <Text style={styles.planBigCardSub}>
-                  {canUseWhenToMeet ? 'Poll the group for the best time' : 'Update your RSVP to join'}
+              <View style={{ flex: 1 }}>
+                <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700' }]}>
+                  Find a time together
+                </Text>
+                <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 2 }]}>
+                  {canUseWhenToMeet ? "Poll the group — see who's free when" : 'Update your RSVP to join'}
                 </Text>
               </View>
-              <ChevronRight size={18} color="rgba(255,255,255,0.7)" strokeWidth={2} />
+              <ChevronRight size={16} color={theme.colors.text.tertiary} strokeWidth={2} />
             </Pressable>
 
-            {/* Itinerary */}
+            {/* We know when */}
             <Pressable
-              onPress={canManage && !isCancelled ? () => router.push(`/hangout/${hangoutId}/dayplan` as any) : undefined}
+              onPress={canManage ? () => router.push(`/hangout/${hangoutId}/settings` as any) : undefined}
               style={({ pressed }) => [
-                styles.planBigCard,
+                styles.planChoice,
                 {
-                  backgroundColor: '#7C3AED',
-                  shadowColor: '#7C3AED',
-                  opacity: (canManage && !isCancelled) ? (pressed ? 0.82 : 1) : 0.42,
+                  backgroundColor: h.start_time
+                    ? theme.colors.accent + '10'
+                    : theme.colors.bg.surface,
+                  borderColor: h.start_time
+                    ? theme.colors.accent + '50'
+                    : theme.colors.border.default,
+                  opacity: pressed ? 0.7 : 1,
                 },
               ]}
             >
-              <View style={styles.planBigCardIconWrap}>
-                <Route size={26} color="#fff" strokeWidth={1.8} />
+              <View style={[styles.planChoiceIcon, { backgroundColor: theme.colors.accent + '18' }]}>
+                <Calendar size={24} color={theme.colors.accent} strokeWidth={1.8} />
               </View>
-              <View style={{ flex: 1, paddingLeft: 14 }}>
-                <Text style={styles.planBigCardTitle}>Itinerary</Text>
-                <Text style={styles.planBigCardSub}>
-                  {canManage ? 'Map out every stop for the day' : 'Only the host can edit this'}
+              <View style={{ flex: 1 }}>
+                <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700' }]}>
+                  We know when
+                </Text>
+                <Text style={[theme.typography.caption, { color: h.start_time ? theme.colors.accent : theme.colors.text.secondary, marginTop: 2, fontWeight: h.start_time ? '600' : '400' }]}>
+                  {h.start_time ? formatDateTime(h.start_time) : canManage ? 'Tap to set a date and time' : 'Not set yet'}
                 </Text>
               </View>
-              <ChevronRight size={18} color="rgba(255,255,255,0.7)" strokeWidth={2} />
+              {canManage && <ChevronRight size={16} color={theme.colors.text.tertiary} strokeWidth={2} />}
             </Pressable>
           </View>
 
-          {/* ── Decisions (polls + add) ── */}
+          {/* ── Decisions (polls + itinerary + add) ── */}
           <SectionHeader title="Decisions" />
           <Card padding="none" style={{ overflow: 'hidden' }}>
+            {/* Itinerary row — always shown for hosts, read-only for others */}
+            {canManage && (
+              <>
+                <DecisionRow
+                  icon={<Route size={18} color="#8B5CF6" strokeWidth={1.8} />}
+                  iconBg="#8B5CF618"
+                  title="Itinerary"
+                  subtitle="Map out every stop for the day"
+                  onPress={() => router.push(`/hangout/${hangoutId}/dayplan` as any)}
+                  theme={theme}
+                />
+                {((polls.data ?? []).length > 0 || !isCancelled) && <RowDivider theme={theme} />}
+              </>
+            )}
+
             {/* Restaurant / activity polls */}
             {(polls.data ?? []).map((poll, idx) => {
-              const icon = poll.kind === 'activity'
+              const pollIcon = poll.kind === 'activity'
                 ? <Dices size={18} color="#3B82F6" strokeWidth={1.8} />
                 : <UtensilsCrossed size={18} color="#F59E0B" strokeWidth={1.8} />;
               const iconBg = poll.kind === 'activity' ? '#3B82F618' : '#F59E0B18';
@@ -390,11 +414,11 @@ export default function HangoutDetailScreen(): React.ReactElement {
               return (
                 <React.Fragment key={poll.id}>
                   <DecisionRow
-                    icon={icon}
+                    icon={pollIcon}
                     iconBg={iconBg}
                     title={pollTitle}
                     subtitle={subtitle}
-                    onPress={() => {/* PollCard is on this screen below */}}
+                    onPress={() => {/* PollCard below */}}
                     theme={theme}
                   />
                   {(idx < (polls.data ?? []).length - 1 || (canManage && !isCancelled)) && <RowDivider theme={theme} />}
@@ -406,10 +430,7 @@ export default function HangoutDetailScreen(): React.ReactElement {
             {canManage && !isCancelled && (
               <Pressable
                 onPress={() => setShowAddPoll(true)}
-                style={({ pressed }) => [
-                  styles.decisionAdd,
-                  pressed && { opacity: 0.6 },
-                ]}
+                style={({ pressed }) => [styles.decisionAdd, pressed && { opacity: 0.6 }]}
               >
                 <Plus size={15} color={theme.colors.accent} strokeWidth={2.5} />
                 <Text style={[theme.typography.bodyMedium, { color: theme.colors.accent }]}>
@@ -418,8 +439,7 @@ export default function HangoutDetailScreen(): React.ReactElement {
               </Pressable>
             )}
 
-            {/* Empty state when no polls yet */}
-            {(polls.data ?? []).length === 0 && (!canManage || isCancelled) && (
+            {!canManage && (polls.data ?? []).length === 0 && (
               <View style={{ padding: 16 }}>
                 <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary }]}>
                   No decisions yet.
@@ -776,41 +796,24 @@ function formatDateTime(iso: string): string {
 }
 
 const styles = StyleSheet.create({
-  planningStack: {
+  planChoiceStack: {
     gap: 10,
-    marginBottom: 20,
-    paddingHorizontal: 16,
   },
-  planBigCard: {
+  planChoice: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 20,
-    paddingVertical: 18,
-    paddingHorizontal: 18,
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.28,
-    shadowRadius: 14,
-    elevation: 7,
-  },
-  planBigCardIconWrap: {
-    width: 52,
-    height: 52,
+    gap: 14,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  planChoiceIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  planBigCardTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-  },
-  planBigCardSub: {
-    color: 'rgba(255,255,255,0.72)',
-    fontSize: 12,
-    marginTop: 3,
-    lineHeight: 17,
   },
   decisionRow: {
     flexDirection: 'row',

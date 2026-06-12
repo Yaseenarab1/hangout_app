@@ -24,7 +24,9 @@ import {
   Receipt,
   X,
   Timer,
+  Utensils,
 } from 'lucide-react-native';
+
 import { Avatar, Card, Skeleton } from '@/components/ui';
 import { useTheme } from '@/hooks/useTheme';
 import { useMyProfile } from '@/features/profile';
@@ -33,6 +35,7 @@ import { useFriends } from '@/features/friends';
 import { useMyHangouts } from '@/features/hangouts';
 import { useAuthorAllPosts } from '@/features/feed/hooks/useFeedPosts';
 import { FeedCard } from '@/features/feed/components/FeedCard';
+import { useMyRatings, RateRestaurantSheet, RestaurantRatingCard } from '@/features/ratings';
 import type { FeedPostWithUrl } from '@/features/feed';
 
 const CELL_SIZE = Math.floor(Dimensions.get('window').width / 3);
@@ -46,7 +49,9 @@ export default function ProfileTab(): React.ReactElement {
   const hangouts = useMyHangouts();
   const authorAllPosts = useAuthorAllPosts(user?.id);
   const [selectedPost, setSelectedPost] = useState<FeedPostWithUrl | null>(null);
+  const [showRateSheet, setShowRateSheet] = useState(false);
   const listRef = useRef<FlatList<FeedPostWithUrl>>(null);
+  const myRatings = useMyRatings();
 
   const p = profile.data;
   const allPosts = authorAllPosts.data ?? [];
@@ -187,31 +192,80 @@ export default function ProfileTab(): React.ReactElement {
         </Pressable>
       </View>
 
-      {/* ── Settings link ── */}
-      <View style={{ paddingHorizontal: 16, marginBottom: 20 }}>
-        <Pressable
-          onPress={() => router.push('/profile/settings')}
-          style={({ pressed }) => [
-            styles.settingsRow,
-            {
-              backgroundColor: theme.colors.bg.surface,
-              borderColor: theme.colors.border.default,
-              opacity: pressed ? 0.7 : 1,
-            },
-          ]}
-        >
-          <SettingsIcon size={16} color={theme.colors.text.secondary} strokeWidth={1.5} />
-          <Text
-            style={[
-              theme.typography.bodyMedium,
-              { color: theme.colors.text.primary, flex: 1, marginLeft: 10 },
+      {/* ── My Ratings ── */}
+      <View style={{ marginBottom: 20 }}>
+        {/* Section header */}
+        <View style={[styles.ratingsSectionHeader, { paddingHorizontal: 16 }]}>
+          <View style={styles.ratingsSectionLeft}>
+            <View style={[styles.ratingsIconWrap, { backgroundColor: '#EDE9FE' }]}>
+              <Utensils size={16} color="#8B5CF6" strokeWidth={1.5} />
+            </View>
+            <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
+              My ratings
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => setShowRateSheet(true)}
+            hitSlop={12}
+            style={({ pressed }) => [styles.ratingsAction, { opacity: pressed ? 0.6 : 1 }]}
+          >
+            <Text style={[theme.typography.caption, { color: '#8B5CF6', fontWeight: '600' }]}>
+              Rate a place →
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Horizontal list */}
+        {myRatings.isLoading ? (
+          <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+            <Skeleton width={260} height={80} radius={16} />
+          </View>
+        ) : myRatings.data && myRatings.data.length > 0 ? (
+          <>
+            <FlatList
+              horizontal
+              data={myRatings.data.slice(0, 20)}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => <RestaurantRatingCard rating={item} />}
+              contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8 }}
+              showsHorizontalScrollIndicator={false}
+            />
+            {myRatings.data.length > 3 && (
+              <Pressable
+                onPress={() => router.push('/ratings')}
+                hitSlop={8}
+                style={{ paddingHorizontal: 16, paddingTop: 8 }}
+              >
+                <Text style={[theme.typography.caption, { color: '#8B5CF6', fontWeight: '600' }]}>
+                  See all {myRatings.data.length} →
+                </Text>
+              </Pressable>
+            )}
+          </>
+        ) : (
+          <Pressable
+            onPress={() => setShowRateSheet(true)}
+            style={({ pressed }) => [
+              styles.ratingsEmpty,
+              {
+                marginHorizontal: 16,
+                backgroundColor: '#EDE9FE',
+                borderRadius: 14,
+                opacity: pressed ? 0.75 : 1,
+              },
             ]}
           >
-            Settings
-          </Text>
-          <ChevronRight size={16} color={theme.colors.text.tertiary} />
-        </Pressable>
+            <Text style={{ fontSize: 24 }}>🍽️</Text>
+            <Text style={[theme.typography.body, { color: '#8B5CF6', marginTop: 6, fontWeight: '600' }]}>
+              Rate your first restaurant
+            </Text>
+            <Text style={[theme.typography.caption, { color: '#6D28D9', marginTop: 2 }]}>
+              Track places you've been so friends know what to book
+            </Text>
+          </Pressable>
+        )}
       </View>
+
 
       {/* ── Grid header ── */}
       <View
@@ -292,6 +346,8 @@ export default function ProfileTab(): React.ReactElement {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
       />
+
+      <RateRestaurantSheet visible={showRateSheet} onClose={() => setShowRateSheet(false)} />
 
       {/* Post detail modal */}
       {selectedPost && (
@@ -526,14 +582,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  settingsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-  },
   gridHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -603,6 +651,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  ratingsSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  ratingsSectionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  ratingsIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ratingsAction: {
+    paddingVertical: 4,
+  },
+  ratingsEmpty: {
+    padding: 20,
+    alignItems: 'center',
+    marginTop: 4,
   },
   expiringRow: {
     flexDirection: 'row',

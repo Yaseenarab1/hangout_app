@@ -10,7 +10,7 @@ export type VisionEntityAnnotation = {
 
 export type ParsedItem = {
   description: string;
-  amountCents: number;
+  amount_cents: number;
   quantity: number;
   position: number; // top-y of bounding box, px
 };
@@ -58,7 +58,8 @@ function rightX(ann: VisionEntityAnnotation): number {
 }
 
 // Group annotations into horizontal lines (within LINE_GAP_PX of each other).
-const LINE_GAP_PX = 12;
+// 18px tolerates slight vertical misalignment common on thermal-paper receipts.
+const LINE_GAP_PX = 18;
 
 function groupIntoLines(
   annotations: VisionEntityAnnotation[],
@@ -89,10 +90,18 @@ function groupIntoLines(
   return lines;
 }
 
-// Extract "2x" or "2 x" quantity prefix from a description.
+// Extract quantity prefix from a description.
+// Handles: "2x Burger", "2 x Burger", "2× Burger", "2 Burger" (bare number before a word)
 function extractQuantity(text: string): { qty: number; rest: string } {
-  const m = text.match(/^(\d+)\s*[xX×]\s*/);
-  if (m) return { qty: parseInt(m[1]!, 10), rest: text.slice(m[0].length) };
+  // "2x" / "2 x" / "2×"
+  const m1 = text.match(/^(\d+)\s*[xX×]\s*/);
+  if (m1) return { qty: parseInt(m1[1]!, 10), rest: text.slice(m1[0].length) };
+  // bare integer (1–99) followed by a space and a letter — e.g. "2 Burger"
+  const m2 = text.match(/^(\d{1,2})\s+(?=[A-Za-z])/);
+  if (m2) {
+    const n = parseInt(m2[1]!, 10);
+    if (n >= 1 && n <= 99) return { qty: n, rest: text.slice(m2[0].length) };
+  }
   return { qty: 1, rest: text };
 }
 
@@ -137,26 +146,30 @@ export function parseReceiptText(annotations: VisionEntityAnnotation[]): ParsedR
     const priceWordX = priceWords.length > 0
       ? Math.min(...priceWords.map(leftX))
       : Infinity;
+    const CURRENCY_ONLY = /^[$€£]+$/;
     const descWords = line
-      .filter((w) => rightX(w) <= priceWordX + 5 && !PRICE_RE.test(w.description))
+      .filter((w) => rightX(w) <= priceWordX + 5 && !PRICE_RE.test(w.description) && !CURRENCY_ONLY.test(w.description))
       .map((w) => w.description)
       .join(' ')
       .trim();
 
-    const combinedText = descWords || lineText.replace(priceStr, '').trim();
+    const combinedText = (descWords || lineText.replace(priceStr, '').replace(/[$€£]/g, '').trim()).trim();
     const lower = combinedText.toLowerCase();
 
     // Route to summary fields
     // Tax + any extra fees (service fee, delivery fee, bag fee, surcharge, etc.)
     const isTaxLike =
-      /\btax\b/.test(lower) ||
+      /\btax(?:es)?\b/.test(lower) ||
       /\bservice\s+(?:fee|charge)\b/.test(lower) ||
       /\bdelivery\s+fee\b/.test(lower) ||
       /\bbag\s+fee\b/.test(lower) ||
       /\bconvenience\s+fee\b/.test(lower) ||
       /\bsurcharge\b/.test(lower) ||
       /\bother\s+(?:fee|charge)\b/.test(lower) ||
-      /\bfees?\s*&?\s*charges?\b/.test(lower);
+      /\bfees?\s*&?\s*charges?\b/.test(lower) ||
+      /\badmin(?:istration)?\s*(?:fee|charge)?\b/.test(lower) ||
+      /\bprocessing\s+fee\b/.test(lower) ||
+      /\bcredit\s+card\s+fee\b/.test(lower);
     if (isTaxLike && !/gratuity|tip/.test(lower)) {
       taxCents = (taxCents ?? 0) + cents; // accumulate multiple fees
       continue;
@@ -184,7 +197,7 @@ export function parseReceiptText(annotations: VisionEntityAnnotation[]): ParsedR
 
     items.push({
       description,
-      amountCents: cents,
+      amount_cents: cents,
       quantity: Math.min(qty, 99),
       position: topY(line[0]!),
     });
@@ -192,7 +205,7 @@ export function parseReceiptText(annotations: VisionEntityAnnotation[]): ParsedR
 
   // Confidence
   let confidence: 'high' | 'medium' | 'low';
-  const sumItems = items.reduce((s, i) => s + i.amountCents * i.quantity, 0);
+  const sumItems = items.reduce((s, i) => s + i.amount_cents * i.quantity, 0);
   if (items.length >= 3 && totalCents !== null) {
     const reconcileTarget = totalCents;
     const diff = Math.abs(sumItems + (taxCents ?? 0) + (tipCents ?? 0) - reconcileTarget);
