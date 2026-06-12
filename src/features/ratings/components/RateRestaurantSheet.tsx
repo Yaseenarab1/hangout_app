@@ -264,6 +264,17 @@ export function RateRestaurantSheet({ visible, onClose, onSaved, initialPlace, h
   );
 }
 
+function placeEmoji(type: string | null | undefined): string {
+  const t = (type ?? '').toLowerCase();
+  if (t.includes('movie') || t.includes('cinema') || t.includes('theater') || t.includes('theatre')) return '🎬';
+  if (t.includes('bowling')) return '🎳';
+  if (t.includes('bar') || t.includes('pub') || t.includes('night_club')) return '🍺';
+  if (t.includes('cafe') || t.includes('coffee')) return '☕';
+  if (t.includes('sport') || t.includes('gym') || t.includes('fitness')) return '⚽';
+  if (t.includes('park') || t.includes('nature')) return '🌳';
+  return '🍽️';
+}
+
 // ── Search step ───────────────────────────────────────────────────────────────
 
 function SearchStep({
@@ -301,7 +312,7 @@ function SearchStep({
         <Search size={16} color={theme.colors.text.tertiary} strokeWidth={2} />
         <TextInput
           style={[styles.searchInput, { color: theme.colors.text.primary }]}
-          placeholder="Search a restaurant…"
+          placeholder="Search a restaurant, bar, venue…"
           placeholderTextColor={theme.colors.text.tertiary}
           value={query}
           onChangeText={setQuery}
@@ -373,7 +384,7 @@ function SearchStep({
                 ]}
               >
                 <View style={[styles.resultPhoto, { backgroundColor: theme.colors.accent + '18', alignItems: 'center', justifyContent: 'center' }]}>
-                  <Text style={{ fontSize: 20 }}>🍽️</Text>
+                  <Text style={{ fontSize: 20 }}>{placeEmoji(hp.primary_type)}</Text>
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={[theme.typography.bodySmall, { color: theme.colors.text.primary, fontWeight: '600' }]} numberOfLines={1}>
@@ -589,7 +600,7 @@ function RateStep({
           <Image source={{ uri: photoUrl }} style={StyleSheet.absoluteFill} contentFit={isPoster ? 'contain' : 'cover'} />
         ) : (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.bg.subtle, alignItems: 'center', justifyContent: 'center' }]}>
-            <Text style={{ fontSize: 48 }}>{isPoster ? '🎬' : '🍽️'}</Text>
+            <Text style={{ fontSize: 48 }}>{isPoster ? '🎬' : placeEmoji(type)}</Text>
           </View>
         )}
         {!isPoster && <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.35)' }]} />}

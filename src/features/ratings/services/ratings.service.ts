@@ -73,18 +73,18 @@ export async function fetchHangoutRestaurants(hangoutId?: string): Promise<Hango
 
   if (hangoutIds.length === 0) return [];
 
-  // Get restaurant polls in those hangouts
+  // Get restaurant AND activity polls in those hangouts (activity = venues like theaters, bowling, etc.)
   const { data: polls } = await (supabase as any)
     .from('polls')
-    .select('id, hangout_id, hangouts(id, title)')
-    .eq('kind', 'restaurant')
+    .select('id, hangout_id, hangout:hangouts!polls_hangout_id_fkey(id, title)')
+    .in('kind', ['restaurant', 'activity'])
     .in('hangout_id', hangoutIds);
 
   if (!polls || polls.length === 0) return [];
 
   const pollIds: string[] = polls.map((p: any) => p.id);
   const hangoutByPollId = new Map<string, { id: string; title: string }>(
-    polls.map((p: any) => [p.id, p.hangouts]),
+    polls.map((p: any) => [p.id, p.hangout]),
   );
 
   // Get the options
