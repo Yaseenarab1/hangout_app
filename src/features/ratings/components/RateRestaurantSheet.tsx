@@ -25,24 +25,26 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { searchPlaces, getPlacePhotoUrl } from '@/features/places';
 import { useSearchLocation } from '@/features/places/hooks/useSearchLocation';
 import { useQuery } from '@tanstack/react-query';
-import { useUpsertRating } from '../hooks/useRatings';
+import { useUpsertRating, useHangoutPlaces } from '../hooks/useRatings';
 import { toast } from '@/stores/ui.store';
 import { STAR_LABELS } from '../types';
-import type { RatablePlace } from '../types';
+import type { RatablePlace, HangoutPlace } from '../types';
 
 type Props = {
   visible: boolean;
   onClose: () => void;
   onSaved?: () => void;
   initialPlace?: RatablePlace | null;
+  hangoutId?: string;
 };
 
 type Step = 'search' | 'rate';
 
-export function RateRestaurantSheet({ visible, onClose, onSaved, initialPlace }: Props): React.ReactElement {
+export function RateRestaurantSheet({ visible, onClose, onSaved, initialPlace, hangoutId }: Props): React.ReactElement {
   const theme = useTheme();
   const upsert = useUpsertRating();
   const searchLoc = useSearchLocation();
+  const hangoutPlaces = useHangoutPlaces(hangoutId);
 
   const [step, setStep] = useState<Step>(initialPlace ? 'rate' : 'search');
   const [place, setPlace] = useState<RatablePlace | null>(initialPlace ?? null);
@@ -166,6 +168,8 @@ export function RateRestaurantSheet({ visible, onClose, onSaved, initialPlace }:
             setManualAddress={setManualAddress}
             onSelectPlace={handleSelectPlace}
             onManualAdd={handleManualAdd}
+            hangoutPlaces={hangoutPlaces.data ?? []}
+            hangoutId={hangoutId}
             theme={theme}
           />
         ) : (
@@ -195,6 +199,7 @@ function SearchStep({
   manualName, setManualName,
   manualAddress, setManualAddress,
   onSelectPlace, onManualAdd,
+  hangoutPlaces, hangoutId,
   theme,
 }: {
   query: string; setQuery: (v: string) => void;
@@ -204,8 +209,13 @@ function SearchStep({
   manualAddress: string; setManualAddress: (v: string) => void;
   onSelectPlace: (p: RatablePlace) => void;
   onManualAdd: () => void;
+  hangoutPlaces: HangoutPlace[];
+  hangoutId?: string;
   theme: ReturnType<typeof useTheme>;
 }): React.ReactElement {
+  const showHangoutPlaces = hangoutPlaces.length > 0 && query.length < 2;
+  const sectionLabel = hangoutId ? 'From this hangout' : 'From your hangouts';
+
   return (
     <ScrollView
       style={{ flex: 1 }}
@@ -265,17 +275,71 @@ function SearchStep({
         </View>
       )}
 
-      {/* Results */}
+      {/* Hangout places — shown when not actively searching */}
+      {showHangoutPlaces && (
+        <View style={{ marginBottom: 16 }}>
+          <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }]}>
+            {sectionLabel}
+          </Text>
+          <View style={{ gap: 8 }}>
+            {hangoutPlaces.map((hp, i) => (
+              <Pressable
+                key={`${hp.hangout_id}-${i}`}
+                onPress={() => onSelectPlace({
+                  place_id: hp.place_id ?? `manual:${hp.name}`,
+                  place_name: hp.name,
+                  place_address: hp.address,
+                  place_photo: null,
+                  place_type: hp.primary_type,
+                })}
+                style={({ pressed }) => [
+                  styles.resultRow,
+                  { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.accent + '40' },
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <View style={[styles.resultPhoto, { backgroundColor: theme.colors.accent + '18', alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={{ fontSize: 20 }}>🍽️</Text>
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[theme.typography.bodySmall, { color: theme.colors.text.primary, fontWeight: '600' }]} numberOfLines={1}>
+                    {hp.name}
+                  </Text>
+                  {hp.primary_type ? (
+                    <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]} numberOfLines={1}>
+                      {hp.primary_type}
+                    </Text>
+                  ) : null}
+                  {!hangoutId && hp.hangout_title ? (
+                    <Text style={[theme.typography.caption, { color: theme.colors.accent, marginTop: 1 }]} numberOfLines={1}>
+                      {hp.hangout_title}
+                    </Text>
+                  ) : null}
+                </View>
+              </Pressable>
+            ))}
+          </View>
+          {query.length === 0 && (
+            <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary, marginTop: 12, textAlign: 'center' }]}>
+              or search for any restaurant above
+            </Text>
+          )}
+        </View>
+      )}
+
+      {/* Search results */}
       {isLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator color={theme.colors.accent} />
         </View>
       ) : query.length < 2 ? (
+        !showHangoutPlaces ? (
         <View style={styles.centered}>
           <Text style={[theme.typography.bodySmall, { color: theme.colors.text.tertiary, textAlign: 'center' }]}>
             Start typing to search
           </Text>
         </View>
+        ) : null
       ) : results && results.length > 0 ? (
         <View style={{ gap: 8, marginTop: 12 }}>
           {results.slice(0, 12).map((p) => (

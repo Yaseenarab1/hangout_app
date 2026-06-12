@@ -6,6 +6,7 @@ import {
   upsertRating,
   deleteRating,
   fetchFriendRatings,
+  fetchHangoutRestaurants,
 } from '../services/ratings.service';
 import type { RestaurantRating, UpsertRatingInput, PlaceCompatibility } from '../types';
 
@@ -83,6 +84,14 @@ export function useDeleteRating() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ratingsKeys.mine });
     },
+  });
+}
+
+export function useHangoutPlaces(hangoutId?: string) {
+  return useQuery({
+    queryKey: ['ratings', 'hangout-places', hangoutId ?? 'all'],
+    queryFn: () => fetchHangoutRestaurants(hangoutId),
+    staleTime: 5 * 60 * 1000,
   });
 }
 

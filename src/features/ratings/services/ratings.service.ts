@@ -1,6 +1,6 @@
 import { supabase } from '@/services/supabase/client';
 import { TABLES } from '@/services/supabase/tables';
-import type { RestaurantRating, UpsertRatingInput } from '../types';
+import type { RestaurantRating, UpsertRatingInput, HangoutPlace } from '../types';
 
 const SELECT = `
   id, user_id, place_id, place_name, place_address,
@@ -52,6 +52,62 @@ export async function deleteRating(id: string): Promise<void> {
     .delete()
     .eq('id', id);
   if (error) throw error;
+}
+
+export async function fetchHangoutRestaurants(hangoutId?: string): Promise<HangoutPlace[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  // Determine which hangout IDs to pull restaurants from
+  let hangoutIds: string[];
+  if (hangoutId) {
+    hangoutIds = [hangoutId];
+  } else {
+    const { data: parts } = await (supabase as any)
+      .from('hangout_participants')
+      .select('hangout_id')
+      .eq('user_id', user.id)
+      .limit(30);
+    hangoutIds = (parts ?? []).map((p: { hangout_id: string }) => p.hangout_id);
+  }
+
+  if (hangoutIds.length === 0) return [];
+
+  // Get restaurant polls in those hangouts
+  const { data: polls } = await (supabase as any)
+    .from('polls')
+    .select('id, hangout_id, hangouts(id, title)')
+    .eq('kind', 'restaurant')
+    .in('hangout_id', hangoutIds);
+
+  if (!polls || polls.length === 0) return [];
+
+  const pollIds: string[] = polls.map((p: any) => p.id);
+  const hangoutByPollId = new Map<string, { id: string; title: string }>(
+    polls.map((p: any) => [p.id, p.hangouts]),
+  );
+
+  // Get the options
+  const { data: options } = await (supabase as any)
+    .from('poll_options')
+    .select('label, metadata, poll_id')
+    .in('poll_id', pollIds)
+    .limit(50);
+
+  return (options ?? [])
+    .map((o: any) => {
+      const meta: Record<string, any> = o.metadata ?? {};
+      const hangout = hangoutByPollId.get(o.poll_id);
+      return {
+        name: o.label as string,
+        place_id: (meta.placeId as string) ?? null,
+        address: (meta.address as string) ?? null,
+        primary_type: (meta.primaryType as string) ?? null,
+        hangout_title: hangout?.title ?? '',
+        hangout_id: hangout?.id ?? '',
+      } satisfies HangoutPlace;
+    })
+    .filter((p: HangoutPlace) => p.name.trim().length > 0);
 }
 
 export async function fetchFriendRatings(

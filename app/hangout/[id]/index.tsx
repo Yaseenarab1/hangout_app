@@ -1,5 +1,5 @@
 import { usePollsByHangout } from '@/features/polls';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { PollCard, PollFollowUpCard, AddPollSheet } from '@/features/polls';
 import { usePoll} from '@/features/polls';
 import { View, Text, StyleSheet, Alert, Pressable, TouchableOpacity } from 'react-native';
@@ -21,7 +21,9 @@ import {
   Dices,
   Plus,
   ChevronRight,
+  Star,
 } from 'lucide-react-native';
+import { RateRestaurantSheet } from '@/features/ratings';
 import { UnreadBadge } from '@/features/messaging';
 import { usePhotosSummary } from '@/features/photos/hooks/usePhotosSummary';
 import { useUserBalance } from '@/features/bills/hooks/useUserBalance';
@@ -113,6 +115,7 @@ export default function HangoutDetailScreen(): React.ReactElement {
   const searchLocation = useSearchLocation();
   const saveSearchLocation = useSaveSearchLocation();
   const [showAddPoll, setShowAddPoll] = useState(false);
+  const [showRateSheet, setShowRateSheet] = useState(false);
 
   async function handleUseHangoutLocation(): Promise<void> {
     const addr = hangout.data?.primary_location_address ?? hangout.data?.primary_location_name;
@@ -572,7 +575,32 @@ export default function HangoutDetailScreen(): React.ReactElement {
           )}
           <ChevronRight size={15} color={theme.colors.text.tertiary} strokeWidth={2} style={{ marginLeft: 6 }} />
         </Pressable>
+
+        <RowDivider theme={theme} />
+
+        {/* Rate restaurants */}
+        <Pressable
+          onPress={() => setShowRateSheet(true)}
+          style={({ pressed }) => [styles.togetherRow, pressed && { opacity: 0.7 }]}
+        >
+          <View style={[styles.togetherIcon, { backgroundColor: '#8B5CF618' }]}>
+            <Star size={20} color="#8B5CF6" strokeWidth={1.6} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>Rate restaurants</Text>
+            <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 1 }]}>
+              Rate places from this hangout
+            </Text>
+          </View>
+          <ChevronRight size={15} color={theme.colors.text.tertiary} strokeWidth={2} style={{ marginLeft: 6 }} />
+        </Pressable>
       </Card>
+
+      <RateRestaurantSheet
+        visible={showRateSheet}
+        onClose={() => setShowRateSheet(false)}
+        hangoutId={hangoutId}
+      />
 
       {/* Host: cancel hangout */}
       {isHost && !isCancelled ? (

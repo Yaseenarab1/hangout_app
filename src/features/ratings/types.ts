@@ -39,6 +39,15 @@ export type PlaceCompatibility = {
   myRating: number | null;
 };
 
+export type HangoutPlace = {
+  name: string;
+  place_id: string | null;
+  address: string | null;
+  primary_type: string | null;
+  hangout_title: string;
+  hangout_id: string;
+};
+
 export const STAR_LABELS: Record<number, string> = {
   1: 'Not worth it',
   2: "It's ok",
