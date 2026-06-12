@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Alert, ActionSheetIOS, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
@@ -82,6 +82,11 @@ export default function PhotosScreen(): React.ReactElement {
     setSelectedIds(new Set([photo.id]));
   }, []);
 
+  const startSelectMode = useCallback(() => {
+    setSelectionMode(true);
+    setSelectedIds(new Set());
+  }, []);
+
   const toggleSelected = useCallback((photo: HangoutPhoto) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -146,6 +151,26 @@ export default function PhotosScreen(): React.ReactElement {
     }
   }, [photos]);
 
+  const handleSelectButton = useCallback(() => {
+    const count = photos.length;
+    const options = [`Download all ${count} photo${count !== 1 ? 's' : ''}`, 'Select photos', 'Cancel'];
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, cancelButtonIndex: 2 },
+        (idx) => {
+          if (idx === 0) handleSaveAll();
+          else if (idx === 1) startSelectMode();
+        },
+      );
+    } else {
+      Alert.alert('Download photos', undefined, [
+        { text: `Download all ${count} photo${count !== 1 ? 's' : ''}`, onPress: handleSaveAll },
+        { text: 'Select photos', onPress: startSelectMode },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    }
+  }, [photos.length, handleSaveAll, startSelectMode]);
+
   const handleAddPhotos = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -206,12 +231,14 @@ export default function PhotosScreen(): React.ReactElement {
     <View style={styles.headerBtns}>
       {photos.length > 0 && (
         <Pressable
-          onPress={handleSaveAll}
+          onPress={handleSelectButton}
           style={styles.headerBtn}
           hitSlop={12}
           disabled={!!saveProgress}
         >
-          <Download size={22} color={theme.colors.accent} />
+          <Text style={[theme.typography.bodyMedium, { color: theme.colors.accent }]}>
+            Select
+          </Text>
         </Pressable>
       )}
       <Pressable
