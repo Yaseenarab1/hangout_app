@@ -17,6 +17,8 @@ import {
   removeOption,
   startVoting,
   closePoll,
+  reopenPoll,
+  deletePoll,
   setParticipantVoteWeight,
 } from '../services/polls.service';
 import type {
@@ -362,7 +364,7 @@ export function useStartVoting() {
   });
 }
 
-export function useClosePoll() {
+export function useClosePoll(hangoutId?: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -372,12 +374,50 @@ export function useClosePoll() {
       pollId: string;
       forcedWinnerOptionId?: string;
     }) => closePoll(pollId, forcedWinnerOptionId),
-    onSuccess: (_data, vars) => {
+    onSuccess: (result, vars) => {
       qc.invalidateQueries({ queryKey: pollKeys.detail(vars.pollId) });
-      toast.success('Poll closed.');
+      if (hangoutId) {
+        qc.invalidateQueries({ queryKey: hangoutKeys.detail(hangoutId) });
+      }
+      const msg = result.updatedLocation
+        ? 'Poll closed — hangout location updated!'
+        : 'Poll closed.';
+      toast.success(msg);
     },
     onError: (error) => {
       logError(error, { where: 'closePoll' });
+      toast.error(friendlyErrorMessage(error));
+    },
+  });
+}
+
+export function useReopenPoll(hangoutId?: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (pollId: string) => reopenPoll(pollId),
+    onSuccess: (_data, pollId) => {
+      qc.invalidateQueries({ queryKey: pollKeys.detail(pollId) });
+      if (hangoutId) qc.invalidateQueries({ queryKey: pollKeys.byHangout(hangoutId) });
+      toast.success('Poll reopened for voting.');
+    },
+    onError: (error) => {
+      logError(error, { where: 'reopenPoll' });
+      toast.error(friendlyErrorMessage(error));
+    },
+  });
+}
+
+export function useDeletePoll(hangoutId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (pollId: string) => deletePoll(pollId),
+    onSuccess: (_data, pollId) => {
+      qc.removeQueries({ queryKey: pollKeys.detail(pollId) });
+      qc.invalidateQueries({ queryKey: pollKeys.byHangout(hangoutId) });
+      toast.success('Poll deleted.');
+    },
+    onError: (error) => {
+      logError(error, { where: 'deletePoll' });
       toast.error(friendlyErrorMessage(error));
     },
   });

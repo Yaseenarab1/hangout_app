@@ -28,6 +28,8 @@ import {
   useCastRankedVote,
   useClearRankedVote,
   useClosePoll,
+  useReopenPoll,
+  useDeletePoll,
   useAddOptionsBatch,
   useRemoveOption,
 } from '../hooks/usePolls';
@@ -39,11 +41,13 @@ import type { PollWithOptions, PollOption } from '../types';
 export type PollCardProps = {
   pollId: string;
   canManage: boolean;
+  hangoutId?: string;
 };
 
 export function PollCard({
   pollId,
   canManage,
+  hangoutId,
 }: PollCardProps): React.ReactElement | null {
   const theme = useTheme();
   const poll = usePoll(pollId);
@@ -64,14 +68,14 @@ export function PollCard({
   switch (p.phase) {
     case 'voting':
       return p.voting_method === 'ranked' ? (
-        <RankedVotingCard poll={p} canManage={canManage} />
+        <RankedVotingCard poll={p} canManage={canManage} hangoutId={hangoutId} />
       ) : (
-        <SimpleVotingCard poll={p} canManage={canManage} />
+        <SimpleVotingCard poll={p} canManage={canManage} hangoutId={hangoutId} />
       );
     case 'suggesting':
       return <SuggestingCard poll={p} />;
     case 'closed':
-      return <ClosedCard poll={p} />;
+      return <ClosedCard poll={p} canManage={canManage} hangoutId={hangoutId} />;
   }
 }
 
@@ -169,14 +173,16 @@ function sortRankedByMyRanks<
 function SimpleVotingCard({
   poll,
   canManage,
+  hangoutId,
 }: {
   poll: PollWithOptions;
   canManage: boolean;
+  hangoutId?: string;
 }): React.ReactElement {
   const theme = useTheme();
   const castVote = useCastVote();
   const unvote = useUnvote();
-  const closePoll = useClosePoll();
+  const closePoll = useClosePoll(hangoutId);
   const addBatch = useAddOptionsBatch();
   const removeOption = useRemoveOption();
   const [showManage, setShowManage] = useState(false);
@@ -437,23 +443,15 @@ function SimpleVotingCard({
                 fullWidth
               />
               <Button
-                label="Close poll"
+                label={poll.totalVotes === 0 ? 'Close poll (no votes yet)' : 'Close poll'}
                 variant="ghost"
                 size="sm"
-                onPress={handleClose}
+                onPress={poll.totalVotes === 0 ? undefined : handleClose}
                 loading={closePoll.isPending}
+                disabled={poll.totalVotes === 0}
                 fullWidth
               />
             </>
-          ) : canManage ? (
-            <Button
-              label="Close poll"
-              variant="ghost"
-              size="sm"
-              onPress={handleClose}
-              loading={closePoll.isPending}
-              fullWidth
-            />
           ) : null}
         </View>
       </Card>
@@ -510,14 +508,16 @@ function SimpleVotingCard({
 function RankedVotingCard({
   poll,
   canManage,
+  hangoutId,
 }: {
   poll: PollWithOptions;
   canManage: boolean;
+  hangoutId?: string;
 }): React.ReactElement {
   const theme = useTheme();
   const castRanked = useCastRankedVote();
   const clearRanked = useClearRankedVote();
-  const closePoll = useClosePoll();
+  const closePoll = useClosePoll(hangoutId);
   const addBatch = useAddOptionsBatch();
   const removeOption = useRemoveOption();
   const [showVoteSheet, setShowVoteSheet] = useState(false);
@@ -755,11 +755,12 @@ function RankedVotingCard({
               ) : null}
               {canManage ? (
                 <Button
-                  label="Close poll"
+                  label={poll.totalVotes === 0 ? 'Close poll (no votes yet)' : 'Close poll'}
                   variant="ghost"
                   size="sm"
-                  onPress={handleClose}
+                  onPress={poll.totalVotes === 0 ? undefined : handleClose}
                   loading={closePoll.isPending}
+                  disabled={poll.totalVotes === 0}
                   fullWidth
                 />
               ) : null}
@@ -874,11 +875,43 @@ function SuggestingCard({ poll }: { poll: PollWithOptions }): React.ReactElement
   );
 }
 
-function ClosedCard({ poll }: { poll: PollWithOptions }): React.ReactElement {
+function ClosedCard({
+  poll,
+  canManage = false,
+  hangoutId,
+}: {
+  poll: PollWithOptions;
+  canManage?: boolean;
+  hangoutId?: string;
+}): React.ReactElement {
   const theme = useTheme();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [showAllResults, setShowAllResults] = useState(false);
+  const reopenPollMut = useReopenPoll(hangoutId);
+  const deletePollMut = useDeletePoll(hangoutId ?? '');
+
   const winner = poll.options.find((o) => o.id === poll.winning_option_id);
   const winnerMeta = (winner?.metadata as { emoji?: string | null; placeId?: string | null }) ?? {};
+
+  const sortedOptions = useMemo(
+    () => [...poll.options].sort((a, b) => b.voteCount - a.voteCount),
+    [poll.options],
+  );
+
+  function handleDelete() {
+    Alert.alert(
+      'Delete poll?',
+      'This will permanently remove the poll and all votes.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => deletePollMut.mutate(poll.id),
+        },
+      ],
+    );
+  }
 
   return (
     <>
@@ -936,7 +969,7 @@ function ClosedCard({ poll }: { poll: PollWithOptions }): React.ReactElement {
                 { color: theme.colors.text.tertiary, marginTop: 2 },
               ]}
             >
-              {poll.totalVotes} {poll.totalVotes === 1 ? 'voter' : 'voters'}
+              {winner.voteCount} of {poll.totalVotes} {poll.totalVotes === 1 ? 'voter' : 'voters'}
             </Text>
           </View>
         </Pressable>
@@ -949,6 +982,103 @@ function ClosedCard({ poll }: { poll: PollWithOptions }): React.ReactElement {
         >
           Closed with no winner picked.
         </Text>
+      )}
+
+      {/* All results toggle */}
+      {sortedOptions.length > 1 && (
+        <>
+          <Pressable
+            onPress={() => setShowAllResults((v) => !v)}
+            style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+          >
+            <Text style={[theme.typography.caption, { color: theme.colors.accent, fontWeight: '600' }]}>
+              {showAllResults ? 'Hide results' : `See all ${sortedOptions.length} results`}
+            </Text>
+          </Pressable>
+          {showAllResults && (
+            <View style={{ marginTop: 8, gap: 4 }}>
+              {sortedOptions.map((opt, idx) => {
+                const isWinner = opt.id === poll.winning_option_id;
+                const pct = poll.totalVotes > 0 ? Math.round((opt.voteCount / poll.totalVotes) * 100) : 0;
+                const meta = (opt.metadata as { emoji?: string | null }) ?? {};
+                return (
+                  <View
+                    key={opt.id}
+                    style={[
+                      styles.optionRow,
+                      {
+                        backgroundColor: isWinner
+                          ? theme.colors.accent + '15'
+                          : theme.colors.bg.subtle,
+                        borderColor: isWinner
+                          ? theme.colors.accent
+                          : theme.colors.border.default,
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.progressFill,
+                        {
+                          width: `${pct}%`,
+                          backgroundColor: isWinner
+                            ? theme.colors.accent + '30'
+                            : theme.colors.border.default + '60',
+                        },
+                      ]}
+                    />
+                    <View style={styles.optionContent}>
+                      <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary, width: 18 }]}>
+                        {idx + 1}
+                      </Text>
+                      {meta.emoji ? (
+                        <Text style={{ fontSize: 14, marginRight: 6 }}>{meta.emoji}</Text>
+                      ) : null}
+                      <Text
+                        style={[
+                          theme.typography.bodySmall,
+                          {
+                            color: theme.colors.text.primary,
+                            flex: 1,
+                            fontWeight: isWinner ? '600' : '400',
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {opt.label}
+                      </Text>
+                      <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, minWidth: 50, textAlign: 'right' }]}>
+                        {opt.voteCount} vote{opt.voteCount !== 1 ? 's' : ''} · {pct}%
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </>
+      )}
+
+      {/* Host management buttons */}
+      {canManage && (
+        <View style={{ marginTop: 12, gap: 8 }}>
+          <Button
+            label="Reopen for voting"
+            variant="ghost"
+            size="sm"
+            onPress={() => reopenPollMut.mutate(poll.id)}
+            loading={reopenPollMut.isPending}
+            fullWidth
+          />
+          <Button
+            label="Delete poll"
+            variant="ghost"
+            size="sm"
+            onPress={handleDelete}
+            loading={deletePollMut.isPending}
+            fullWidth
+          />
+        </View>
       )}
     </Card>
 
@@ -969,17 +1099,6 @@ function closePollWithConfirm(
   poll: PollWithOptions,
   onConfirm: () => void,
 ): void {
-  if (poll.totalVotes === 0) {
-    Alert.alert(
-      'Close with no votes?',
-      "No one's voted yet. You can pick a winner manually after closing.",
-      [
-        { text: 'Keep open', style: 'cancel' },
-        { text: 'Close anyway', style: 'destructive', onPress: onConfirm },
-      ],
-    );
-    return;
-  }
   Alert.alert(
     'Close poll?',
     poll.voting_method === 'ranked'

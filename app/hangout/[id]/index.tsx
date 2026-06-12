@@ -461,7 +461,7 @@ export default function HangoutDetailScreen(): React.ReactElement {
             );
             return (
               <View key={poll.id} style={{ marginTop: 8 }}>
-                <PollCard pollId={poll.id} canManage={canManage} />
+                <PollCard pollId={poll.id} canManage={canManage} hangoutId={hangoutId} />
                 {poll.phase === 'closed' && canManage ? (
                   <PollFollowUpCardWrapper
                     pollId={poll.id}

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -33,6 +33,7 @@ export default function WhenToMeetScreen(): React.ReactElement {
   const { id: hangoutId, create } = useLocalSearchParams<{ id: string; create?: string }>();
   const { user } = useSession();
   const [showCreate, setShowCreate] = useState(create === '1');
+  const [scrollLocked, setScrollLocked] = useState(false);
 
   const hangout = useHangout(hangoutId ?? '');
   const session = useHangoutSession(hangoutId);
@@ -52,17 +53,17 @@ export default function WhenToMeetScreen(): React.ReactElement {
 
   const update = useUpdateAvailability(s?.id ?? '', user?.id ?? '', hangoutId);
 
-  // Debounced save — save immediately on toggle (optimistic)
   function handleToggle(slot: string) {
     if (!s) return;
     const next = new Set(mySlots);
-    if (next.has(slot)) {
-      next.delete(slot);
-    } else {
-      next.add(slot);
-    }
+    if (next.has(slot)) next.delete(slot);
+    else next.add(slot);
     update.mutate([...next]);
   }
+
+  const handleSlotsChange = useCallback((slots: string[]) => {
+    update.mutate(slots);
+  }, [update]);
 
   // ── Header ──────────────────────────────────────────────────────────────
   const Header = (
@@ -187,6 +188,7 @@ export default function WhenToMeetScreen(): React.ReactElement {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
+        scrollEnabled={!scrollLocked}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingBottom: insets.bottom + 40 },
@@ -195,7 +197,7 @@ export default function WhenToMeetScreen(): React.ReactElement {
         {/* Instruction banner */}
         <View style={[styles.instruction, { backgroundColor: ACCENT + '0D', borderColor: ACCENT + '25' }]}>
           <Text style={[styles.instructionText, { color: ACCENT }]}>
-            Tap cells to mark when you're free. Green = everyone available.
+            Tap a cell to toggle it. Drag to select multiple at once. Green = everyone available.
           </Text>
         </View>
 
@@ -207,6 +209,9 @@ export default function WhenToMeetScreen(): React.ReactElement {
           mySlots={mySlots}
           responses={s.responses}
           onToggle={handleToggle}
+          onSlotsChange={handleSlotsChange}
+          onDragStart={() => setScrollLocked(true)}
+          onDragEnd={() => setScrollLocked(false)}
         />
       </ScrollView>
     </View>

@@ -15,7 +15,7 @@ import { decode } from 'base64-arraybuffer';
 const db = () => supabase as any;
 
 const BILL_SELECT = `
-  id, hangout_id, payer_id, amount_cents, currency, description,
+  id, hangout_id, payer_id, amount_cents, currency, description, mode,
   paid_at, receipt_storage_path, created_by, created_at, updated_at,
   voided_at, voided_by, void_reason,
   payer:profiles!bills_payer_id_fkey(id, display_name, avatar_url),

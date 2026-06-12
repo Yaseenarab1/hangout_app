@@ -451,11 +451,12 @@ export async function startVoting(pollId: string): Promise<Poll> {
 export async function closePoll(
   pollId: string,
   forcedWinnerOptionId?: string,
-): Promise<Poll> {
+): Promise<{ poll: Poll; updatedLocation: boolean }> {
   let winnerId = forcedWinnerOptionId ?? null;
+  let detailed: PollWithOptions | null = null;
 
   if (!winnerId) {
-    const detailed = await getPollWithDetails(pollId);
+    detailed = await getPollWithDetails(pollId);
     if (!detailed) throw new Error('Poll not found');
 
     if (detailed.voting_method === 'ranked') {
@@ -476,6 +477,8 @@ export async function closePoll(
         winnerId = sorted[0]?.id ?? null;
       }
     }
+  } else {
+    detailed = await getPollWithDetails(pollId);
   }
 
   const { data, error } = await supabase
@@ -490,7 +493,44 @@ export async function closePoll(
     .single();
 
   if (error) throw error;
+  const poll = data as Poll;
+
+  // Auto-update hangout location when a restaurant poll closes with a winner
+  let updatedLocation = false;
+  if (winnerId && detailed && detailed.hangout_id &&
+      (detailed.kind === 'restaurant' || detailed.kind === 'activity')) {
+    const winner = detailed.options.find((o) => o.id === winnerId);
+    const meta = (winner?.metadata as { placeId?: string; address?: string; primaryType?: string } | null) ?? {};
+    if (winner?.label) {
+      const update: { primary_location_name: string; primary_location_address?: string } = {
+        primary_location_name: winner.label,
+      };
+      if (meta.address) update.primary_location_address = meta.address;
+      const { error: locErr } = await (supabase as any)
+        .from(TABLES.hangouts)
+        .update(update)
+        .eq('id', detailed.hangout_id);
+      if (!locErr) updatedLocation = true;
+    }
+  }
+
+  return { poll, updatedLocation };
+}
+
+export async function reopenPoll(pollId: string): Promise<Poll> {
+  const { data, error } = await supabase
+    .from(TABLES.polls)
+    .update({ phase: 'voting', winning_option_id: null, closed_at: null })
+    .eq('id', pollId)
+    .select()
+    .single();
+  if (error) throw error;
   return data as Poll;
+}
+
+export async function deletePoll(pollId: string): Promise<void> {
+  const { error } = await supabase.from(TABLES.polls).delete().eq('id', pollId);
+  if (error) throw error;
 }
 
 function buildBallotsFromRows(rows: RankedVote[]): IRVBallot[] {
