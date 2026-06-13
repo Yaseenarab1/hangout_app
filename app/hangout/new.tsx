@@ -14,7 +14,15 @@ import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { X, Navigation, MapPin, ChevronRight, Users, Clock, CalendarDays } from 'lucide-react-native';
+import {
+  X,
+  Navigation,
+  MapPin,
+  ChevronRight,
+  Users,
+  Clock,
+  CalendarDays,
+} from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Input, Textarea, Button } from '@/components/ui';
 import { useTheme } from '@/hooks/useTheme';
@@ -31,23 +39,36 @@ import {
 type Step = 'type' | 'details' | 'when' | 'invite';
 type TimeChoice = 'known' | 'poll' | null;
 
-type HangoutType = {
+type HangoutCategory = {
+  key: 'food' | 'out' | 'movie' | 'sport' | 'other';
   emoji: string;
   label: string;
-  category: 'food' | 'activity' | 'other';
+  subtitle: string;
 };
 
-const HANGOUT_TYPES: HangoutType[] = [
-  { emoji: '🍽️', label: 'Dinner', category: 'food' },
-  { emoji: '🥂', label: 'Drinks', category: 'food' },
-  { emoji: '☕', label: 'Brunch', category: 'food' },
-  { emoji: '🎉', label: 'Night out', category: 'food' },
-  { emoji: '🎬', label: 'Movie night', category: 'activity' },
-  { emoji: '⚽', label: 'Sports', category: 'activity' },
-  { emoji: '🎮', label: 'Game night', category: 'activity' },
-  { emoji: '🚗', label: 'Road trip', category: 'activity' },
-  { emoji: '🪩', label: 'Party', category: 'activity' },
-  { emoji: '✨', label: 'Other', category: 'other' },
+// Five direct choices. Each one is a decision the group is actually making —
+// the sub-flow then handles the details (cuisine→restaurant, activity→venue, …).
+const HANGOUT_CATEGORIES: HangoutCategory[] = [
+  {
+    key: 'food',
+    emoji: '🍽️',
+    label: 'Food',
+    subtitle: 'Dinner, brunch or coffee — pick a cuisine, then the spot',
+  },
+  {
+    key: 'out',
+    emoji: '🌆',
+    label: 'Out',
+    subtitle: 'Drinks, game night, party — things to do around the city',
+  },
+  {
+    key: 'movie',
+    emoji: '🎬',
+    label: 'Movie',
+    subtitle: 'Catch one at the cinema or stream it in',
+  },
+  { key: 'sport', emoji: '🏀', label: 'Sport', subtitle: 'Play it, or watch the game somewhere' },
+  { key: 'other', emoji: '✨', label: 'Other', subtitle: 'Something else — you name it' },
 ];
 
 const STEP_ORDER: Step[] = ['type', 'details', 'when', 'invite'];
@@ -100,7 +121,11 @@ export default function NewHangoutScreen(): React.ReactElement {
       setValue('locationName', place.name, { shouldDirty: true });
     }
     if (place.location) {
-      saveSearchLocation.mutate({ name: place.name, lat: place.location.lat, lng: place.location.lng });
+      saveSearchLocation.mutate({
+        name: place.name,
+        lat: place.location.lat,
+        lng: place.location.lng,
+      });
     }
   }
 
@@ -127,9 +152,7 @@ export default function NewHangoutScreen(): React.ReactElement {
 
   const onSubmit = (input: CreateHangoutInput): void => {
     const payload: CreateHangoutInput =
-      timeChoice === 'known'
-        ? { ...input, startTime: pickedDate.toISOString() }
-        : input;
+      timeChoice === 'known' ? { ...input, startTime: pickedDate.toISOString() } : input;
 
     createHangout.mutate(payload, {
       onSuccess: (hangout) => {
@@ -148,11 +171,19 @@ export default function NewHangoutScreen(): React.ReactElement {
   if (step === 'type') {
     return (
       <View style={[styles.root, { backgroundColor: theme.colors.bg.canvas }]}>
-        <View style={[styles.navBar, { paddingTop: headerTop, backgroundColor: theme.colors.bg.canvas }]}>
+        <View
+          style={[
+            styles.navBar,
+            { paddingTop: headerTop, backgroundColor: theme.colors.bg.canvas },
+          ]}
+        >
           <Pressable
             onPress={() => router.back()}
             hitSlop={12}
-            style={({ pressed }) => [styles.closeBtn, { backgroundColor: theme.colors.bg.subtle, opacity: pressed ? 0.6 : 1 }]}
+            style={({ pressed }) => [
+              styles.closeBtn,
+              { backgroundColor: theme.colors.bg.subtle, opacity: pressed ? 0.6 : 1 },
+            ]}
           >
             <X size={18} color={theme.colors.text.primary} strokeWidth={2} />
           </Pressable>
@@ -166,34 +197,60 @@ export default function NewHangoutScreen(): React.ReactElement {
         >
           <View style={styles.hero}>
             <Text style={styles.heroEmoji}>✌️</Text>
-            <Text style={[theme.typography.h2, { color: theme.colors.text.primary, marginTop: 12, letterSpacing: -0.5, textAlign: 'center' }]}>
+            <Text
+              style={[
+                theme.typography.h2,
+                {
+                  color: theme.colors.text.primary,
+                  marginTop: 12,
+                  letterSpacing: -0.5,
+                  textAlign: 'center',
+                },
+              ]}
+            >
               What kind of hangout?
             </Text>
-            <Text style={[theme.typography.body, { color: theme.colors.text.secondary, marginTop: 4, textAlign: 'center' }]}>
+            <Text
+              style={[
+                theme.typography.body,
+                { color: theme.colors.text.secondary, marginTop: 4, textAlign: 'center' },
+              ]}
+            >
               Pick one to get started — or skip.
             </Text>
           </View>
 
-          <View style={styles.typeGrid}>
-            {HANGOUT_TYPES.map((t) => (
+          <View style={styles.typeList}>
+            {HANGOUT_CATEGORIES.map((cat) => (
               <Pressable
-                key={t.label}
+                key={cat.key}
                 onPress={() => {
-                  if (t.label === 'Movie night') {
-                    router.push({ pathname: '/hangout/new-movie', params: { prefilledTitle: t.label } });
-                  } else if (t.label === 'Sports') {
-                    router.push({ pathname: '/hangout/new-sports', params: { prefilledTitle: t.label } });
-                  } else if (t.category === 'food') {
-                    router.push({ pathname: '/hangout/new-food', params: { prefilledTitle: t.label } });
-                  } else if (t.category === 'activity') {
-                    router.push({ pathname: '/hangout/new-activity', params: { prefilledTitle: t.label } });
-                  } else {
-                    setValue('title', t.label, { shouldDirty: true, shouldValidate: true });
-                    setStep('details');
+                  switch (cat.key) {
+                    case 'food':
+                      router.push({
+                        pathname: '/hangout/new-food',
+                        params: { prefilledTitle: "Let's grab food" },
+                      });
+                      break;
+                    case 'out':
+                      router.push({
+                        pathname: '/hangout/new-activity',
+                        params: { prefilledTitle: 'Night out' },
+                      });
+                      break;
+                    case 'movie':
+                      router.push({ pathname: '/hangout/new-movie' });
+                      break;
+                    case 'sport':
+                      router.push({ pathname: '/hangout/new-sports' });
+                      break;
+                    case 'other':
+                      setStep('details');
+                      break;
                   }
                 }}
                 style={({ pressed }) => [
-                  styles.typeCard,
+                  styles.typeRow,
                   {
                     backgroundColor: theme.colors.bg.surface,
                     borderColor: theme.colors.border.default,
@@ -201,10 +258,26 @@ export default function NewHangoutScreen(): React.ReactElement {
                   },
                 ]}
               >
-                <Text style={styles.typeEmoji}>{t.emoji}</Text>
-                <Text style={[theme.typography.caption, { color: theme.colors.text.primary, fontWeight: '600', marginTop: 6, textAlign: 'center' }]}>
-                  {t.label}
-                </Text>
+                <Text style={styles.typeRowEmoji}>{cat.emoji}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[
+                      theme.typography.bodyMedium,
+                      { color: theme.colors.text.primary, fontWeight: '700' },
+                    ]}
+                  >
+                    {cat.label}
+                  </Text>
+                  <Text
+                    style={[
+                      theme.typography.caption,
+                      { color: theme.colors.text.secondary, marginTop: 2 },
+                    ]}
+                  >
+                    {cat.subtitle}
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={theme.colors.text.tertiary} />
               </Pressable>
             ))}
           </View>
@@ -213,9 +286,7 @@ export default function NewHangoutScreen(): React.ReactElement {
             onPress={() => setStep('details')}
             style={{ alignItems: 'center', paddingTop: 24, paddingBottom: 8 }}
           >
-            <Text style={[theme.typography.body, { color: theme.colors.text.tertiary }]}>
-              Skip
-            </Text>
+            <Text style={[theme.typography.body, { color: theme.colors.text.tertiary }]}>Skip</Text>
           </Pressable>
         </ScrollView>
       </View>
@@ -230,13 +301,26 @@ export default function NewHangoutScreen(): React.ReactElement {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         {/* Nav bar */}
-        <View style={[styles.navBar, { paddingTop: headerTop, backgroundColor: theme.colors.bg.canvas }]}>
+        <View
+          style={[
+            styles.navBar,
+            { paddingTop: headerTop, backgroundColor: theme.colors.bg.canvas },
+          ]}
+        >
           <Pressable
             onPress={() => setStep('type')}
             hitSlop={12}
-            style={({ pressed }) => [styles.closeBtn, { backgroundColor: theme.colors.bg.subtle, opacity: pressed ? 0.6 : 1 }]}
+            style={({ pressed }) => [
+              styles.closeBtn,
+              { backgroundColor: theme.colors.bg.subtle, opacity: pressed ? 0.6 : 1 },
+            ]}
           >
-            <ChevronRight size={18} color={theme.colors.text.primary} strokeWidth={2} style={{ transform: [{ rotate: '180deg' }] }} />
+            <ChevronRight
+              size={18}
+              color={theme.colors.text.primary}
+              strokeWidth={2}
+              style={{ transform: [{ rotate: '180deg' }] }}
+            />
           </Pressable>
           <StepDots step="details" />
           <View style={{ width: 36 }} />
@@ -250,10 +334,17 @@ export default function NewHangoutScreen(): React.ReactElement {
           {/* Hero */}
           <View style={styles.hero}>
             <Text style={styles.heroEmoji}>🗓️</Text>
-            <Text style={[theme.typography.h2, { color: theme.colors.text.primary, marginTop: 12, letterSpacing: -0.5 }]}>
+            <Text
+              style={[
+                theme.typography.h2,
+                { color: theme.colors.text.primary, marginTop: 12, letterSpacing: -0.5 },
+              ]}
+            >
               What's the plan?
             </Text>
-            <Text style={[theme.typography.body, { color: theme.colors.text.secondary, marginTop: 4 }]}>
+            <Text
+              style={[theme.typography.body, { color: theme.colors.text.secondary, marginTop: 4 }]}
+            >
               You can always fill in details later.
             </Text>
           </View>
@@ -315,7 +406,9 @@ export default function NewHangoutScreen(): React.ReactElement {
                 style={styles.locationBtn}
               >
                 <Navigation size={13} color={theme.colors.accent} />
-                <Text style={[theme.typography.caption, { color: theme.colors.accent, marginLeft: 5 }]}>
+                <Text
+                  style={[theme.typography.caption, { color: theme.colors.accent, marginLeft: 5 }]}
+                >
                   {locatingMe ? 'Getting location…' : 'Use my current location'}
                 </Text>
               </Pressable>
@@ -373,13 +466,26 @@ export default function NewHangoutScreen(): React.ReactElement {
         style={[styles.root, { backgroundColor: theme.colors.bg.canvas }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={[styles.navBar, { paddingTop: headerTop, backgroundColor: theme.colors.bg.canvas }]}>
+        <View
+          style={[
+            styles.navBar,
+            { paddingTop: headerTop, backgroundColor: theme.colors.bg.canvas },
+          ]}
+        >
           <Pressable
             onPress={() => setStep('details')}
             hitSlop={12}
-            style={({ pressed }) => [styles.closeBtn, { backgroundColor: theme.colors.bg.subtle, opacity: pressed ? 0.6 : 1 }]}
+            style={({ pressed }) => [
+              styles.closeBtn,
+              { backgroundColor: theme.colors.bg.subtle, opacity: pressed ? 0.6 : 1 },
+            ]}
           >
-            <ChevronRight size={18} color={theme.colors.text.primary} strokeWidth={2} style={{ transform: [{ rotate: '180deg' }] }} />
+            <ChevronRight
+              size={18}
+              color={theme.colors.text.primary}
+              strokeWidth={2}
+              style={{ transform: [{ rotate: '180deg' }] }}
+            />
           </Pressable>
           <StepDots step="when" />
           <View style={{ width: 36 }} />
@@ -392,10 +498,17 @@ export default function NewHangoutScreen(): React.ReactElement {
         >
           <View style={styles.hero}>
             <Text style={styles.heroEmoji}>⏰</Text>
-            <Text style={[theme.typography.h2, { color: theme.colors.text.primary, marginTop: 12, letterSpacing: -0.5 }]}>
+            <Text
+              style={[
+                theme.typography.h2,
+                { color: theme.colors.text.primary, marginTop: 12, letterSpacing: -0.5 },
+              ]}
+            >
               When is this happening?
             </Text>
-            <Text style={[theme.typography.body, { color: theme.colors.text.secondary, marginTop: 4 }]}>
+            <Text
+              style={[theme.typography.body, { color: theme.colors.text.secondary, marginTop: 4 }]}
+            >
               Pick one — you can always change it later.
             </Text>
           </View>
@@ -407,12 +520,9 @@ export default function NewHangoutScreen(): React.ReactElement {
               style={[
                 styles.timeCard,
                 {
-                  backgroundColor: timeChoice === 'known'
-                    ? '#8B5CF6' + '15'
-                    : theme.colors.bg.surface,
-                  borderColor: timeChoice === 'known'
-                    ? '#8B5CF6'
-                    : theme.colors.border.default,
+                  backgroundColor:
+                    timeChoice === 'known' ? '#8B5CF6' + '15' : theme.colors.bg.surface,
+                  borderColor: timeChoice === 'known' ? '#8B5CF6' : theme.colors.border.default,
                   borderWidth: timeChoice === 'known' ? 2 : 1,
                 },
               ]}
@@ -420,10 +530,20 @@ export default function NewHangoutScreen(): React.ReactElement {
               <View style={[styles.timeCardIcon, { backgroundColor: '#8B5CF6' + '20' }]}>
                 <CalendarDays size={24} color="#8B5CF6" strokeWidth={1.8} />
               </View>
-              <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700', marginTop: 12 }]}>
+              <Text
+                style={[
+                  theme.typography.bodyMedium,
+                  { color: theme.colors.text.primary, fontWeight: '700', marginTop: 12 },
+                ]}
+              >
                 I know the time
               </Text>
-              <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 3 }]}>
+              <Text
+                style={[
+                  theme.typography.caption,
+                  { color: theme.colors.text.secondary, marginTop: 3 },
+                ]}
+              >
                 Set a date and time now
               </Text>
             </Pressable>
@@ -434,12 +554,9 @@ export default function NewHangoutScreen(): React.ReactElement {
               style={[
                 styles.timeCard,
                 {
-                  backgroundColor: timeChoice === 'poll'
-                    ? '#22C55E' + '12'
-                    : theme.colors.bg.surface,
-                  borderColor: timeChoice === 'poll'
-                    ? '#22C55E'
-                    : theme.colors.border.default,
+                  backgroundColor:
+                    timeChoice === 'poll' ? '#22C55E' + '12' : theme.colors.bg.surface,
+                  borderColor: timeChoice === 'poll' ? '#22C55E' : theme.colors.border.default,
                   borderWidth: timeChoice === 'poll' ? 2 : 1,
                 },
               ]}
@@ -447,10 +564,20 @@ export default function NewHangoutScreen(): React.ReactElement {
               <View style={[styles.timeCardIcon, { backgroundColor: '#22C55E' + '18' }]}>
                 <Clock size={24} color="#22C55E" strokeWidth={1.8} />
               </View>
-              <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700', marginTop: 12 }]}>
+              <Text
+                style={[
+                  theme.typography.bodyMedium,
+                  { color: theme.colors.text.primary, fontWeight: '700', marginTop: 12 },
+                ]}
+              >
                 Find a time together
               </Text>
-              <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 3 }]}>
+              <Text
+                style={[
+                  theme.typography.caption,
+                  { color: theme.colors.text.secondary, marginTop: 3 },
+                ]}
+              >
                 Poll the group with When to Meet
               </Text>
             </Pressable>
@@ -458,12 +585,22 @@ export default function NewHangoutScreen(): React.ReactElement {
 
           {/* Date + time picker — inline when "I know the time" is selected */}
           {timeChoice === 'known' && (
-            <View style={[styles.pickerWrap, { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default }]}>
+            <View
+              style={[
+                styles.pickerWrap,
+                {
+                  backgroundColor: theme.colors.bg.surface,
+                  borderColor: theme.colors.border.default,
+                },
+              ]}
+            >
               <DateTimePicker
                 value={pickedDate}
                 mode="datetime"
                 display="spinner"
-                onChange={(_, date) => { if (date) setPickedDate(date); }}
+                onChange={(_, date) => {
+                  if (date) setPickedDate(date);
+                }}
                 themeVariant={theme.mode === 'dark' ? 'dark' : 'light'}
                 style={{ width: '100%' }}
               />
@@ -471,7 +608,16 @@ export default function NewHangoutScreen(): React.ReactElement {
           )}
         </ScrollView>
 
-        <View style={[styles.footer, { paddingBottom: headerTop + (Platform.OS === 'ios' ? 8 : 16), backgroundColor: theme.colors.bg.canvas, borderTopColor: theme.colors.border.default }]}>
+        <View
+          style={[
+            styles.footer,
+            {
+              paddingBottom: headerTop + (Platform.OS === 'ios' ? 8 : 16),
+              backgroundColor: theme.colors.bg.canvas,
+              borderTopColor: theme.colors.border.default,
+            },
+          ]}
+        >
           <Button
             label="Next: invite friends"
             trailingIcon={<ChevronRight size={16} color="#FFFFFF" />}
@@ -480,7 +626,10 @@ export default function NewHangoutScreen(): React.ReactElement {
             size="lg"
           />
           {timeChoice === null && (
-            <Pressable onPress={() => setStep('invite')} style={{ marginTop: 12, alignItems: 'center' }}>
+            <Pressable
+              onPress={() => setStep('invite')}
+              style={{ marginTop: 12, alignItems: 'center' }}
+            >
               <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary }]}>
                 Decide later
               </Text>
@@ -495,11 +644,16 @@ export default function NewHangoutScreen(): React.ReactElement {
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.bg.canvas }]}>
       {/* Nav bar */}
-      <View style={[styles.navBar, { paddingTop: headerTop, backgroundColor: theme.colors.bg.canvas }]}>
+      <View
+        style={[styles.navBar, { paddingTop: headerTop, backgroundColor: theme.colors.bg.canvas }]}
+      >
         <Pressable
           onPress={() => setStep('when')}
           hitSlop={12}
-          style={({ pressed }) => [styles.closeBtn, { backgroundColor: theme.colors.bg.subtle, opacity: pressed ? 0.6 : 1 }]}
+          style={({ pressed }) => [
+            styles.closeBtn,
+            { backgroundColor: theme.colors.bg.subtle, opacity: pressed ? 0.6 : 1 },
+          ]}
         >
           <ChevronRight
             size={18}
@@ -515,7 +669,12 @@ export default function NewHangoutScreen(): React.ReactElement {
       {/* Header */}
       <View style={styles.inviteHeader}>
         <Text style={styles.heroEmoji}>👥</Text>
-        <Text style={[theme.typography.h2, { color: theme.colors.text.primary, marginTop: 12, letterSpacing: -0.5 }]}>
+        <Text
+          style={[
+            theme.typography.h2,
+            { color: theme.colors.text.primary, marginTop: 12, letterSpacing: -0.5 },
+          ]}
+        >
           Invite friends
         </Text>
         <Text style={[theme.typography.body, { color: theme.colors.text.secondary, marginTop: 4 }]}>
@@ -529,11 +688,7 @@ export default function NewHangoutScreen(): React.ReactElement {
           control={control}
           name="inviteUserIds"
           render={({ field: { value, onChange } }) => (
-            <ParticipantPicker
-              value={value}
-              onChange={onChange}
-              title="Friends to invite"
-            />
+            <ParticipantPicker value={value} onChange={onChange} title="Friends to invite" />
           )}
         />
       </View>
@@ -555,9 +710,7 @@ export default function NewHangoutScreen(): React.ReactElement {
               ? 'Create hangout'
               : `Create & invite ${inviteUserIds.length}`
           }
-          leadingIcon={inviteUserIds.length === 0
-            ? undefined
-            : <Users size={16} color="#FFFFFF" />}
+          leadingIcon={inviteUserIds.length === 0 ? undefined : <Users size={16} color="#FFFFFF" />}
           onPress={handleSubmit(onSubmit)}
           loading={createHangout.isPending}
           disabled={createHangout.isPending}
@@ -613,22 +766,21 @@ const styles = StyleSheet.create({
   heroEmoji: {
     fontSize: 48,
   },
-  typeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+  typeList: {
+    gap: 10,
     marginTop: 4,
   },
-  typeCard: {
-    width: '47%',
-    paddingVertical: 18,
-    paddingHorizontal: 12,
+  typeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     borderRadius: 16,
     borderWidth: 1,
-    alignItems: 'center',
   },
-  typeEmoji: {
-    fontSize: 36,
+  typeRowEmoji: {
+    fontSize: 30,
   },
   form: {
     gap: 16,
