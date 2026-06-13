@@ -102,7 +102,6 @@ export default function NewMovieScreen(): React.ReactElement {
   }
 
   const canProceedFromPick = movieOptions.length >= 1;
-  const canProceedFromVenue = venueOptions.length >= 1;
 
   const handleSubmit = (): void => {
     const v = getValues();
@@ -209,6 +208,7 @@ export default function NewMovieScreen(): React.ReactElement {
               mode={mode!}
               value={movieOptions}
               onChange={(opts) => setValue('movieOptions', opts)}
+              participantIds={inviteUserIds}
               min={1}
               max={8}
             />

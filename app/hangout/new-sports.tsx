@@ -157,7 +157,7 @@ export default function NewSportsScreen(): React.ReactElement {
           What sport?
         </Text>
         <Text style={[theme.typography.body, { color: theme.colors.text.secondary, marginTop: 4, marginBottom: 24 }]}>
-          We'll find places to play near you.
+          We&apos;ll find places to play near you.
         </Text>
         <SportPicker onSelect={handleSportSelect} />
       </Screen>
@@ -176,7 +176,7 @@ export default function NewSportsScreen(): React.ReactElement {
           Play or watch?
         </Text>
         <Text style={[theme.typography.body, { color: theme.colors.text.secondary, marginTop: 4, marginBottom: 28 }]}>
-          We'll find the right spots based on your answer.
+          We&apos;ll find the right spots based on your answer.
         </Text>
         <View style={styles.modeOptions}>
           <Pressable

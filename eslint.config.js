@@ -1,8 +1,6 @@
 // ESLint v9 flat config
 const expoConfig = require('eslint-config-expo/flat');
 const tsParser = require('@typescript-eslint/parser');
-const tsPlugin = require('@typescript-eslint/eslint-plugin');
-const reactHooks = require('eslint-plugin-react-hooks');
 
 module.exports = [
   ...expoConfig,
@@ -14,10 +12,9 @@ module.exports = [
         project: './tsconfig.json',
       },
     },
-    plugins: {
-      '@typescript-eslint': tsPlugin,
-      'react-hooks': reactHooks,
-    },
+    // eslint-config-expo/flat already registers `@typescript-eslint` and
+    // `react-hooks`; redefining either throws "Cannot redefine plugin". We just
+    // reference their rules below against expo's shared registration.
     rules: {
       // No `any`. Use `unknown` and narrow.
       '@typescript-eslint/no-explicit-any': 'error',

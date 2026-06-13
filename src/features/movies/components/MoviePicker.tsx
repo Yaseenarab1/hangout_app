@@ -17,6 +17,7 @@ import { SelectionReviewSheet } from '@/components/ui/SelectionReviewSheet';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useNowPlaying, useStreamingTitles, useMovieSearch } from '../hooks/useMovies';
 import type { MovieOption } from '../types';
+import { SuggestedForGroup, type GroupRecommendation } from '@/features/recommendations';
 
 export type MoviePickerMode = 'cinema' | 'streaming';
 
@@ -26,6 +27,10 @@ export type MoviePickerProps = {
   onChange: (options: MovieOption[]) => void;
   min?: number;
   max?: number;
+  /** Group whose media ratings drive "Suggested for your group". */
+  participantIds?: string[];
+  /** When set, recommendations resolve the group from this hangout's participants. */
+  hangoutId?: string;
 };
 
 const PLATFORMS = [
@@ -44,6 +49,8 @@ export function MoviePicker({
   onChange,
   min = 1,
   max = 8,
+  participantIds = [],
+  hangoutId,
 }: MoviePickerProps): React.ReactElement {
   const theme = useTheme();
   const [query, setQuery] = useState('');
@@ -105,6 +112,32 @@ export function MoviePicker({
 
   const remove = (id: string): void => onChange(value.filter((v) => v.id !== id));
 
+  const addRecommendation = (rec: GroupRecommendation): void => {
+    if (isAtMax || rec.tmdbId == null) return;
+    const id = `tmdb:${rec.tmdbId}`;
+    if (selectedIds.has(id)) return;
+    onChange([
+      ...value,
+      {
+        id,
+        tmdbId: rec.tmdbId,
+        title: rec.name,
+        overview: '',
+        posterUrl: rec.posterUrl ?? null,
+        rating: null,
+        year: rec.year != null ? String(rec.year) : null,
+        mediaType: rec.mediaType ?? 'movie',
+        genres: [],
+      },
+    ]);
+  };
+
+  // Recommendation keys are `tmdb:<type>:<id>`; selected movies are `tmdb:<id>`.
+  const excludeKeys = useMemo(
+    () => value.map((v) => `tmdb:${v.mediaType}:${v.tmdbId}`),
+    [value],
+  );
+
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
@@ -151,6 +184,15 @@ export function MoviePicker({
             autoCorrect={false}
           />
         </View>
+
+        {/* Suggested for your group — ranked from the group's movie ratings */}
+        <SuggestedForGroup
+          kind="movie"
+          participantIds={participantIds}
+          hangoutId={hangoutId}
+          excludeKeys={excludeKeys}
+          onAdd={addRecommendation}
+        />
 
         {/* Filters toggle */}
         <Pressable
