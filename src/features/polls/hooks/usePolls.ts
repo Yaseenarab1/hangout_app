@@ -1,7 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { friendlyErrorMessage, logError } from '@/services/errors';
 import { toast } from '@/stores/ui.store';
-import { hangoutKeys } from '@/features/hangouts';
+import { hangoutKeys, type HangoutWithParticipants } from '@/features/hangouts';
+import { useSession } from '@/features/auth';
 import {
   createActivityHangout,
   createVenueHangout,
@@ -36,6 +37,23 @@ export const pollKeys = {
   byHangout: (hangoutId: string) => ['polls', 'byHangout', hangoutId] as const,
   detail: (pollId: string) => ['polls', 'detail', pollId] as const,
 };
+
+/**
+ * Read the current user's vote weight from the cached hangout detail so optimistic
+ * vote updates move the weighted bar by the right amount (0.5×, 2×, …) instead of
+ * always 1×. Falls back to 1 when the hangout isn't cached or the weight is unknown;
+ * the onSettled refetch reconciles either way.
+ */
+function myVoteWeight(
+  qc: QueryClient,
+  hangoutId: string,
+  userId: string | undefined,
+): number {
+  if (!userId) return 1;
+  const hangout = qc.getQueryData<HangoutWithParticipants>(hangoutKeys.detail(hangoutId));
+  const weight = hangout?.participants.find((p) => p.user_id === userId)?.vote_weight;
+  return typeof weight === 'number' ? weight : 1;
+}
 
 export function usePollsByHangout(hangoutId: string | undefined) {
   return useQuery({
@@ -114,6 +132,7 @@ export function useCreateActivityPoll(hangoutId: string) {
  */
 export function useCastVote() {
   const qc = useQueryClient();
+  const { user } = useSession();
   return useMutation({
     mutationFn: (input: VoteInput) => castVote(input),
     onMutate: async (input) => {
@@ -121,6 +140,8 @@ export function useCastVote() {
       await qc.cancelQueries({ queryKey: key });
       const prev = qc.getQueryData<PollWithOptions>(key);
       if (!prev) return { prev };
+
+      const myWeight = myVoteWeight(qc, prev.hangout_id, user?.id);
 
       // Build new state: remove old vote (if any), add vote on input.optionId
       const oldVotedOptionId = prev.options.find((o) => o.isMyVote)?.id ?? null;
@@ -133,13 +154,13 @@ export function useCastVote() {
 
           if (o.id === oldVotedOptionId && oldVotedOptionId !== input.optionId) {
             voteCount = Math.max(0, voteCount - 1);
-            weightedScore = Math.max(0, weightedScore - 1);
+            weightedScore = Math.max(0, weightedScore - myWeight);
             isMyVote = false;
           }
           if (o.id === input.optionId) {
             if (!isMyVote) {
               voteCount += 1;
-              weightedScore += 1;
+              weightedScore += myWeight;
               isMyVote = true;
             }
           }
@@ -169,6 +190,7 @@ export function useCastVote() {
  */
 export function useUnvote() {
   const qc = useQueryClient();
+  const { user } = useSession();
   return useMutation({
     mutationFn: (pollId: string) => unvote(pollId),
     onMutate: async (pollId) => {
@@ -176,6 +198,7 @@ export function useUnvote() {
       await qc.cancelQueries({ queryKey: key });
       const prev = qc.getQueryData<PollWithOptions>(key);
       if (!prev) return { prev };
+      const myWeight = myVoteWeight(qc, prev.hangout_id, user?.id);
       const updated: PollWithOptions = {
         ...prev,
         options: prev.options.map((o) =>
@@ -183,7 +206,7 @@ export function useUnvote() {
             ? {
                 ...o,
                 voteCount: Math.max(0, o.voteCount - 1),
-                weightedScore: Math.max(0, o.weightedScore - 1),
+                weightedScore: Math.max(0, o.weightedScore - myWeight),
                 isMyVote: false,
               }
             : o,

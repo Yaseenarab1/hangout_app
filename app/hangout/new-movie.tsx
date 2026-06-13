@@ -10,6 +10,8 @@ import {
   ChevronRight,
   CalendarDays,
   Navigation,
+  ListOrdered,
+  Vote as VoteIcon,
 } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';
 import { Input, Textarea, Button } from '@/components/ui';
@@ -20,7 +22,7 @@ import { AddressAutocomplete } from '@/features/places';
 import { useSaveSearchLocation } from '@/features/places/hooks/useSearchLocation';
 import type { PlaceDetails } from '@/features/places';
 import { ActivityVenuePicker, type ActivityVenueOption } from '@/features/polls';
-import { StartTimeSheet } from '@/features/polls';
+import { StartTimeSheet, VotingStyleSheet, type VotingMethod } from '@/features/polls';
 import { MoviePicker, type MovieOption } from '@/features/movies';
 import { useCreateActivityHangout } from '@/features/polls';
 
@@ -35,6 +37,7 @@ type FormState = {
   inviteUserIds: string[];
   movieOptions: MovieOption[];
   venueOptions: ActivityVenueOption[];
+  votingMethod: VotingMethod;
   startTime: Date | null;
 };
 
@@ -47,6 +50,7 @@ export default function NewMovieScreen(): React.ReactElement {
   const [step, setStep] = useState<Step>('mode');
   const [mode, setMode] = useState<Mode | null>(null);
   const [showStartTimeSheet, setShowStartTimeSheet] = useState(false);
+  const [showVotingStyleSheet, setShowVotingStyleSheet] = useState(false);
   const [addressText, setAddressText] = useState('');
   const [locatingMe, setLocatingMe] = useState(false);
 
@@ -59,6 +63,7 @@ export default function NewMovieScreen(): React.ReactElement {
       inviteUserIds: [],
       movieOptions: [],
       venueOptions: [],
+      votingMethod: 'simple',
       startTime: null,
     },
   });
@@ -66,8 +71,12 @@ export default function NewMovieScreen(): React.ReactElement {
   const movieOptions = watch('movieOptions');
   const venueOptions = watch('venueOptions');
   const inviteUserIds = watch('inviteUserIds');
+  const votingMethod = watch('votingMethod');
   const startTime = watch('startTime');
   const title = watch('title');
+
+  // Movies + (cinema venues, only when there are movies) form one merged poll.
+  const pollOptionCount = movieOptions.length + (movieOptions.length > 0 ? venueOptions.length : 0);
 
   function handlePlaceSelected(place: PlaceDetails) {
     setAddressText(place.address);
@@ -106,7 +115,15 @@ export default function NewMovieScreen(): React.ReactElement {
 
     const venueOpts = v.venueOptions.map((u) => ({
       label: u.name,
-      emoji: '🎥',
+      metadata: {
+        placeId: u.placeId ?? null,
+        address: u.address ?? null,
+        rating: u.rating ?? null,
+        priceLevel: u.priceLevel ?? null,
+        primaryType: u.primaryType ?? null,
+        mapsUrl: u.mapsUrl ?? null,
+        isCustom: u.isCustom ?? false,
+      },
     }));
 
     // Merge movie + venue into one poll if we have both, otherwise just movies
@@ -129,7 +146,7 @@ export default function NewMovieScreen(): React.ReactElement {
         poll: allOptions && allOptions.length >= 1
           ? {
               mode: 'simple_vote',
-              votingMethod: 'simple',
+              votingMethod: allOptions.length >= 2 ? v.votingMethod : 'simple',
               voteDeadline: finalDeadline,
               options: allOptions,
             }
@@ -356,6 +373,20 @@ export default function NewMovieScreen(): React.ReactElement {
             onPress={() => setShowStartTimeSheet(true)}
             highlightValue={startTime !== null}
           />
+          {pollOptionCount >= 2 ? (
+            <SummaryRow
+              label="Voting style"
+              icon={
+                votingMethod === 'ranked' ? (
+                  <ListOrdered size={18} color={theme.colors.text.tertiary} />
+                ) : (
+                  <VoteIcon size={18} color={theme.colors.text.tertiary} />
+                )
+              }
+              value={votingMethod === 'ranked' ? 'Ranked vote' : 'Simple vote'}
+              onPress={() => setShowVotingStyleSheet(true)}
+            />
+          ) : null}
         </ScrollView>
 
         <View style={[styles.bottomBar, { borderTopColor: theme.colors.border.default, backgroundColor: theme.colors.bg.canvas }]}>
@@ -375,6 +406,13 @@ export default function NewMovieScreen(): React.ReactElement {
         onClose={() => setShowStartTimeSheet(false)}
         value={startTime}
         onChange={(d) => setValue('startTime', d)}
+      />
+
+      <VotingStyleSheet
+        visible={showVotingStyleSheet}
+        onClose={() => setShowVotingStyleSheet(false)}
+        value={votingMethod}
+        onChange={(m) => setValue('votingMethod', m)}
       />
     </Screen>
   );

@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
-import { ChevronRight, CalendarDays, Navigation, Play, Tv } from 'lucide-react-native';
+import { ChevronRight, CalendarDays, Navigation, Play, Tv, ListOrdered, Vote as VoteIcon } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';
 import { Input, Textarea, Button } from '@/components/ui';
 import { SummaryRow } from '@/components/ui/SummaryRow';
@@ -12,7 +12,7 @@ import { ParticipantPicker } from '@/features/hangouts';
 import { AddressAutocomplete } from '@/features/places';
 import { useSaveSearchLocation } from '@/features/places/hooks/useSearchLocation';
 import type { PlaceDetails } from '@/features/places';
-import { StartTimeSheet } from '@/features/polls';
+import { StartTimeSheet, VotingStyleSheet, type VotingMethod } from '@/features/polls';
 import { useCreateVenueHangout } from '@/features/polls';
 import { SportPicker, SportVenuePicker, type Sport, type SportVenueOption } from '@/features/sports';
 
@@ -26,6 +26,7 @@ type FormState = {
   locationAddress: string;
   inviteUserIds: string[];
   venueOptions: SportVenueOption[];
+  votingMethod: VotingMethod;
   startTime: Date | null;
 };
 
@@ -39,6 +40,7 @@ export default function NewSportsScreen(): React.ReactElement {
   const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
   const [sportMode, setSportMode] = useState<SportMode>('play');
   const [showStartTimeSheet, setShowStartTimeSheet] = useState(false);
+  const [showVotingStyleSheet, setShowVotingStyleSheet] = useState(false);
   const [addressText, setAddressText] = useState('');
   const [locatingMe, setLocatingMe] = useState(false);
 
@@ -50,12 +52,14 @@ export default function NewSportsScreen(): React.ReactElement {
       locationAddress: '',
       inviteUserIds: [],
       venueOptions: [],
+      votingMethod: 'simple',
       startTime: null,
     },
   });
 
   const venueOptions = watch('venueOptions');
   const inviteUserIds = watch('inviteUserIds');
+  const votingMethod = watch('votingMethod');
   const startTime = watch('startTime');
   const title = watch('title');
 
@@ -133,7 +137,7 @@ export default function NewSportsScreen(): React.ReactElement {
         poll: pollOptions.length >= 1
           ? {
               title: pollTitle,
-              votingMethod: 'simple',
+              votingMethod: pollOptions.length >= 2 ? v.votingMethod : 'simple',
               voteDeadline: finalDeadline,
               options: pollOptions,
             }
@@ -368,6 +372,20 @@ export default function NewSportsScreen(): React.ReactElement {
             onPress={() => setShowStartTimeSheet(true)}
             highlightValue={startTime !== null}
           />
+          {venueOptions.length >= 2 ? (
+            <SummaryRow
+              label="Voting style"
+              icon={
+                votingMethod === 'ranked' ? (
+                  <ListOrdered size={18} color={theme.colors.text.tertiary} />
+                ) : (
+                  <VoteIcon size={18} color={theme.colors.text.tertiary} />
+                )
+              }
+              value={votingMethod === 'ranked' ? 'Ranked vote' : 'Simple vote'}
+              onPress={() => setShowVotingStyleSheet(true)}
+            />
+          ) : null}
         </ScrollView>
 
         <View style={[styles.bottomBar, { borderTopColor: theme.colors.border.default, backgroundColor: theme.colors.bg.canvas }]}>
@@ -387,6 +405,13 @@ export default function NewSportsScreen(): React.ReactElement {
         onClose={() => setShowStartTimeSheet(false)}
         value={startTime}
         onChange={(d) => setValue('startTime', d)}
+      />
+
+      <VotingStyleSheet
+        visible={showVotingStyleSheet}
+        onClose={() => setShowVotingStyleSheet(false)}
+        value={votingMethod}
+        onChange={(m) => setValue('votingMethod', m)}
       />
     </Screen>
   );
