@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert, Pressable, Modal, Image, FlatList, Dimensions } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Alert,
+  Pressable,
+  Modal,
+  Image,
+  FlatList,
+  Dimensions,
+} from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import {
   Settings as SettingsIcon,
@@ -53,6 +63,10 @@ export default function ProfileScreen(): React.ReactElement {
   const removeFriend = useRemoveFriend();
   const blockUser = useBlockUser();
   const cancelReq = useCancelFriendRequest();
+
+  // Must run unconditionally (rules of hooks) — keep above the early returns below.
+  const authorPosts = useAuthorPosts(userId);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   if (!userId) {
     return (
@@ -116,16 +130,11 @@ export default function ProfileScreen(): React.ReactElement {
     );
   }
 
-  const authorPosts = useAuthorPosts(userId);
-  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
-
   const isFriend = !isMe && (friends.data ?? []).some((f) => f.id === p.id);
   const outgoingReq = !isMe
     ? (outgoing.data ?? []).find((r) => r.recipient_id === p.id)
     : undefined;
-  const incomingReq = !isMe
-    ? (incoming.data ?? []).find((r) => r.sender_id === p.id)
-    : undefined;
+  const incomingReq = !isMe ? (incoming.data ?? []).find((r) => r.sender_id === p.id) : undefined;
 
   const handleRemove = (): void => {
     Alert.alert('Remove friend?', `${p.display_name} won't be notified.`, [
@@ -179,9 +188,7 @@ export default function ProfileScreen(): React.ReactElement {
         >
           {p.display_name}
         </Text>
-        <Text
-          style={[theme.typography.body, { color: theme.colors.text.secondary, marginTop: 4 }]}
-        >
+        <Text style={[theme.typography.body, { color: theme.colors.text.secondary, marginTop: 4 }]}>
           @{p.username}
         </Text>
         {p.bio ? (
@@ -252,10 +259,7 @@ export default function ProfileScreen(): React.ReactElement {
               onPress={() => router.push('/profile/settings/notifications')}
             />
             <Divider />
-            <ListItem
-              title="Privacy"
-              onPress={() => router.push('/profile/settings/privacy')}
-            />
+            <ListItem title="Privacy" onPress={() => router.push('/profile/settings/privacy')} />
             <Divider />
             <ListItem title="About" onPress={() => router.push('/profile/settings/about')} />
           </Card>
@@ -324,26 +328,25 @@ export default function ProfileScreen(): React.ReactElement {
       {(isMe || isFriend) && authorPosts.data && authorPosts.data.length > 0 && (
         <>
           <SectionHeader title="Posts" />
-          <PostGallery
-            posts={authorPosts.data}
-            onTap={(i) => setViewerIndex(i)}
-          />
+          <PostGallery posts={authorPosts.data} onTap={(i) => setViewerIndex(i)} />
         </>
       )}
 
       {/* Story-style viewer for gallery taps */}
       {viewerIndex !== null && authorPosts.data && authorPosts.data.length > 0 && (
         <StoryViewer
-          groups={[{
-            author: {
-              id: p.id,
-              display_name: p.display_name,
-              username: p.username,
-              avatar_url: p.avatar_url,
+          groups={[
+            {
+              author: {
+                id: p.id,
+                display_name: p.display_name,
+                username: p.username,
+                avatar_url: p.avatar_url,
+              },
+              posts: authorPosts.data,
+              hasUnviewed: false,
             },
-            posts: authorPosts.data,
-            hasUnviewed: false,
-          }]}
+          ]}
           initialGroupIndex={0}
           onClose={() => setViewerIndex(null)}
         />
@@ -366,11 +369,7 @@ function PostGallery({
     <View style={styles.gallery}>
       {posts.map((post, i) => (
         <Pressable key={post.id} onPress={() => onTap(i)} style={styles.galleryItem}>
-          <Image
-            source={{ uri: post.image_url }}
-            style={styles.galleryImage}
-            resizeMode="cover"
-          />
+          <Image source={{ uri: post.image_url }} style={styles.galleryImage} resizeMode="cover" />
         </Pressable>
       ))}
     </View>
