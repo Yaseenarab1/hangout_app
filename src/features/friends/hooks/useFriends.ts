@@ -19,6 +19,12 @@ import {
   unblockUser,
 } from '../services/friends.service';
 
+// -----------------------------------------------------------------------------
+// Mutations
+// -----------------------------------------------------------------------------
+
+import { Alert } from 'react-native';
+
 export function useFriends() {
   return useQuery({
     queryKey: QUERY_KEYS.friends,
@@ -54,12 +60,6 @@ export function useBlockedUsers() {
   });
 }
 
-// -----------------------------------------------------------------------------
-// Mutations
-// -----------------------------------------------------------------------------
-
-import { Alert } from 'react-native';
-
 export function useSendFriendRequest() {
   const qc = useQueryClient();
   const unblock = useUnblockUser();
@@ -77,36 +77,32 @@ export function useSendFriendRequest() {
 
       if (code === 'BLOCKED_THEM') {
         // Special-case the "you blocked them" error with an unblock prompt.
-        Alert.alert(
-          "You've blocked this user",
-          'Unblock them to send a friend request?',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Unblock & send',
-              onPress: () => {
-                unblock.mutate(variables.recipientId, {
-                  onSuccess: () => {
-                    // Retry the friend request after a short delay so RLS state settles
-                    setTimeout(() => {
-                      sendFriendRequest(variables.recipientId, variables.message)
-                        .then(() => {
-                          qc.invalidateQueries({
-                            queryKey: QUERY_KEYS.friendRequests('outgoing'),
-                          });
-                          toast.success('Friend request sent.');
-                        })
-                        .catch((retryErr) => {
-                          logError(retryErr, { where: 'sendFriendRequest.afterUnblock' });
-                          toast.error(friendlyErrorMessage(retryErr));
+        Alert.alert("You've blocked this user", 'Unblock them to send a friend request?', [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Unblock & send',
+            onPress: () => {
+              unblock.mutate(variables.recipientId, {
+                onSuccess: () => {
+                  // Retry the friend request after a short delay so RLS state settles
+                  setTimeout(() => {
+                    sendFriendRequest(variables.recipientId, variables.message)
+                      .then(() => {
+                        qc.invalidateQueries({
+                          queryKey: QUERY_KEYS.friendRequests('outgoing'),
                         });
-                    }, 250);
-                  },
-                });
-              },
+                        toast.success('Friend request sent.');
+                      })
+                      .catch((retryErr) => {
+                        logError(retryErr, { where: 'sendFriendRequest.afterUnblock' });
+                        toast.error(friendlyErrorMessage(retryErr));
+                      });
+                  }, 250);
+                },
+              });
             },
-          ],
-        );
+          },
+        ]);
         return;
       }
 

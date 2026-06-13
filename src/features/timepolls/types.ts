@@ -50,7 +50,7 @@ export type CreateTimePollInput = {
   hangoutId: string;
   title?: string;
   voteDeadline: string;
-  slots: Array<{ startsAt: string; endsAt: string }>;
+  slots: { startsAt: string; endsAt: string }[];
 };
 
 export type VoteOnSlotInput = {

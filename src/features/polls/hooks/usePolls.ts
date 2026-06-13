@@ -44,11 +44,7 @@ export const pollKeys = {
  * always 1×. Falls back to 1 when the hangout isn't cached or the weight is unknown;
  * the onSettled refetch reconciles either way.
  */
-function myVoteWeight(
-  qc: QueryClient,
-  hangoutId: string,
-  userId: string | undefined,
-): number {
+function myVoteWeight(qc: QueryClient, hangoutId: string, userId: string | undefined): number {
   if (!userId) return 1;
   const hangout = qc.getQueryData<HangoutWithParticipants>(hangoutKeys.detail(hangoutId));
   const weight = hangout?.participants.find((p) => p.user_id === userId)?.vote_weight;
@@ -249,8 +245,7 @@ export function useCastRankedVote() {
       // Recount voters: was I a voter before? am I now?
       const wasVoter = prev.myRanks.length > 0;
       const isNowVoter = input.rankedOptionIds.length > 0;
-      const totalVotes =
-        prev.totalVotes + (isNowVoter ? 1 : 0) - (wasVoter ? 1 : 0);
+      const totalVotes = prev.totalVotes + (isNowVoter ? 1 : 0) - (wasVoter ? 1 : 0);
 
       const updated: PollWithOptions = {
         ...prev,
@@ -329,7 +324,7 @@ export function useCreatePollOnHangout(hangoutId: string) {
       kind: 'activity' | 'cuisine' | 'restaurant' | 'venue';
       votingMethod: 'simple' | 'ranked';
       voteDeadline: string;
-      options: Array<{ label: string; metadata?: Record<string, unknown> }>;
+      options: { label: string; metadata?: Record<string, unknown> }[];
       title?: string;
     }) => createPollOnHangout({ ...input, hangoutId }),
     onSuccess: () => {
@@ -362,7 +357,7 @@ export function useAddOptionsBatch() {
   return useMutation({
     mutationFn: (input: {
       pollId: string;
-      options: Array<{ label: string; metadata?: Record<string, unknown> }>;
+      options: { label: string; metadata?: Record<string, unknown> }[];
     }) => addOptionsBatch(input),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: pollKeys.detail(vars.pollId), refetchType: 'active' });
@@ -378,8 +373,7 @@ export function useAddOptionsBatch() {
 export function useRemoveOption() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ optionId }: { pollId: string; optionId: string }) =>
-      removeOption(optionId),
+    mutationFn: ({ optionId }: { pollId: string; optionId: string }) => removeOption(optionId),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: pollKeys.detail(vars.pollId), refetchType: 'active' });
     },

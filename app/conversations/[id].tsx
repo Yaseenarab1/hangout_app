@@ -10,10 +10,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { ArrowDown } from 'lucide-react-native';
+import { ArrowDown, MessageCircle } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';
 import { EmptyState } from '@/components/ui';
-import { MessageCircle } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useSession } from '@/features/auth';
 import { useQueryClient } from '@tanstack/react-query';
@@ -25,12 +24,11 @@ import {
   DateSeparator,
 } from '@/features/messaging';
 import type { Message } from '@/features/messaging';
+import { useConvMessages, useSendConvMessage, convMessagesKey } from '@/features/conversations';
 import {
-  useConvMessages,
-  useSendConvMessage,
-  convMessagesKey,
-} from '@/features/conversations';
-import { softDeleteConvMessage, updateConvLastRead } from '@/features/conversations/services/conversations.service';
+  softDeleteConvMessage,
+  updateConvLastRead,
+} from '@/features/conversations/services/conversations.service';
 import type { ConvMessage } from '@/features/conversations';
 
 const SCROLL_THRESHOLD = 200;
@@ -72,9 +70,7 @@ function buildListItems(messages: ConvMessage[]): ListItem[] {
     const prev = messages[i - 1];
 
     const showSep =
-      !prev ||
-      new Date(msg.created_at).toDateString() !==
-        new Date(prev.created_at).toDateString();
+      !prev || new Date(msg.created_at).toDateString() !== new Date(prev.created_at).toDateString();
 
     if (showSep) {
       items.push({ type: 'date', date: new Date(msg.created_at), key: `sep-${msg.created_at}` });
@@ -84,8 +80,7 @@ function buildListItems(messages: ConvMessage[]): ListItem[] {
       prev &&
       prev.sender_id === msg.sender_id &&
       !showSep &&
-      new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() <
-        2 * 60 * 1000;
+      new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() < 2 * 60 * 1000;
 
     items.push({ type: 'message', message: msg, showHeader: !sameGroup });
   }
@@ -179,7 +174,11 @@ export default function ConversationScreen(): React.ReactElement {
   };
 
   return (
-    <Screen header={{ title: title ?? 'Chat', showBack: true }} contentPadding={0} avoidKeyboard={false}>
+    <Screen
+      header={{ title: title ?? 'Chat', showBack: true }}
+      contentPadding={0}
+      avoidKeyboard={false}
+    >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -192,13 +191,13 @@ export default function ConversationScreen(): React.ReactElement {
             </View>
           ) : isError ? (
             <View style={styles.center}>
-              <Text style={{ color: theme.colors.text.secondary }}>
-                Couldn't load messages.
-              </Text>
+              <Text style={{ color: theme.colors.text.secondary }}>Couldn't load messages.</Text>
             </View>
           ) : messages.length === 0 ? (
             <EmptyState
-              icon={<MessageCircle size={42} color={theme.colors.text.tertiary} strokeWidth={1.5} />}
+              icon={
+                <MessageCircle size={42} color={theme.colors.text.tertiary} strokeWidth={1.5} />
+              }
               title="Start the conversation"
               body="Say something!"
             />
@@ -206,9 +205,7 @@ export default function ConversationScreen(): React.ReactElement {
             <FlatList
               ref={listRef}
               data={invertedItems}
-              keyExtractor={(item) =>
-                item.type === 'date' ? item.key : item.message.id
-              }
+              keyExtractor={(item) => (item.type === 'date' ? item.key : item.message.id)}
               renderItem={renderItem}
               inverted
               contentContainerStyle={styles.list}
@@ -236,9 +233,7 @@ export default function ConversationScreen(): React.ReactElement {
             >
               <ArrowDown size={18} color="#FFFFFF" />
               {newCount > 0 && (
-                <Text style={styles.fabCount}>
-                  {newCount > 99 ? '99+' : newCount} new
-                </Text>
+                <Text style={styles.fabCount}>{newCount > 99 ? '99+' : newCount} new</Text>
               )}
             </Pressable>
           )}

@@ -7,8 +7,7 @@ import { ActivityOptionPicker, type ActivityOption } from './ActivityOptionPicke
 import { ActivityVenuePicker, type ActivityVenueOption } from './ActivityVenuePicker';
 import { CuisineOptionPicker } from '@/features/food/components/CuisineOptionPicker';
 import { RestaurantSearchPicker } from '@/features/food/components/RestaurantSearchPicker';
-import type { CuisineOption } from '@/features/food/types';
-import type { RestaurantOption } from '@/features/food/types';
+import type { CuisineOption, RestaurantOption } from '@/features/food/types';
 import type { PollKind } from '../types';
 
 export type ExistingOption = {
@@ -25,7 +24,7 @@ export type ManagePollOptionsSheetProps = {
   existing: ExistingOption[];
   onSave: (changes: {
     removeOptionIds: string[];
-    addOptions: Array<{ label: string; metadata?: Record<string, unknown> }>;
+    addOptions: { label: string; metadata?: Record<string, unknown> }[];
   }) => void;
   isSubmitting?: boolean;
   venueQuery?: string;
@@ -152,7 +151,7 @@ export function ManagePollOptionsSheet({
 
   const computeChanges = () => {
     const removeOptionIds: string[] = [];
-    const addOptions: Array<{ label: string; metadata?: Record<string, unknown> }> = [];
+    const addOptions: { label: string; metadata?: Record<string, unknown> }[] = [];
 
     const handleArray = <T extends { __originalId?: string }>(
       currentValue: T[],
@@ -211,8 +210,7 @@ export function ManagePollOptionsSheet({
   };
 
   const changes = computeChanges();
-  const hasChanges =
-    changes.addOptions.length > 0 || changes.removeOptionIds.length > 0;
+  const hasChanges = changes.addOptions.length > 0 || changes.removeOptionIds.length > 0;
 
   const title =
     pollKind === 'activity'
@@ -227,8 +225,7 @@ export function ManagePollOptionsSheet({
     if (!hasChanges) return 'No changes yet';
     const parts: string[] = [];
     if (changes.addOptions.length > 0) parts.push(`add ${changes.addOptions.length}`);
-    if (changes.removeOptionIds.length > 0)
-      parts.push(`remove ${changes.removeOptionIds.length}`);
+    if (changes.removeOptionIds.length > 0) parts.push(`remove ${changes.removeOptionIds.length}`);
     return `Save (${parts.join(' & ')})`;
   })();
 
@@ -242,9 +239,7 @@ export function ManagePollOptionsSheet({
       <View style={[styles.container, { backgroundColor: theme.colors.bg.canvas }]}>
         <View style={[styles.header, { borderBottomColor: theme.colors.border.default }]}>
           <View style={{ flex: 1 }}>
-            <Text style={[theme.typography.h3, { color: theme.colors.text.primary }]}>
-              {title}
-            </Text>
+            <Text style={[theme.typography.h3, { color: theme.colors.text.primary }]}>{title}</Text>
             <Text
               style={[
                 theme.typography.caption,

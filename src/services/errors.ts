@@ -29,7 +29,6 @@ export function initErrorTracking(): void {
 
 export function logError(error: unknown, context?: Record<string, unknown>): void {
   if (env.isDev) {
-    // eslint-disable-next-line no-console
     console.error('[error]', error, context);
     return;
   }
@@ -38,7 +37,6 @@ export function logError(error: unknown, context?: Record<string, unknown>): voi
 
 export function logWarning(message: string, context?: Record<string, unknown>): void {
   if (env.isDev) {
-    // eslint-disable-next-line no-console
     console.warn('[warn]', message, context);
     return;
   }
@@ -75,7 +73,11 @@ export function friendlyErrorMessage(error: unknown): string {
     if (message.includes('rate limit') || message.includes('too many')) {
       return 'Too many attempts. Wait a minute and try again.';
     }
-    if (message.includes('row-level security') || message.includes('rls') || message.includes('policy')) {
+    if (
+      message.includes('row-level security') ||
+      message.includes('rls') ||
+      message.includes('policy')
+    ) {
       // RLS errors are intentionally vague — don't leak existence.
       return "You don't have permission to do that.";
     }

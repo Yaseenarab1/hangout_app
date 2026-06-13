@@ -4,10 +4,9 @@ import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 import { useLocalSearchParams } from 'expo-router';
-import { Plus, Download } from 'lucide-react-native';
+import { Plus, Download, Images } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';
 import { EmptyState, Skeleton } from '@/components/ui';
-import { Images } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useSession } from '@/features/auth';
 import { toast } from '@/stores/ui.store';
@@ -153,15 +152,16 @@ export default function PhotosScreen(): React.ReactElement {
 
   const handleSelectButton = useCallback(() => {
     const count = photos.length;
-    const options = [`Download all ${count} photo${count !== 1 ? 's' : ''}`, 'Select photos', 'Cancel'];
+    const options = [
+      `Download all ${count} photo${count !== 1 ? 's' : ''}`,
+      'Select photos',
+      'Cancel',
+    ];
     if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options, cancelButtonIndex: 2 },
-        (idx) => {
-          if (idx === 0) handleSaveAll();
-          else if (idx === 1) startSelectMode();
-        },
-      );
+      ActionSheetIOS.showActionSheetWithOptions({ options, cancelButtonIndex: 2 }, (idx) => {
+        if (idx === 0) handleSaveAll();
+        else if (idx === 1) startSelectMode();
+      });
     } else {
       Alert.alert('Download photos', undefined, [
         { text: `Download all ${count} photo${count !== 1 ? 's' : ''}`, onPress: handleSaveAll },
@@ -174,10 +174,7 @@ export default function PhotosScreen(): React.ReactElement {
   const handleAddPhotos = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert(
-        'Permission required',
-        'Allow photo library access in Settings to add photos.',
-      );
+      Alert.alert('Permission required', 'Allow photo library access in Settings to add photos.');
       return;
     }
 
@@ -223,9 +220,7 @@ export default function PhotosScreen(): React.ReactElement {
 
   const headerRight = selectionMode ? (
     <Pressable onPress={exitSelectionMode} hitSlop={12} style={styles.headerBtn}>
-      <Text style={[theme.typography.bodyMedium, { color: theme.colors.accent }]}>
-        Cancel
-      </Text>
+      <Text style={[theme.typography.bodyMedium, { color: theme.colors.accent }]}>Cancel</Text>
     </Pressable>
   ) : (
     <View style={styles.headerBtns}>
@@ -236,9 +231,7 @@ export default function PhotosScreen(): React.ReactElement {
           hitSlop={12}
           disabled={!!saveProgress}
         >
-          <Text style={[theme.typography.bodyMedium, { color: theme.colors.accent }]}>
-            Select
-          </Text>
+          <Text style={[theme.typography.bodyMedium, { color: theme.colors.accent }]}>Select</Text>
         </Pressable>
       )}
       <Pressable
@@ -272,8 +265,8 @@ export default function PhotosScreen(): React.ReactElement {
             {saveProgress
               ? `Saving ${saveProgress.done} of ${saveProgress.total} to camera roll…`
               : progress?.phase === 'resizing'
-              ? `Processing ${progress.index + 1} of ${progress.total}…`
-              : `Uploading ${progress!.index + 1} of ${progress!.total}…`}
+                ? `Processing ${progress.index + 1} of ${progress.total}…`
+                : `Uploading ${progress!.index + 1} of ${progress!.total}…`}
           </Text>
         </View>
       )}
@@ -289,10 +282,7 @@ export default function PhotosScreen(): React.ReactElement {
 
       {/* Error */}
       {isError && !isLoading && (
-        <EmptyState
-          title="Couldn't load photos"
-          body="Check your connection and try again."
-        />
+        <EmptyState title="Couldn't load photos" body="Check your connection and try again." />
       )}
 
       {/* Empty */}
@@ -329,10 +319,7 @@ export default function PhotosScreen(): React.ReactElement {
             },
           ]}
         >
-          <Pressable
-            onPress={allSelected ? exitSelectionMode : selectAll}
-            hitSlop={8}
-          >
+          <Pressable onPress={allSelected ? exitSelectionMode : selectAll} hitSlop={8}>
             <Text style={[theme.typography.bodySmall, { color: theme.colors.accent }]}>
               {allSelected ? 'Deselect all' : 'Select all'}
             </Text>

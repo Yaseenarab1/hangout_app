@@ -22,9 +22,8 @@ import { X, Trash2, Download, Flag, MoreHorizontal, Check } from 'lucide-react-n
 import { useTheme } from '@/hooks/useTheme';
 import { toast } from '@/stores/ui.store';
 import { getPhotoSignedUrl, fetchPhotoReactions } from '../services/photos.service';
-import type { PhotoReaction } from '../types';
+import type { PhotoReaction, HangoutPhoto } from '../types';
 import { REACTION_EMOJIS } from '../types';
-import type { HangoutPhoto } from '../types';
 
 const REACTION_COLORS = {
   mine: 'rgba(139,92,246,0.3)',
@@ -57,7 +56,9 @@ function ZoomablePhoto({
 
   useEffect(() => {
     if (!photo.signedUrl && photo.storage_path) {
-      getPhotoSignedUrl(photo.storage_path).then(setUri).catch(() => {});
+      getPhotoSignedUrl(photo.storage_path)
+        .then(setUri)
+        .catch(() => {});
     }
   }, [photo.signedUrl, photo.storage_path]);
 
@@ -113,12 +114,11 @@ function ReactionBar({
           <Pressable
             key={emoji}
             onPress={() => onReact(emoji)}
-            style={[
-              styles.emojiBtn,
-              mine.has(emoji) && { backgroundColor: REACTION_COLORS.mine },
-            ]}
+            style={[styles.emojiBtn, mine.has(emoji) && { backgroundColor: REACTION_COLORS.mine }]}
           >
-            <Text style={styles.emojiText} allowFontScaling={false}>{emoji}</Text>
+            <Text style={styles.emojiText} allowFontScaling={false}>
+              {emoji}
+            </Text>
           </Pressable>
         ))}
       </View>
@@ -133,19 +133,17 @@ function ReactionBar({
               style={[
                 styles.reactionChip,
                 {
-                  backgroundColor: mine.has(emoji)
-                    ? REACTION_COLORS.mine
-                    : REACTION_COLORS.theirs,
+                  backgroundColor: mine.has(emoji) ? REACTION_COLORS.mine : REACTION_COLORS.theirs,
                   borderColor: mine.has(emoji)
                     ? 'rgba(139,92,246,0.6)'
                     : theme.colors.border.default,
                 },
               ]}
             >
-              <Text style={styles.emojiText} allowFontScaling={false}>{emoji}</Text>
-              <Text style={[styles.countText, { color: theme.colors.text.primary }]}>
-                {count}
+              <Text style={styles.emojiText} allowFontScaling={false}>
+                {emoji}
               </Text>
+              <Text style={[styles.countText, { color: theme.colors.text.primary }]}>{count}</Text>
             </Pressable>
           ))}
         </View>
@@ -200,9 +198,7 @@ export function PhotoViewer({
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gs) =>
-        !isZoomedRef.current &&
-        gs.dy > 15 &&
-        gs.dy > Math.abs(gs.dx),
+        !isZoomedRef.current && gs.dy > 15 && gs.dy > Math.abs(gs.dx),
       onPanResponderMove: (_, gs) => {
         if (gs.dy > 0) dismissY.setValue(gs.dy);
       },
@@ -219,12 +215,15 @@ export function PhotoViewer({
     }),
   ).current;
 
-  const handleScrollEnd = useCallback((e: any) => {
-    const offset = e.nativeEvent.contentOffset.x;
-    const idx = Math.round(offset / W);
-    setCurrentIdx(idx);
-    isZoomedRef.current = false;
-  }, [W]);
+  const handleScrollEnd = useCallback(
+    (e: any) => {
+      const offset = e.nativeEvent.contentOffset.x;
+      const idx = Math.round(offset / W);
+      setCurrentIdx(idx);
+      isZoomedRef.current = false;
+    },
+    [W],
+  );
 
   const handleSave = useCallback(async () => {
     if (!photo) return;
@@ -321,10 +320,7 @@ export function PhotoViewer({
                 },
               ]}
             >
-              <Pressable
-                style={styles.menuRow}
-                onPress={handleSave}
-              >
+              <Pressable style={styles.menuRow} onPress={handleSave}>
                 <Download size={16} color={theme.colors.text.primary} />
                 <Text style={[styles.menuLabel, { color: theme.colors.text.primary }]}>
                   Save to camera roll
@@ -333,9 +329,7 @@ export function PhotoViewer({
               {isMine ? (
                 <Pressable style={styles.menuRow} onPress={handleDelete}>
                   <Trash2 size={16} color={theme.colors.danger} />
-                  <Text style={[styles.menuLabel, { color: theme.colors.danger }]}>
-                    Delete
-                  </Text>
+                  <Text style={[styles.menuLabel, { color: theme.colors.danger }]}>Delete</Text>
                 </Pressable>
               ) : (
                 <Pressable
@@ -346,9 +340,7 @@ export function PhotoViewer({
                   }}
                 >
                   <Flag size={16} color={theme.colors.text.secondary} />
-                  <Text
-                    style={[styles.menuLabel, { color: theme.colors.text.secondary }]}
-                  >
+                  <Text style={[styles.menuLabel, { color: theme.colors.text.secondary }]}>
                     Report
                   </Text>
                 </Pressable>
@@ -385,15 +377,11 @@ export function PhotoViewer({
           />
 
           {/* Footer */}
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          >
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={styles.footer}>
               {/* Uploader name */}
               {photo.uploader && (
-                <Text style={styles.uploaderName}>
-                  {photo.uploader.display_name}
-                </Text>
+                <Text style={styles.uploaderName}>{photo.uploader.display_name}</Text>
               )}
 
               {/* Caption */}
@@ -432,9 +420,7 @@ export function PhotoViewer({
                 myUserId={myUserId}
                 onReact={(emoji) => {
                   // Optimistic update
-                  const exists = reactions.some(
-                    (r) => r.user_id === myUserId && r.emoji === emoji,
-                  );
+                  const exists = reactions.some((r) => r.user_id === myUserId && r.emoji === emoji);
                   setReactions((prev) =>
                     exists
                       ? prev.filter((r) => !(r.user_id === myUserId && r.emoji === emoji))

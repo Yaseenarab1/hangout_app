@@ -12,8 +12,6 @@ import {
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useLocalSearchParams, router } from 'expo-router';
 import { ArrowLeft, Users, CalendarDays, Share2 } from 'lucide-react-native';
-
-const SUPABASE_URL = 'https://cruosjnuhcuewjnzhlja.supabase.co';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 import { useSession } from '@/features/auth';
@@ -24,6 +22,8 @@ import {
   AvailabilityGrid,
   CreateSessionSheet,
 } from '@/features/availability';
+
+const SUPABASE_URL = 'https://cruosjnuhcuewjnzhlja.supabase.co';
 
 const ACCENT = '#8B5CF6';
 
@@ -39,7 +39,7 @@ export default function WhenToMeetScreen(): React.ReactElement {
   const session = useHangoutSession(hangoutId);
 
   const isHost = hangout.data?.host_id === user?.id;
-  const myRole = hangout.data?.participants.find(p => p.user_id === user?.id)?.role;
+  const myRole = hangout.data?.participants.find((p) => p.user_id === user?.id)?.role;
   const canCreate = isHost || myRole === 'co_host';
 
   const s = session.data;
@@ -47,7 +47,7 @@ export default function WhenToMeetScreen(): React.ReactElement {
   // My current availability as a Set
   const mySlots = useMemo<Set<string>>(() => {
     if (!s || !user) return new Set();
-    const myResp = s.responses.find(r => r.user_id === user.id);
+    const myResp = s.responses.find((r) => r.user_id === user.id);
     return new Set(myResp?.available ?? []);
   }, [s, user]);
 
@@ -61,9 +61,12 @@ export default function WhenToMeetScreen(): React.ReactElement {
     update.mutate([...next]);
   }
 
-  const handleSlotsChange = useCallback((slots: string[]) => {
-    update.mutate(slots);
-  }, [update]);
+  const handleSlotsChange = useCallback(
+    (slots: string[]) => {
+      update.mutate(slots);
+    },
+    [update],
+  );
 
   // ── Header ──────────────────────────────────────────────────────────────
   const Header = (
@@ -89,11 +92,15 @@ export default function WhenToMeetScreen(): React.ReactElement {
       </Pressable>
 
       <View style={{ flex: 1, marginLeft: 12 }}>
-        <Text style={[theme.typography.h3, { color: theme.colors.text.primary, fontWeight: '800' }]}>
+        <Text
+          style={[theme.typography.h3, { color: theme.colors.text.primary, fontWeight: '800' }]}
+        >
           When to Meet
         </Text>
         {s && (
-          <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary, marginTop: 1 }]}>
+          <Text
+            style={[theme.typography.caption, { color: theme.colors.text.tertiary, marginTop: 1 }]}
+          >
             {s.dates.length} date{s.dates.length === 1 ? '' : 's'} · {s.responses.length} filled in
           </Text>
         )}
@@ -142,14 +149,29 @@ export default function WhenToMeetScreen(): React.ReactElement {
         <Animated.View entering={FadeIn.duration(400)} style={styles.emptyWrap}>
           <View style={[styles.emptyHero, { backgroundColor: ACCENT + '10' }]}>
             <CalendarDays size={42} color={ACCENT} strokeWidth={1.5} />
-            <View style={[styles.heroDot, { top: 18, right: 22, width: 8, height: 8, backgroundColor: ACCENT + '40' }]} />
-            <View style={[styles.heroDot, { bottom: 20, left: 26, width: 5, height: 5, backgroundColor: ACCENT + '30' }]} />
+            <View
+              style={[
+                styles.heroDot,
+                { top: 18, right: 22, width: 8, height: 8, backgroundColor: ACCENT + '40' },
+              ]}
+            />
+            <View
+              style={[
+                styles.heroDot,
+                { bottom: 20, left: 26, width: 5, height: 5, backgroundColor: ACCENT + '30' },
+              ]}
+            />
           </View>
 
           <Text style={[styles.emptyTitle, { color: theme.colors.text.primary }]}>
             Find a time that works
           </Text>
-          <Text style={[theme.typography.body, { color: theme.colors.text.secondary, textAlign: 'center', lineHeight: 22 }]}>
+          <Text
+            style={[
+              theme.typography.body,
+              { color: theme.colors.text.secondary, textAlign: 'center', lineHeight: 22 },
+            ]}
+          >
             Everyone marks when they're free on a grid. The best overlapping times light up green.
           </Text>
 
@@ -162,7 +184,15 @@ export default function WhenToMeetScreen(): React.ReactElement {
               <Text style={styles.emptyBtnText}>Choose dates to check</Text>
             </Pressable>
           ) : (
-            <View style={[styles.waitingChip, { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default }]}>
+            <View
+              style={[
+                styles.waitingChip,
+                {
+                  backgroundColor: theme.colors.bg.surface,
+                  borderColor: theme.colors.border.default,
+                },
+              ]}
+            >
               <Users size={14} color={theme.colors.text.tertiary} />
               <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>
                 Waiting for the host to set up dates
@@ -189,13 +219,15 @@ export default function WhenToMeetScreen(): React.ReactElement {
       <ScrollView
         showsVerticalScrollIndicator={false}
         scrollEnabled={!scrollLocked}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: insets.bottom + 40 },
-        ]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
       >
         {/* Instruction banner */}
-        <View style={[styles.instruction, { backgroundColor: ACCENT + '0D', borderColor: ACCENT + '25' }]}>
+        <View
+          style={[
+            styles.instruction,
+            { backgroundColor: ACCENT + '0D', borderColor: ACCENT + '25' },
+          ]}
+        >
           <Text style={[styles.instructionText, { color: ACCENT }]}>
             Tap a cell to toggle it. Drag to select multiple at once. Green = everyone available.
           </Text>

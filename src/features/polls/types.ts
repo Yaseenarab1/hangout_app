@@ -80,7 +80,7 @@ export type PollWithOptions = Poll & {
   /** For simple: my vote row. For ranked: null (use myRanks instead). */
   myVote: Vote | null;
   /** For ranked: array of {optionId, rank} for the current user. */
-  myRanks: Array<{ optionId: string; rank: number }>;
+  myRanks: { optionId: string; rank: number }[];
 };
 
 export type ActivityCatalogItem = {

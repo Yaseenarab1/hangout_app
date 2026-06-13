@@ -38,7 +38,7 @@ export function proportionalSplit(
   const raw = entries.map(([, sub]) => (totalCents * sub) / grandTotal);
   const floored = raw.map(Math.floor);
   const distributed = floored.reduce((a, b) => a + b, 0);
-  let remainder = totalCents - distributed;
+  const remainder = totalCents - distributed;
 
   // Compute fractional parts for largest-remainder method
   const fractions = raw.map((r, i) => ({ id: entries[i]![0], frac: r - floored[i]! }));

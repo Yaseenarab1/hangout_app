@@ -9,13 +9,7 @@ import type {
   AddOptionInput,
   CastRankedVoteInput,
 } from '../schemas';
-import type {
-  Poll,
-  PollOption,
-  PollWithOptions,
-  Vote,
-  RankedVote,
-} from '../types';
+import type { Poll, PollOption, PollWithOptions, Vote, RankedVote } from '../types';
 
 /**
  * Polls service — supports both 'simple' and 'ranked' voting methods,
@@ -79,9 +73,7 @@ export async function createActivityPoll(
         catalogId: opt.catalogId ?? null,
       },
     }));
-    const { error: optErr } = await supabase
-      .from(TABLES.poll_options)
-      .insert(optionRows);
+    const { error: optErr } = await supabase.from(TABLES.poll_options).insert(optionRows);
     if (optErr) throw optErr;
   }
 
@@ -101,7 +93,7 @@ export async function createVenueHangout(input: {
     title: string;
     votingMethod: 'simple' | 'ranked';
     voteDeadline: string;
-    options: Array<{ label: string; metadata: Record<string, unknown> }>;
+    options: { label: string; metadata: Record<string, unknown> }[];
   } | null;
 }): Promise<{ hangoutId: string; pollId: string | null }> {
   const hangout = await createHangout(input.hangout);
@@ -122,7 +114,7 @@ export async function createPollOnHangout(input: {
   kind: 'activity' | 'cuisine' | 'restaurant' | 'venue';
   votingMethod: 'simple' | 'ranked';
   voteDeadline: string;
-  options: Array<{ label: string; metadata?: Record<string, unknown> }>;
+  options: { label: string; metadata?: Record<string, unknown> }[];
   title?: string;
 }): Promise<Poll> {
   const { data: auth } = await supabase.auth.getUser();
@@ -160,9 +152,7 @@ export async function createPollOnHangout(input: {
       label: o.label,
       metadata: o.metadata ?? {},
     }));
-    const { error: optErr } = await supabase
-      .from(TABLES.poll_options)
-      .insert(rows as any);
+    const { error: optErr } = await supabase.from(TABLES.poll_options).insert(rows as any);
     if (optErr) throw optErr;
   }
 
@@ -180,9 +170,7 @@ export async function listPollsByHangout(hangoutId: string): Promise<Poll[]> {
   return (data ?? []) as Poll[];
 }
 
-export async function getPollWithDetails(
-  pollId: string,
-): Promise<PollWithOptions | null> {
+export async function getPollWithDetails(pollId: string): Promise<PollWithOptions | null> {
   const { data: auth } = await supabase.auth.getUser();
   const myUserId = auth.user?.id;
 
@@ -232,16 +220,12 @@ async function buildSimplePollDetail(
       ...opt,
       voteCount: optionVotes.length,
       weightedScore,
-      isMyVote: myUserId
-        ? optionVotes.some((v) => v.voter_id === myUserId)
-        : false,
+      isMyVote: myUserId ? optionVotes.some((v) => v.voter_id === myUserId) : false,
       myRank: null,
     };
   });
 
-  const myVote = myUserId
-    ? votesList.find((v) => v.voter_id === myUserId) ?? null
-    : null;
+  const myVote = myUserId ? (votesList.find((v) => v.voter_id === myUserId) ?? null) : null;
 
   return {
     ...poll,
@@ -268,9 +252,7 @@ async function buildRankedPollDetail(
   const voterIds = new Set(rankedList.map((r) => r.voter_id));
 
   const enriched = options.map((opt) => {
-    const firstChoiceFor = rankedList.filter(
-      (r) => r.option_id === opt.id && r.rank === 1,
-    );
+    const firstChoiceFor = rankedList.filter((r) => r.option_id === opt.id && r.rank === 1);
     const myVote = myUserId
       ? rankedList.find((r) => r.option_id === opt.id && r.voter_id === myUserId)
       : null;
@@ -432,10 +414,10 @@ export async function addOption(input: AddOptionInput): Promise<PollOption> {
  */
 export async function addOptionsBatch(input: {
   pollId: string;
-  options: Array<{
+  options: {
     label: string;
     metadata?: Record<string, unknown>;
-  }>;
+  }[];
 }): Promise<PollOption[]> {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error('Not authenticated');
@@ -459,10 +441,7 @@ export async function addOptionsBatch(input: {
 }
 
 export async function removeOption(optionId: string): Promise<void> {
-  const { error } = await supabase
-    .from(TABLES.poll_options)
-    .delete()
-    .eq('id', optionId);
+  const { error } = await supabase.from(TABLES.poll_options).delete().eq('id', optionId);
   if (error) throw error;
 }
 
@@ -501,9 +480,7 @@ export async function closePoll(
       winnerId = result.winnerId;
     } else {
       if (detailed.totalVotes > 0) {
-        const sorted = [...detailed.options].sort(
-          (a, b) => b.weightedScore - a.weightedScore,
-        );
+        const sorted = [...detailed.options].sort((a, b) => b.weightedScore - a.weightedScore);
         winnerId = sorted[0]?.id ?? null;
       }
     }
@@ -527,10 +504,16 @@ export async function closePoll(
 
   // Auto-update hangout location when a restaurant poll closes with a winner
   let updatedLocation = false;
-  if (winnerId && detailed && detailed.hangout_id &&
-      (detailed.kind === 'restaurant' || detailed.kind === 'activity')) {
+  if (
+    winnerId &&
+    detailed &&
+    detailed.hangout_id &&
+    (detailed.kind === 'restaurant' || detailed.kind === 'activity')
+  ) {
     const winner = detailed.options.find((o) => o.id === winnerId);
-    const meta = (winner?.metadata as { placeId?: string; address?: string; primaryType?: string } | null) ?? {};
+    const meta =
+      (winner?.metadata as { placeId?: string; address?: string; primaryType?: string } | null) ??
+      {};
     if (winner?.label) {
       const update: { primary_location_name: string; primary_location_address?: string } = {
         primary_location_name: winner.label,

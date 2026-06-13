@@ -1,9 +1,9 @@
 import type { ShareInput } from '../types';
 
-type EqualConfig = { method: 'equal'; participants: Array<{ user_id: string }> };
-type PercentConfig = { method: 'percent'; participants: Array<{ user_id: string; percent: number }> };
-type ExactConfig = { method: 'exact'; participants: Array<{ user_id: string; amount_cents: number }> };
-type SharesConfig = { method: 'shares'; participants: Array<{ user_id: string; weight: number }> };
+type EqualConfig = { method: 'equal'; participants: { user_id: string }[] };
+type PercentConfig = { method: 'percent'; participants: { user_id: string; percent: number }[] };
+type ExactConfig = { method: 'exact'; participants: { user_id: string; amount_cents: number }[] };
+type SharesConfig = { method: 'shares'; participants: { user_id: string; weight: number }[] };
 
 export type SplitConfig = EqualConfig | PercentConfig | ExactConfig | SharesConfig;
 
@@ -29,7 +29,10 @@ export function computeShares(totalCents: number, config: SplitConfig): ShareInp
     const sumRaw = raw.reduce((a, b) => a + b, 0);
     let remainder = totalCents - sumRaw;
     const amounts = raw.map((a) => {
-      if (remainder > 0) { remainder--; return a + 1; }
+      if (remainder > 0) {
+        remainder--;
+        return a + 1;
+      }
       return a;
     });
     return sorted.map((p, i) => ({
@@ -63,7 +66,10 @@ export function computeShares(totalCents: number, config: SplitConfig): ShareInp
   const sumRaw = raw.reduce((a, b) => a + b, 0);
   let remainder = totalCents - sumRaw;
   const amounts = raw.map((a) => {
-    if (remainder > 0) { remainder--; return a + 1; }
+    if (remainder > 0) {
+      remainder--;
+      return a + 1;
+    }
     return a;
   });
   return sorted.map((p, i) => ({

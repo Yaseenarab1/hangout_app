@@ -1,12 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
-  Alert,
-  Modal,
-} from 'react-native';
+import { View, Text, Pressable, StyleSheet, Alert, Modal } from 'react-native';
 import {
   Sparkles,
   Vote,
@@ -55,9 +48,7 @@ export function PollCard({
   if (!poll.data) {
     return (
       <Card padding="md" style={{ marginTop: 12 }}>
-        <Text
-          style={[theme.typography.bodySmall, { color: theme.colors.text.tertiary }]}
-        >
+        <Text style={[theme.typography.bodySmall, { color: theme.colors.text.tertiary }]}>
           Loading poll…
         </Text>
       </Card>
@@ -81,11 +72,7 @@ export function PollCard({
 
 // Strips venue poll title boilerplate to get the activity term for seeding search
 function venueQueryFromTitle(title: string): string {
-  const prefixes = [
-    'Where should we go for ',
-    'Where should we play ',
-    'Where should we watch ',
-  ];
+  const prefixes = ['Where should we go for ', 'Where should we play ', 'Where should we watch '];
   for (const p of prefixes) {
     if (title.startsWith(p)) return title.slice(p.length).replace(/\?$/, '').trim();
   }
@@ -109,10 +96,7 @@ function VoterCount({
       <View style={styles.countRow}>
         <Users size={12} color={theme.colors.text.tertiary} />
         <Text
-          style={[
-            theme.typography.caption,
-            { color: theme.colors.text.tertiary, marginLeft: 4 },
-          ]}
+          style={[theme.typography.caption, { color: theme.colors.text.tertiary, marginLeft: 4 }]}
         >
           No votes yet
         </Text>
@@ -123,20 +107,12 @@ function VoterCount({
     <View style={styles.countRow}>
       <Users size={12} color={theme.colors.text.secondary} />
       <Text
-        style={[
-          theme.typography.caption,
-          { color: theme.colors.text.secondary, marginLeft: 4 },
-        ]}
+        style={[theme.typography.caption, { color: theme.colors.text.secondary, marginLeft: 4 }]}
       >
         {totalVotes} {totalVotes === 1 ? 'person' : 'people'} voted
       </Text>
       {hasVoted ? (
-        <View
-          style={[
-            styles.youVotedBadge,
-            { backgroundColor: theme.colors.success + '20' },
-          ]}
-        >
+        <View style={[styles.youVotedBadge, { backgroundColor: theme.colors.success + '20' }]}>
           <Check size={10} color={theme.colors.success} />
           <Text
             style={[
@@ -161,17 +137,13 @@ function VoterCount({
 // Per-user sort helpers
 // ============================================================================
 
-function sortSimpleByMyVote<T extends PollOption & { isMyVote: boolean }>(
-  options: T[],
-): T[] {
+function sortSimpleByMyVote<T extends PollOption & { isMyVote: boolean }>(options: T[]): T[] {
   const myVote = options.filter((o) => o.isMyVote);
   const others = options.filter((o) => !o.isMyVote);
   return [...myVote, ...others];
 }
 
-function sortRankedByMyRanks<
-  T extends PollOption & { myRank: number | null },
->(options: T[]): T[] {
+function sortRankedByMyRanks<T extends PollOption & { myRank: number | null }>(options: T[]): T[] {
   const ranked = options
     .filter((o) => o.myRank !== null)
     .sort((a, b) => (a.myRank as number) - (b.myRank as number));
@@ -208,10 +180,7 @@ function SimpleVotingCard({
     isMyVote: boolean;
   } | null>(null);
 
-  const sortedOptions = useMemo(
-    () => sortSimpleByMyVote(poll.options),
-    [poll.options],
-  );
+  const sortedOptions = useMemo(() => sortSimpleByMyVote(poll.options), [poll.options]);
 
   const hasVoted = !!poll.myVote;
 
@@ -229,7 +198,7 @@ function SimpleVotingCard({
 
   const handleApplyChanges = async (changes: {
     removeOptionIds: string[];
-    addOptions: Array<{ label: string; metadata?: Record<string, unknown> }>;
+    addOptions: { label: string; metadata?: Record<string, unknown> }[];
   }): Promise<void> => {
     setIsApplyingChanges(true);
     try {
@@ -238,8 +207,7 @@ function SimpleVotingCard({
       );
       if (optionsWithVotes.length > 0) {
         const lostVotes = optionsWithVotes.reduce(
-          (sum, id) =>
-            sum + (poll.options.find((o) => o.id === id)?.voteCount ?? 0),
+          (sum, id) => sum + (poll.options.find((o) => o.id === id)?.voteCount ?? 0),
           0,
         );
         const ok = await new Promise<boolean>((resolve) => {
@@ -305,10 +273,7 @@ function SimpleVotingCard({
         </View>
 
         <Text
-          style={[
-            theme.typography.caption,
-            { color: theme.colors.text.tertiary, marginTop: 6 },
-          ]}
+          style={[theme.typography.caption, { color: theme.colors.text.tertiary, marginTop: 6 }]}
         >
           Tap to vote • Tap again to undo
           {poll.options.some((o) => (o.metadata as { placeId?: string }).placeId)
@@ -317,10 +282,20 @@ function SimpleVotingCard({
         </Text>
 
         {poll.options.length === 0 ? (
-          <View style={[styles.emptyOptions, { borderColor: theme.colors.border.default, backgroundColor: theme.colors.bg.subtle }]}>
+          <View
+            style={[
+              styles.emptyOptions,
+              { borderColor: theme.colors.border.default, backgroundColor: theme.colors.bg.subtle },
+            ]}
+          >
             {canManage ? (
               <>
-                <Text style={[theme.typography.bodySmall, { color: theme.colors.text.secondary, textAlign: 'center', marginBottom: 12 }]}>
+                <Text
+                  style={[
+                    theme.typography.bodySmall,
+                    { color: theme.colors.text.secondary, textAlign: 'center', marginBottom: 12 },
+                  ]}
+                >
                   No options yet — add some so everyone can vote.
                 </Text>
                 <Button
@@ -332,7 +307,12 @@ function SimpleVotingCard({
                 />
               </>
             ) : (
-              <Text style={[theme.typography.bodySmall, { color: theme.colors.text.tertiary, textAlign: 'center' }]}>
+              <Text
+                style={[
+                  theme.typography.bodySmall,
+                  { color: theme.colors.text.tertiary, textAlign: 'center' },
+                ]}
+              >
                 No options yet — the host is still setting this up.
               </Text>
             )}
@@ -342,10 +322,9 @@ function SimpleVotingCard({
             {sortedOptions.map((opt) => {
               const isMyVote = opt.isMyVote;
               const pct =
-                poll.totalVotes > 0
-                  ? Math.round((opt.voteCount / poll.totalVotes) * 100)
-                  : 0;
-              const meta = (opt.metadata as { emoji?: string | null; placeId?: string | null }) ?? {};
+                poll.totalVotes > 0 ? Math.round((opt.voteCount / poll.totalVotes) * 100) : 0;
+              const meta =
+                (opt.metadata as { emoji?: string | null; placeId?: string | null }) ?? {};
               return (
                 <Pressable
                   key={opt.id}
@@ -368,9 +347,7 @@ function SimpleVotingCard({
                       backgroundColor: isMyVote
                         ? theme.colors.accent + '15'
                         : theme.colors.bg.subtle,
-                      borderColor: isMyVote
-                        ? theme.colors.accent
-                        : theme.colors.border.default,
+                      borderColor: isMyVote ? theme.colors.accent : theme.colors.border.default,
                     },
                     pressed && { opacity: 0.7 },
                   ]}
@@ -388,15 +365,8 @@ function SimpleVotingCard({
                   />
                   <View style={styles.optionContent}>
                     {isMyVote ? (
-                      <View
-                        style={[
-                          styles.myVoteBadge,
-                          { backgroundColor: theme.colors.accent },
-                        ]}
-                      >
-                        <Text
-                          style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '700' }}
-                        >
+                      <View style={[styles.myVoteBadge, { backgroundColor: theme.colors.accent }]}>
+                        <Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '700' }}>
                           YOUR PICK
                         </Text>
                       </View>
@@ -546,10 +516,7 @@ function RankedVotingCard({
     placeName: string;
   } | null>(null);
 
-  const sortedOptions = useMemo(
-    () => sortRankedByMyRanks(poll.options),
-    [poll.options],
-  );
+  const sortedOptions = useMemo(() => sortRankedByMyRanks(poll.options), [poll.options]);
 
   const myRankCount = poll.myRanks.length;
   const hasVoted = myRankCount > 0;
@@ -560,7 +527,7 @@ function RankedVotingCard({
 
   const handleApplyChanges = async (changes: {
     removeOptionIds: string[];
-    addOptions: Array<{ label: string; metadata?: Record<string, unknown> }>;
+    addOptions: { label: string; metadata?: Record<string, unknown> }[];
   }): Promise<void> => {
     setIsApplyingChanges(true);
     try {
@@ -632,10 +599,7 @@ function RankedVotingCard({
         </View>
 
         <Text
-          style={[
-            theme.typography.caption,
-            { color: theme.colors.text.tertiary, marginTop: 6 },
-          ]}
+          style={[theme.typography.caption, { color: theme.colors.text.tertiary, marginTop: 6 }]}
         >
           {hasVoted
             ? `Your top ${myRankCount} ranked. Tap below to edit.`
@@ -643,10 +607,20 @@ function RankedVotingCard({
         </Text>
 
         {poll.options.length === 0 ? (
-          <View style={[styles.emptyOptions, { borderColor: theme.colors.border.default, backgroundColor: theme.colors.bg.subtle }]}>
+          <View
+            style={[
+              styles.emptyOptions,
+              { borderColor: theme.colors.border.default, backgroundColor: theme.colors.bg.subtle },
+            ]}
+          >
             {canManage ? (
               <>
-                <Text style={[theme.typography.bodySmall, { color: theme.colors.text.secondary, textAlign: 'center', marginBottom: 12 }]}>
+                <Text
+                  style={[
+                    theme.typography.bodySmall,
+                    { color: theme.colors.text.secondary, textAlign: 'center', marginBottom: 12 },
+                  ]}
+                >
                   No options yet — add some so everyone can rank.
                 </Text>
                 <Button
@@ -658,7 +632,12 @@ function RankedVotingCard({
                 />
               </>
             ) : (
-              <Text style={[theme.typography.bodySmall, { color: theme.colors.text.tertiary, textAlign: 'center' }]}>
+              <Text
+                style={[
+                  theme.typography.bodySmall,
+                  { color: theme.colors.text.tertiary, textAlign: 'center' },
+                ]}
+              >
                 No options yet — the host is still setting this up.
               </Text>
             )}
@@ -667,7 +646,8 @@ function RankedVotingCard({
           <>
             <View style={{ marginTop: 12, gap: 4 }}>
               {sortedOptions.slice(0, 6).map((opt) => {
-                const meta = (opt.metadata as { emoji?: string | null; placeId?: string | null }) ?? {};
+                const meta =
+                  (opt.metadata as { emoji?: string | null; placeId?: string | null }) ?? {};
                 const myRank = opt.myRank;
                 return (
                   <Pressable
@@ -686,26 +666,17 @@ function RankedVotingCard({
                       styles.previewRow,
                       {
                         backgroundColor:
-                          myRank !== null
-                            ? theme.colors.accent + '15'
-                            : theme.colors.bg.subtle,
+                          myRank !== null ? theme.colors.accent + '15' : theme.colors.bg.subtle,
                         borderColor:
-                          myRank !== null
-                            ? theme.colors.accent
-                            : theme.colors.border.default,
+                          myRank !== null ? theme.colors.accent : theme.colors.border.default,
                       },
                     ]}
                   >
                     {myRank !== null ? (
                       <View
-                        style={[
-                          styles.miniRankBadge,
-                          { backgroundColor: theme.colors.accent },
-                        ]}
+                        style={[styles.miniRankBadge, { backgroundColor: theme.colors.accent }]}
                       >
-                        <Text
-                          style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '600' }}
-                        >
+                        <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '600' }}>
                           {myRank}
                         </Text>
                       </View>
@@ -883,10 +854,7 @@ function SuggestingCard({ poll }: { poll: PollWithOptions }): React.ReactElement
         <Badge label="Suggesting" variant="warning" />
       </View>
       <Text
-        style={[
-          theme.typography.bodySmall,
-          { color: theme.colors.text.secondary, marginTop: 8 },
-        ]}
+        style={[theme.typography.bodySmall, { color: theme.colors.text.secondary, marginTop: 8 }]}
       >
         {poll.options.length === 0
           ? 'Waiting for suggestions…'
@@ -920,206 +888,212 @@ function ClosedCard({
   );
 
   function handleDelete() {
-    Alert.alert(
-      'Delete poll?',
-      'This will permanently remove the poll and all votes.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deletePollMut.mutate(poll.id),
-        },
-      ],
-    );
+    Alert.alert('Delete poll?', 'This will permanently remove the poll and all votes.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => deletePollMut.mutate(poll.id),
+      },
+    ]);
   }
 
   return (
     <>
-    <Card padding="md" style={{ marginTop: 12 }}>
-      <View style={styles.headerRow}>
-        <Trophy size={18} color={theme.colors.warning} />
-        <Text
-          style={[
-            theme.typography.bodyMedium,
-            { color: theme.colors.text.primary, marginLeft: 8, flex: 1 },
-          ]}
-        >
-          {poll.title}
-        </Text>
-        {poll.voting_method === 'ranked' ? (
-          <Badge label="Ranked" variant="default" />
-        ) : null}
-      </View>
-
-      {winner ? (
-        <Pressable
-          onLongPress={winnerMeta.placeId ? () => setSheetOpen(true) : undefined}
-          delayLongPress={350}
-          style={[
-            styles.winnerRow,
-            {
-              backgroundColor: theme.colors.accent + '15',
-              borderColor: theme.colors.accent,
-            },
-          ]}
-        >
-          {winnerMeta.emoji ? (
-            <Text style={{ fontSize: 28, marginRight: 12 }}>{winnerMeta.emoji}</Text>
-          ) : null}
-          <View style={{ flex: 1 }}>
-            <Text
-              style={[
-                theme.typography.caption,
-                { color: theme.colors.accent, fontWeight: '600' },
-              ]}
-            >
-              WINNER
-            </Text>
-            <Text
-              style={[
-                theme.typography.h3,
-                { color: theme.colors.text.primary, marginTop: 2 },
-              ]}
-            >
-              {winner.label}
-            </Text>
-            <Text
-              style={[
-                theme.typography.caption,
-                { color: theme.colors.text.tertiary, marginTop: 2 },
-              ]}
-            >
-              {winner.voteCount} of {poll.totalVotes} {poll.totalVotes === 1 ? 'voter' : 'voters'}
-            </Text>
-          </View>
-        </Pressable>
-      ) : (
-        <Text
-          style={[
-            theme.typography.bodySmall,
-            { color: theme.colors.text.secondary, marginTop: 12 },
-          ]}
-        >
-          Closed with no winner picked.
-        </Text>
-      )}
-
-      {/* All results toggle */}
-      {sortedOptions.length > 1 && (
-        <>
-          <Pressable
-            onPress={() => setShowAllResults((v) => !v)}
-            style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+      <Card padding="md" style={{ marginTop: 12 }}>
+        <View style={styles.headerRow}>
+          <Trophy size={18} color={theme.colors.warning} />
+          <Text
+            style={[
+              theme.typography.bodyMedium,
+              { color: theme.colors.text.primary, marginLeft: 8, flex: 1 },
+            ]}
           >
-            <Text style={[theme.typography.caption, { color: theme.colors.accent, fontWeight: '600' }]}>
-              {showAllResults ? 'Hide results' : `See all ${sortedOptions.length} results`}
-            </Text>
+            {poll.title}
+          </Text>
+          {poll.voting_method === 'ranked' ? <Badge label="Ranked" variant="default" /> : null}
+        </View>
+
+        {winner ? (
+          <Pressable
+            onLongPress={winnerMeta.placeId ? () => setSheetOpen(true) : undefined}
+            delayLongPress={350}
+            style={[
+              styles.winnerRow,
+              {
+                backgroundColor: theme.colors.accent + '15',
+                borderColor: theme.colors.accent,
+              },
+            ]}
+          >
+            {winnerMeta.emoji ? (
+              <Text style={{ fontSize: 28, marginRight: 12 }}>{winnerMeta.emoji}</Text>
+            ) : null}
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[
+                  theme.typography.caption,
+                  { color: theme.colors.accent, fontWeight: '600' },
+                ]}
+              >
+                WINNER
+              </Text>
+              <Text
+                style={[theme.typography.h3, { color: theme.colors.text.primary, marginTop: 2 }]}
+              >
+                {winner.label}
+              </Text>
+              <Text
+                style={[
+                  theme.typography.caption,
+                  { color: theme.colors.text.tertiary, marginTop: 2 },
+                ]}
+              >
+                {winner.voteCount} of {poll.totalVotes} {poll.totalVotes === 1 ? 'voter' : 'voters'}
+              </Text>
+            </View>
           </Pressable>
-          {showAllResults && (
-            <View style={{ marginTop: 8, gap: 4 }}>
-              {sortedOptions.map((opt, idx) => {
-                const isWinner = opt.id === poll.winning_option_id;
-                const pct = poll.totalVotes > 0 ? Math.round((opt.voteCount / poll.totalVotes) * 100) : 0;
-                const meta = (opt.metadata as { emoji?: string | null }) ?? {};
-                return (
-                  <View
-                    key={opt.id}
-                    style={[
-                      styles.optionRow,
-                      {
-                        backgroundColor: isWinner
-                          ? theme.colors.accent + '15'
-                          : theme.colors.bg.subtle,
-                        borderColor: isWinner
-                          ? theme.colors.accent
-                          : theme.colors.border.default,
-                      },
-                    ]}
-                  >
+        ) : (
+          <Text
+            style={[
+              theme.typography.bodySmall,
+              { color: theme.colors.text.secondary, marginTop: 12 },
+            ]}
+          >
+            Closed with no winner picked.
+          </Text>
+        )}
+
+        {/* All results toggle */}
+        {sortedOptions.length > 1 && (
+          <>
+            <Pressable
+              onPress={() => setShowAllResults((v) => !v)}
+              style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+            >
+              <Text
+                style={[
+                  theme.typography.caption,
+                  { color: theme.colors.accent, fontWeight: '600' },
+                ]}
+              >
+                {showAllResults ? 'Hide results' : `See all ${sortedOptions.length} results`}
+              </Text>
+            </Pressable>
+            {showAllResults && (
+              <View style={{ marginTop: 8, gap: 4 }}>
+                {sortedOptions.map((opt, idx) => {
+                  const isWinner = opt.id === poll.winning_option_id;
+                  const pct =
+                    poll.totalVotes > 0 ? Math.round((opt.voteCount / poll.totalVotes) * 100) : 0;
+                  const meta = (opt.metadata as { emoji?: string | null }) ?? {};
+                  return (
                     <View
+                      key={opt.id}
                       style={[
-                        styles.progressFill,
+                        styles.optionRow,
                         {
-                          width: `${pct}%`,
                           backgroundColor: isWinner
-                            ? theme.colors.accent + '30'
-                            : theme.colors.border.default + '60',
+                            ? theme.colors.accent + '15'
+                            : theme.colors.bg.subtle,
+                          borderColor: isWinner ? theme.colors.accent : theme.colors.border.default,
                         },
                       ]}
-                    />
-                    <View style={styles.optionContent}>
-                      <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary, width: 18 }]}>
-                        {idx + 1}
-                      </Text>
-                      {meta.emoji ? (
-                        <Text style={{ fontSize: 14, marginRight: 6 }}>{meta.emoji}</Text>
-                      ) : null}
-                      <Text
+                    >
+                      <View
                         style={[
-                          theme.typography.bodySmall,
+                          styles.progressFill,
                           {
-                            color: theme.colors.text.primary,
-                            flex: 1,
-                            fontWeight: isWinner ? '600' : '400',
+                            width: `${pct}%`,
+                            backgroundColor: isWinner
+                              ? theme.colors.accent + '30'
+                              : theme.colors.border.default + '60',
                           },
                         ]}
-                        numberOfLines={1}
-                      >
-                        {opt.label}
-                      </Text>
-                      <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, minWidth: 50, textAlign: 'right' }]}>
-                        {opt.voteCount} vote{opt.voteCount !== 1 ? 's' : ''} · {pct}%
-                      </Text>
+                      />
+                      <View style={styles.optionContent}>
+                        <Text
+                          style={[
+                            theme.typography.caption,
+                            { color: theme.colors.text.tertiary, width: 18 },
+                          ]}
+                        >
+                          {idx + 1}
+                        </Text>
+                        {meta.emoji ? (
+                          <Text style={{ fontSize: 14, marginRight: 6 }}>{meta.emoji}</Text>
+                        ) : null}
+                        <Text
+                          style={[
+                            theme.typography.bodySmall,
+                            {
+                              color: theme.colors.text.primary,
+                              flex: 1,
+                              fontWeight: isWinner ? '600' : '400',
+                            },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {opt.label}
+                        </Text>
+                        <Text
+                          style={[
+                            theme.typography.caption,
+                            {
+                              color: theme.colors.text.secondary,
+                              minWidth: 50,
+                              textAlign: 'right',
+                            },
+                          ]}
+                        >
+                          {opt.voteCount} vote{opt.voteCount !== 1 ? 's' : ''} · {pct}%
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                );
-              })}
-            </View>
-          )}
-        </>
-      )}
+                  );
+                })}
+              </View>
+            )}
+          </>
+        )}
 
-      {/* Host management buttons */}
-      {canManage && (
-        <View style={{ marginTop: 12, gap: 8 }}>
-          <Button
-            label="Reopen for voting"
-            variant="ghost"
-            size="sm"
-            onPress={() => reopenPollMut.mutate(poll.id)}
-            loading={reopenPollMut.isPending}
-            fullWidth
-          />
-          <Button
-            label="Delete poll"
-            variant="ghost"
-            size="sm"
-            onPress={handleDelete}
-            loading={deletePollMut.isPending}
-            fullWidth
-          />
-        </View>
-      )}
-    </Card>
+        {/* Host management buttons */}
+        {canManage && (
+          <View style={{ marginTop: 12, gap: 8 }}>
+            <Button
+              label="Reopen for voting"
+              variant="ghost"
+              size="sm"
+              onPress={() => reopenPollMut.mutate(poll.id)}
+              loading={reopenPollMut.isPending}
+              fullWidth
+            />
+            <Button
+              label="Delete poll"
+              variant="ghost"
+              size="sm"
+              onPress={handleDelete}
+              loading={deletePollMut.isPending}
+              fullWidth
+            />
+          </View>
+        )}
+      </Card>
 
-    {winnerMeta.placeId ? (
-      <PlaceDetailSheet
-        visible={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        placeId={winnerMeta.placeId}
-        placeName={winner!.label}
-        pollPhase="closed"
-      />
-    ) : null}
+      {winnerMeta.placeId ? (
+        <PlaceDetailSheet
+          visible={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          placeId={winnerMeta.placeId}
+          placeName={winner!.label}
+          pollPhase="closed"
+        />
+      ) : null}
     </>
   );
 }
 
-function closePollWithConfirm(
-  poll: PollWithOptions,
-  onConfirm: () => void,
-): void {
+function closePollWithConfirm(poll: PollWithOptions, onConfirm: () => void): void {
   Alert.alert(
     'Close poll?',
     poll.voting_method === 'ranked'

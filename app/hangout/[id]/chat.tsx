@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { ArrowDown } from 'lucide-react-native';
+import { ArrowDown, MessageCircle } from 'lucide-react-native';
 import { Screen } from '@/components/layout/Screen';
 import { useTheme } from '@/hooks/useTheme';
 import { useSession } from '@/features/auth';
@@ -30,7 +30,6 @@ import { softDeleteMessage } from '@/features/messaging/services/messages.servic
 import { messagesKey } from '@/features/messaging/hooks/useMessages';
 import { unreadCountKey } from '@/features/messaging/hooks/useUnreadCount';
 import { EmptyState } from '@/components/ui';
-import { MessageCircle } from 'lucide-react-native';
 import type { Message } from '@/features/messaging';
 
 // How far from bottom before we show the "scroll down" FAB
@@ -48,9 +47,7 @@ function buildListItems(messages: Message[]): ListItem[] {
     const prev = messages[i - 1];
 
     const showSep =
-      !prev ||
-      new Date(msg.created_at).toDateString() !==
-        new Date(prev.created_at).toDateString();
+      !prev || new Date(msg.created_at).toDateString() !== new Date(prev.created_at).toDateString();
 
     if (showSep) {
       items.push({
@@ -64,9 +61,7 @@ function buildListItems(messages: Message[]): ListItem[] {
       prev &&
       prev.sender_id === msg.sender_id &&
       !showSep &&
-      new Date(msg.created_at).getTime() -
-        new Date(prev.created_at).getTime() <
-        2 * 60 * 1000;
+      new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() < 2 * 60 * 1000;
 
     items.push({ type: 'message', message: msg, showHeader: !sameGroup });
   }
@@ -138,7 +133,11 @@ export default function ChatScreen(): React.ReactElement {
         pages: prev.pages.map((p: Message[]) => p.filter((m) => m.id !== msg.id)),
       };
     });
-    sendMessage.mutate({ hangoutId, body: msg.body, replyToMessageId: msg.reply_to_message_id ?? undefined });
+    sendMessage.mutate({
+      hangoutId,
+      body: msg.body,
+      replyToMessageId: msg.reply_to_message_id ?? undefined,
+    });
   };
 
   const handleDelete = useCallback(
@@ -205,7 +204,9 @@ export default function ChatScreen(): React.ReactElement {
             </View>
           ) : messages.length === 0 ? (
             <EmptyState
-              icon={<MessageCircle size={42} color={theme.colors.text.tertiary} strokeWidth={1.5} />}
+              icon={
+                <MessageCircle size={42} color={theme.colors.text.tertiary} strokeWidth={1.5} />
+              }
               title="Say hi to the group"
               body="You're the first one here. Send a message!"
             />
@@ -213,9 +214,7 @@ export default function ChatScreen(): React.ReactElement {
             <FlatList
               ref={listRef}
               data={invertedItems}
-              keyExtractor={(item) =>
-                item.type === 'date' ? item.key : item.message.id
-              }
+              keyExtractor={(item) => (item.type === 'date' ? item.key : item.message.id)}
               renderItem={renderItem}
               inverted
               contentContainerStyle={styles.list}
@@ -228,10 +227,7 @@ export default function ChatScreen(): React.ReactElement {
               scrollEventThrottle={100}
               ListFooterComponent={
                 isFetchingOlder ? (
-                  <ActivityIndicator
-                    style={{ paddingVertical: 16 }}
-                    color={theme.colors.accent}
-                  />
+                  <ActivityIndicator style={{ paddingVertical: 16 }} color={theme.colors.accent} />
                 ) : null
               }
             />
@@ -245,9 +241,7 @@ export default function ChatScreen(): React.ReactElement {
             >
               <ArrowDown size={18} color="#FFFFFF" />
               {newCount > 0 && (
-                <Text style={styles.fabCount}>
-                  {newCount > 99 ? '99+' : newCount} new
-                </Text>
+                <Text style={styles.fabCount}>{newCount > 99 ? '99+' : newCount} new</Text>
               )}
             </Pressable>
           )}

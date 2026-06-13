@@ -1,8 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, runOnJS } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/useTheme';
 import type { AvailabilityResponse } from '../types';
 
@@ -56,16 +55,24 @@ function getCellStyle(
   if (isMe) return { bg: ACCENT };
   if (count > 0) {
     const opacity = Math.round((count / Math.max(total, 1)) * 0.35 * 255)
-      .toString(16).padStart(2, '0');
+      .toString(16)
+      .padStart(2, '0');
     return { bg: ACCENT + opacity };
   }
   return { bg: 'transparent' };
 }
 
 export function AvailabilityGrid({
-  dates, startHour, endHour,
-  myUserId, mySlots, responses,
-  onToggle, onSlotsChange, onDragStart, onDragEnd,
+  dates,
+  startHour,
+  endHour,
+  myUserId,
+  mySlots,
+  responses,
+  onToggle,
+  onSlotsChange,
+  onDragStart,
+  onDragEnd,
 }: Props) {
   const theme = useTheme();
 
@@ -184,8 +191,12 @@ export function AvailabilityGrid({
   }
 
   const panGesture = Gesture.Pan()
-    .onBegin((e) => { runOnJS(handleBegin)(e.x, e.y); })
-    .onUpdate((e) => { runOnJS(handleUpdate)(e.x, e.y, e.translationX, e.translationY); })
+    .onBegin((e) => {
+      runOnJS(handleBegin)(e.x, e.y);
+    })
+    .onUpdate((e) => {
+      runOnJS(handleUpdate)(e.x, e.y, e.translationX, e.translationY);
+    })
     .onFinalize((e) => {
       runOnJS(handleFinalize)(Math.abs(e.translationX) + Math.abs(e.translationY));
     });
@@ -209,7 +220,10 @@ export function AvailabilityGrid({
         <View>
           {/* Date headers */}
           <View
-            style={[styles.headerRow, { backgroundColor: bgSurface, borderBottomColor: borderColor }]}
+            style={[
+              styles.headerRow,
+              { backgroundColor: bgSurface, borderBottomColor: borderColor },
+            ]}
             onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}
           >
             <View style={{ width: HOUR_COL_W }} />
@@ -323,7 +337,13 @@ const styles = StyleSheet.create({
   },
   dateHeader: { alignItems: 'center', gap: 4 },
   dateWeekday: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3, textTransform: 'uppercase' },
-  dateDayCircle: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  dateDayCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   dateDay: { fontSize: 14, fontWeight: '700' },
   hourRow: { flexDirection: 'row', alignItems: 'center' },
   hourLabel: { alignItems: 'flex-end', paddingRight: 8 },
@@ -332,14 +352,22 @@ const styles = StyleSheet.create({
   bestGlow: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(34,197,94,0.15)' },
   cellCheck: { fontSize: 12, color: '#FFFFFF', fontWeight: '800' },
   respondents: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: 12, marginTop: 4, borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    marginTop: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   respondentsLabel: { fontSize: 12, fontWeight: '500' },
   respondentAvatars: { flexDirection: 'row', gap: -4 },
   respondentDot: {
-    width: 28, height: 28, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
   },
   respondentInitial: { fontSize: 11, fontWeight: '700', color: '#FFFFFF' },
 });

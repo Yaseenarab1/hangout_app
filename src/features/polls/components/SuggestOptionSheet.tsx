@@ -6,8 +6,7 @@ import { Button } from '@/components/ui';
 import { toast } from '@/stores/ui.store';
 import { CuisineOptionPicker } from '@/features/food/components/CuisineOptionPicker';
 import { RestaurantSearchPicker } from '@/features/food/components/RestaurantSearchPicker';
-import type { CuisineOption } from '@/features/food/types';
-import type { RestaurantOption } from '@/features/food/types';
+import type { CuisineOption, RestaurantOption } from '@/features/food/types';
 import { ActivityOptionPicker, type ActivityOption } from './ActivityOptionPicker';
 import { ActivityVenuePicker, type ActivityVenueOption } from './ActivityVenuePicker';
 import { useAddOptionsBatch } from '../hooks/usePolls';
@@ -51,7 +50,7 @@ export function SuggestOptionSheet({
     }
   }, [visible]);
 
-  function buildAddOptions(): Array<{ label: string; metadata?: Record<string, unknown> }> {
+  function buildAddOptions(): { label: string; metadata?: Record<string, unknown> }[] {
     if (pollKind === 'activity') {
       const existingCatalogIds = new Set(
         existing.map((e) => (e.metadata as { catalogId?: string }).catalogId).filter(Boolean),
@@ -170,9 +169,7 @@ export function SuggestOptionSheet({
       <View style={[styles.container, { backgroundColor: theme.colors.bg.canvas }]}>
         <View style={[styles.header, { borderBottomColor: theme.colors.border.default }]}>
           <View style={{ flex: 1 }}>
-            <Text style={[theme.typography.h3, { color: theme.colors.text.primary }]}>
-              {title}
-            </Text>
+            <Text style={[theme.typography.h3, { color: theme.colors.text.primary }]}>{title}</Text>
             <Text
               style={[
                 theme.typography.caption,
@@ -196,12 +193,7 @@ export function SuggestOptionSheet({
               max={5}
             />
           ) : pollKind === 'cuisine' ? (
-            <CuisineOptionPicker
-              value={cuisineValue}
-              onChange={setCuisineValue}
-              min={0}
-              max={5}
-            />
+            <CuisineOptionPicker value={cuisineValue} onChange={setCuisineValue} min={0} max={5} />
           ) : pollKind === 'venue' ? (
             <ActivityVenuePicker
               value={venueValue}
@@ -225,11 +217,7 @@ export function SuggestOptionSheet({
 
         <View style={[styles.footer, { borderTopColor: theme.colors.border.default }]}>
           <Button
-            label={
-              selectedCount === 0
-                ? 'Pick something first'
-                : `Add ${selectedCount} to poll`
-            }
+            label={selectedCount === 0 ? 'Pick something first' : `Add ${selectedCount} to poll`}
             onPress={handleSave}
             disabled={selectedCount === 0 || addBatch.isPending}
             loading={addBatch.isPending}

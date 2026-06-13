@@ -1,10 +1,7 @@
 import { supabase } from '@/services/supabase/client';
 import { TABLES } from '@/services/supabase/tables';
 import { createHangout } from '@/features/hangouts/services/hangouts.service';
-import type {
-  CreateFoodHangoutInput,
-  CreateRestaurantPollInput,
-} from '../schemas';
+import type { CreateFoodHangoutInput, CreateRestaurantPollInput } from '../schemas';
 import type { Poll } from '@/features/polls';
 
 /**
@@ -29,7 +26,7 @@ export async function createFoodHangout(
 
   let pollKind: 'cuisine' | 'restaurant';
   let pollTitle: string;
-  let optionRows: Array<{ label: string; metadata: Record<string, unknown> }>;
+  let optionRows: { label: string; metadata: Record<string, unknown> }[];
 
   if (input.flow === 'restaurant_only') {
     pollKind = 'restaurant';
@@ -83,18 +80,14 @@ export async function createFoodHangout(
       label: r.label,
       metadata: r.metadata,
     }));
-    const { error: optErr } = await supabase
-      .from(TABLES.poll_options)
-      .insert(fullRows as any);
+    const { error: optErr } = await supabase.from(TABLES.poll_options).insert(fullRows as any);
     if (optErr) throw optErr;
   }
 
   return { hangoutId: hangout.id, pollId: (poll as Poll).id };
 }
 
-export async function createRestaurantPoll(
-  input: CreateRestaurantPollInput,
-): Promise<Poll> {
+export async function createRestaurantPoll(input: CreateRestaurantPollInput): Promise<Poll> {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error('Not authenticated');
 
@@ -131,9 +124,7 @@ export async function createRestaurantPoll(
     },
   }));
 
-  const { error: optErr } = await supabase
-    .from(TABLES.poll_options)
-    .insert(optionRows);
+  const { error: optErr } = await supabase.from(TABLES.poll_options).insert(optionRows);
 
   if (optErr) throw optErr;
 
@@ -205,9 +196,6 @@ export async function saveCustomRestaurant(input: {
 }
 
 export async function deleteCustomRestaurant(id: string): Promise<void> {
-  const { error } = await (supabase as any)
-    .from('user_custom_restaurants')
-    .delete()
-    .eq('id', id);
+  const { error } = await (supabase as any).from('user_custom_restaurants').delete().eq('id', id);
   if (error) throw error;
 }

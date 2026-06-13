@@ -1,7 +1,11 @@
-import { usePollsByHangout } from '@/features/polls';
+import {
+  usePollsByHangout,
+  PollCard,
+  PollFollowUpCard,
+  AddPollSheet,
+  usePoll,
+} from '@/features/polls';
 import React, { useMemo, useState, useCallback } from 'react';
-import { PollCard, PollFollowUpCard, AddPollSheet } from '@/features/polls';
-import { usePoll} from '@/features/polls';
 import { View, Text, StyleSheet, Alert, Pressable, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import {
@@ -29,18 +33,14 @@ import { usePhotosSummary } from '@/features/photos/hooks/usePhotosSummary';
 import { useUserBalance } from '@/features/bills/hooks/useUserBalance';
 import { formatCents } from '@/features/bills/utils/split';
 import { autocompleteAddress, getPlaceDetails } from '@/features/places';
-import { useSaveSearchLocation, useSearchLocation } from '@/features/places/hooks/useSearchLocation';
+import {
+  useSaveSearchLocation,
+  useSearchLocation,
+} from '@/features/places/hooks/useSearchLocation';
 import { toast } from '@/stores/ui.store';
 import { Image } from 'expo-image';
 import { Screen } from '@/components/layout/Screen';
-import {
-  Button,
-  Card,
-  Badge,
-  Skeleton,
-  EmptyState,
-  SectionHeader,
-} from '@/components/ui';
+import { Button, Card, Badge, Skeleton, EmptyState, SectionHeader } from '@/components/ui';
 import { useTheme } from '@/hooks/useTheme';
 import { useSession } from '@/features/auth';
 import { useQuery } from '@tanstack/react-query';
@@ -70,8 +70,6 @@ function useWebRsvps(hangoutId: string) {
     staleTime: 30 * 1000,
   });
 }
-
-
 
 function PollFollowUpCardWrapper({
   pollId,
@@ -140,9 +138,7 @@ export default function HangoutDetailScreen(): React.ReactElement {
   }
 
   const isHost = hangout.data?.host_id === user?.id;
-  const myParticipationRole = hangout.data?.participants.find(
-     (p) => p.user_id === user?.id,
-  )?.role;
+  const myParticipationRole = hangout.data?.participants.find((p) => p.user_id === user?.id)?.role;
   const canManage = isHost || myParticipationRole === 'co_host';
 
   const isCancelled = hangout.data?.status === 'cancelled';
@@ -157,21 +153,17 @@ export default function HangoutDetailScreen(): React.ReactElement {
   };
 
   const handleCancel = (): void => {
-    Alert.alert(
-      'Cancel hangout?',
-      'Everyone invited will be notified.',
-      [
-        { text: 'Keep planning', style: 'cancel' },
-        {
-          text: 'Cancel hangout',
-          style: 'destructive',
-          onPress: () =>
-            cancelHangout.mutate(undefined, {
-              onSuccess: () => router.back(),
-            }),
-        },
-      ],
-    );
+    Alert.alert('Cancel hangout?', 'Everyone invited will be notified.', [
+      { text: 'Keep planning', style: 'cancel' },
+      {
+        text: 'Cancel hangout',
+        style: 'destructive',
+        onPress: () =>
+          cancelHangout.mutate(undefined, {
+            onSuccess: () => router.back(),
+          }),
+      },
+    ]);
   };
 
   // Loading state
@@ -204,14 +196,14 @@ export default function HangoutDetailScreen(): React.ReactElement {
 
   // "Going" list = host + explicitly accepted participants only
   const goingParticipants = [...h.participants]
-    .filter(p => p.role === 'host' || p.status === 'accepted')
+    .filter((p) => p.role === 'host' || p.status === 'accepted')
     .sort((a, b) => {
       if (a.role === 'host' && b.role !== 'host') return -1;
       if (b.role === 'host' && a.role !== 'host') return 1;
       return 0;
     });
   const pendingCount = h.participants.filter(
-    p => p.role !== 'host' && (p.status === 'invited' || p.status === 'maybe'),
+    (p) => p.role !== 'host' && (p.status === 'invited' || p.status === 'maybe'),
   ).length;
 
   // Keep for legacy uses (acceptedCount used in other places)
@@ -237,11 +229,13 @@ export default function HangoutDetailScreen(): React.ReactElement {
     >
       {/* Title + status */}
       <View style={styles.header}>
-        <Text style={[theme.typography.h1, { color: theme.colors.text.primary }]}>
-          {h.title}
-        </Text>
+        <Text style={[theme.typography.h1, { color: theme.colors.text.primary }]}>{h.title}</Text>
         <Pressable
-          onPress={canManage && !isCancelled ? () => router.push(`/hangout/${hangoutId}/settings` as any) : undefined}
+          onPress={
+            canManage && !isCancelled
+              ? () => router.push(`/hangout/${hangoutId}/settings` as any)
+              : undefined
+          }
           style={{ alignSelf: 'flex-start', marginTop: 8 }}
           hitSlop={8}
         >
@@ -252,9 +246,7 @@ export default function HangoutDetailScreen(): React.ReactElement {
       {/* Description */}
       {h.description ? (
         <Card padding="md" variant="subtle" style={{ marginTop: 16 }}>
-          <Text
-            style={[theme.typography.body, { color: theme.colors.text.primary }]}
-          >
+          <Text style={[theme.typography.body, { color: theme.colors.text.primary }]}>
             {h.description}
           </Text>
         </Card>
@@ -290,7 +282,7 @@ export default function HangoutDetailScreen(): React.ReactElement {
       </View>
 
       {/* RSVP — for non-hosts */}
-        {!isHost && myParticipation && !isCancelled ? (
+      {!isHost && myParticipation && !isCancelled ? (
         <View style={styles.rsvpSection}>
           <Text
             style={[
@@ -303,21 +295,36 @@ export default function HangoutDetailScreen(): React.ReactElement {
           <View style={styles.rsvpButtons}>
             <RSVPButton
               label="Going"
-              icon={<CheckCircle size={15} color={myParticipation.status === 'accepted' ? '#FFFFFF' : '#22C55E'} />}
+              icon={
+                <CheckCircle
+                  size={15}
+                  color={myParticipation.status === 'accepted' ? '#FFFFFF' : '#22C55E'}
+                />
+              }
               active={myParticipation.status === 'accepted'}
               activeColor="#22C55E"
               onPress={() => handleRSVP('accepted')}
             />
             <RSVPButton
               label="Maybe"
-              icon={<HelpCircle size={15} color={myParticipation.status === 'maybe' ? '#FFFFFF' : '#F59E0B'} />}
+              icon={
+                <HelpCircle
+                  size={15}
+                  color={myParticipation.status === 'maybe' ? '#FFFFFF' : '#F59E0B'}
+                />
+              }
               active={myParticipation.status === 'maybe'}
               activeColor="#F59E0B"
               onPress={() => handleRSVP('maybe')}
             />
             <RSVPButton
               label="Can't"
-              icon={<XCircle size={15} color={myParticipation.status === 'declined' ? '#FFFFFF' : '#EF4444'} />}
+              icon={
+                <XCircle
+                  size={15}
+                  color={myParticipation.status === 'declined' ? '#FFFFFF' : '#EF4444'}
+                />
+              }
               active={myParticipation.status === 'declined'}
               activeColor="#EF4444"
               onPress={() => handleRSVP('declined')}
@@ -333,7 +340,11 @@ export default function HangoutDetailScreen(): React.ReactElement {
           <View style={styles.planChoiceStack}>
             {/* Find a time together */}
             <Pressable
-              onPress={canUseWhenToMeet ? () => router.push(`/hangout/${hangoutId}/when-to-meet` as any) : undefined}
+              onPress={
+                canUseWhenToMeet
+                  ? () => router.push(`/hangout/${hangoutId}/when-to-meet` as any)
+                  : undefined
+              }
               style={({ pressed }) => [
                 styles.planChoice,
                 {
@@ -347,11 +358,23 @@ export default function HangoutDetailScreen(): React.ReactElement {
                 <Clock size={24} color="#22C55E" strokeWidth={1.8} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700' }]}>
+                <Text
+                  style={[
+                    theme.typography.bodyMedium,
+                    { color: theme.colors.text.primary, fontWeight: '700' },
+                  ]}
+                >
                   Find a time together
                 </Text>
-                <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 2 }]}>
-                  {canUseWhenToMeet ? "Poll the group — see who's free when" : 'Update your RSVP to join'}
+                <Text
+                  style={[
+                    theme.typography.caption,
+                    { color: theme.colors.text.secondary, marginTop: 2 },
+                  ]}
+                >
+                  {canUseWhenToMeet
+                    ? "Poll the group — see who's free when"
+                    : 'Update your RSVP to join'}
                 </Text>
               </View>
               <ChevronRight size={16} color={theme.colors.text.tertiary} strokeWidth={2} />
@@ -359,7 +382,9 @@ export default function HangoutDetailScreen(): React.ReactElement {
 
             {/* We know when */}
             <Pressable
-              onPress={canManage ? () => router.push(`/hangout/${hangoutId}/settings` as any) : undefined}
+              onPress={
+                canManage ? () => router.push(`/hangout/${hangoutId}/settings` as any) : undefined
+              }
               style={({ pressed }) => [
                 styles.planChoice,
                 {
@@ -373,18 +398,40 @@ export default function HangoutDetailScreen(): React.ReactElement {
                 },
               ]}
             >
-              <View style={[styles.planChoiceIcon, { backgroundColor: theme.colors.accent + '18' }]}>
+              <View
+                style={[styles.planChoiceIcon, { backgroundColor: theme.colors.accent + '18' }]}
+              >
                 <Calendar size={24} color={theme.colors.accent} strokeWidth={1.8} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700' }]}>
+                <Text
+                  style={[
+                    theme.typography.bodyMedium,
+                    { color: theme.colors.text.primary, fontWeight: '700' },
+                  ]}
+                >
                   We know when
                 </Text>
-                <Text style={[theme.typography.caption, { color: h.start_time ? theme.colors.accent : theme.colors.text.secondary, marginTop: 2, fontWeight: h.start_time ? '600' : '400' }]}>
-                  {h.start_time ? formatDateTime(h.start_time) : canManage ? 'Tap to set a date and time' : 'Not set yet'}
+                <Text
+                  style={[
+                    theme.typography.caption,
+                    {
+                      color: h.start_time ? theme.colors.accent : theme.colors.text.secondary,
+                      marginTop: 2,
+                      fontWeight: h.start_time ? '600' : '400',
+                    },
+                  ]}
+                >
+                  {h.start_time
+                    ? formatDateTime(h.start_time)
+                    : canManage
+                      ? 'Tap to set a date and time'
+                      : 'Not set yet'}
                 </Text>
               </View>
-              {canManage && <ChevronRight size={16} color={theme.colors.text.tertiary} strokeWidth={2} />}
+              {canManage && (
+                <ChevronRight size={16} color={theme.colors.text.tertiary} strokeWidth={2} />
+              )}
             </Pressable>
           </View>
 
@@ -408,12 +455,25 @@ export default function HangoutDetailScreen(): React.ReactElement {
 
             {/* Restaurant / activity polls */}
             {(polls.data ?? []).map((poll, idx) => {
-              const pollIcon = poll.kind === 'activity'
-                ? <Dices size={18} color="#3B82F6" strokeWidth={1.8} />
-                : <UtensilsCrossed size={18} color="#F59E0B" strokeWidth={1.8} />;
+              const pollIcon =
+                poll.kind === 'activity' ? (
+                  <Dices size={18} color="#3B82F6" strokeWidth={1.8} />
+                ) : (
+                  <UtensilsCrossed size={18} color="#F59E0B" strokeWidth={1.8} />
+                );
               const iconBg = poll.kind === 'activity' ? '#3B82F618' : '#F59E0B18';
-              const pollTitle = poll.kind === 'activity' ? 'What to do' : poll.kind === 'cuisine' ? 'Cuisine vote' : 'Where to eat';
-              const subtitle = poll.phase === 'closed' ? 'Decided ✓' : poll.phase === 'voting' ? 'Voting now' : 'Suggesting options';
+              const pollTitle =
+                poll.kind === 'activity'
+                  ? 'What to do'
+                  : poll.kind === 'cuisine'
+                    ? 'Cuisine vote'
+                    : 'Where to eat';
+              const subtitle =
+                poll.phase === 'closed'
+                  ? 'Decided ✓'
+                  : poll.phase === 'voting'
+                    ? 'Voting now'
+                    : 'Suggesting options';
               return (
                 <React.Fragment key={poll.id}>
                   <DecisionRow
@@ -421,10 +481,14 @@ export default function HangoutDetailScreen(): React.ReactElement {
                     iconBg={iconBg}
                     title={pollTitle}
                     subtitle={subtitle}
-                    onPress={() => {/* PollCard below */}}
+                    onPress={() => {
+                      /* PollCard below */
+                    }}
                     theme={theme}
                   />
-                  {(idx < (polls.data ?? []).length - 1 || (canManage && !isCancelled)) && <RowDivider theme={theme} />}
+                  {(idx < (polls.data ?? []).length - 1 || (canManage && !isCancelled)) && (
+                    <RowDivider theme={theme} />
+                  )}
                 </React.Fragment>
               );
             })}
@@ -488,10 +552,24 @@ export default function HangoutDetailScreen(): React.ReactElement {
           {(webRsvps.data ?? []).map((r, idx) => (
             <View key={r.id}>
               <View style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 }}>
-                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.bg.subtle, alignItems: 'center', justifyContent: 'center' }}>
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: theme.colors.bg.subtle,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
                   <Text style={{ fontSize: 16 }}>🌐</Text>
                 </View>
-                <Text style={[theme.typography.bodyMedium, { flex: 1, color: theme.colors.text.primary }]}>
+                <Text
+                  style={[
+                    theme.typography.bodyMedium,
+                    { flex: 1, color: theme.colors.text.primary },
+                  ]}
+                >
                   {r.name}
                 </Text>
                 <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>
@@ -499,7 +577,13 @@ export default function HangoutDetailScreen(): React.ReactElement {
                 </Text>
               </View>
               {idx < (webRsvps.data ?? []).length - 1 && (
-                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border.default, marginLeft: 62 }} />
+                <View
+                  style={{
+                    height: StyleSheet.hairlineWidth,
+                    backgroundColor: theme.colors.border.default,
+                    marginLeft: 62,
+                  }}
+                />
               )}
             </View>
           ))}
@@ -519,13 +603,25 @@ export default function HangoutDetailScreen(): React.ReactElement {
             <MessageCircle size={20} color="#6366F1" strokeWidth={1.6} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>Chat</Text>
-            <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 1 }]}>
+            <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
+              Chat
+            </Text>
+            <Text
+              style={[
+                theme.typography.caption,
+                { color: theme.colors.text.secondary, marginTop: 1 },
+              ]}
+            >
               Group messages
             </Text>
           </View>
           <UnreadBadge hangoutId={hangoutId} />
-          <ChevronRight size={15} color={theme.colors.text.tertiary} strokeWidth={2} style={{ marginLeft: 6 }} />
+          <ChevronRight
+            size={15}
+            color={theme.colors.text.tertiary}
+            strokeWidth={2}
+            style={{ marginLeft: 6 }}
+          />
         </Pressable>
 
         <RowDivider theme={theme} />
@@ -539,17 +635,31 @@ export default function HangoutDetailScreen(): React.ReactElement {
             <Images size={20} color="#EC4899" strokeWidth={1.6} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>Photos</Text>
-            <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 1 }]}>
+            <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
+              Photos
+            </Text>
+            <Text
+              style={[
+                theme.typography.caption,
+                { color: theme.colors.text.secondary, marginTop: 1 },
+              ]}
+            >
               {photosSummary.count > 0 ? `${photosSummary.count} shared` : 'Add memories'}
             </Text>
           </View>
           {photosSummary.count > 0 && (
             <View style={styles.togetherBadge}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: '#EC4899' }}>{photosSummary.count}</Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#EC4899' }}>
+                {photosSummary.count}
+              </Text>
             </View>
           )}
-          <ChevronRight size={15} color={theme.colors.text.tertiary} strokeWidth={2} style={{ marginLeft: 6 }} />
+          <ChevronRight
+            size={15}
+            color={theme.colors.text.tertiary}
+            strokeWidth={2}
+            style={{ marginLeft: 6 }}
+          />
         </Pressable>
 
         <RowDivider theme={theme} />
@@ -563,17 +673,37 @@ export default function HangoutDetailScreen(): React.ReactElement {
             <Receipt size={20} color="#22C55E" strokeWidth={1.6} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>Bills</Text>
-            <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 1 }]}>
+            <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
+              Bills
+            </Text>
+            <Text
+              style={[
+                theme.typography.caption,
+                { color: theme.colors.text.secondary, marginTop: 1 },
+              ]}
+            >
               Split expenses
             </Text>
           </View>
           {myBalance.data && myBalance.data.net_cents !== 0 && (
-            <Text style={{ fontSize: 13, fontWeight: '700', color: myBalance.data.net_cents > 0 ? '#22C55E' : theme.colors.danger }}>
-              {myBalance.data.net_cents > 0 ? `+${formatCents(myBalance.data.net_cents)}` : formatCents(myBalance.data.net_cents)}
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: '700',
+                color: myBalance.data.net_cents > 0 ? '#22C55E' : theme.colors.danger,
+              }}
+            >
+              {myBalance.data.net_cents > 0
+                ? `+${formatCents(myBalance.data.net_cents)}`
+                : formatCents(myBalance.data.net_cents)}
             </Text>
           )}
-          <ChevronRight size={15} color={theme.colors.text.tertiary} strokeWidth={2} style={{ marginLeft: 6 }} />
+          <ChevronRight
+            size={15}
+            color={theme.colors.text.tertiary}
+            strokeWidth={2}
+            style={{ marginLeft: 6 }}
+          />
         </Pressable>
 
         <RowDivider theme={theme} />
@@ -587,12 +717,24 @@ export default function HangoutDetailScreen(): React.ReactElement {
             <Star size={20} color="#8B5CF6" strokeWidth={1.6} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>Rate restaurants</Text>
-            <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 1 }]}>
+            <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
+              Rate restaurants
+            </Text>
+            <Text
+              style={[
+                theme.typography.caption,
+                { color: theme.colors.text.secondary, marginTop: 1 },
+              ]}
+            >
               Rate places from this hangout
             </Text>
           </View>
-          <ChevronRight size={15} color={theme.colors.text.tertiary} strokeWidth={2} style={{ marginLeft: 6 }} />
+          <ChevronRight
+            size={15}
+            color={theme.colors.text.tertiary}
+            strokeWidth={2}
+            style={{ marginLeft: 6 }}
+          />
         </Pressable>
       </Card>
 
@@ -647,7 +789,9 @@ function DecisionRow({
         <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
           {title}
         </Text>
-        <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 1 }]}>
+        <Text
+          style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 1 }]}
+        >
           {subtitle}
         </Text>
       </View>
@@ -657,14 +801,20 @@ function DecisionRow({
 }
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
-  planning:    { label: 'Planning',       color: '#F59E0B' },
-  scheduled:   { label: 'Locked in',     color: '#3B82F6' },
+  planning: { label: 'Planning', color: '#F59E0B' },
+  scheduled: { label: 'Locked in', color: '#3B82F6' },
   in_progress: { label: 'Happening now', color: '#22C55E' },
-  completed:   { label: 'Wrapped up',    color: '#6B7280' },
-  cancelled:   { label: 'Cancelled',     color: '#EF4444' },
+  completed: { label: 'Wrapped up', color: '#6B7280' },
+  cancelled: { label: 'Cancelled', color: '#EF4444' },
 };
 
-function StatusPill({ status, tappable }: { status: string; tappable: boolean }): React.ReactElement {
+function StatusPill({
+  status,
+  tappable,
+}: {
+  status: string;
+  tappable: boolean;
+}): React.ReactElement {
   const meta = STATUS_META[status] ?? { label: 'Planning', color: '#F59E0B' };
   return (
     <View
@@ -682,19 +832,22 @@ function StatusPill({ status, tappable }: { status: string; tappable: boolean })
     >
       <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: meta.color }} />
       <Text style={{ fontSize: 12, fontWeight: '600', color: meta.color }}>{meta.label}</Text>
-      {tappable && (
-        <Text style={{ fontSize: 11, color: meta.color + 'AA', marginLeft: 1 }}>✎</Text>
-      )}
+      {tappable && <Text style={{ fontSize: 11, color: meta.color + 'AA', marginLeft: 1 }}>✎</Text>}
     </View>
   );
 }
 
 function RowDivider({ theme }: { theme: ReturnType<typeof useTheme> }): React.ReactElement {
   return (
-    <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border.default, marginLeft: 56 }} />
+    <View
+      style={{
+        height: StyleSheet.hairlineWidth,
+        backgroundColor: theme.colors.border.default,
+        marginLeft: 56,
+      }}
+    />
   );
 }
-
 
 function Fact({
   icon,
@@ -713,9 +866,7 @@ function Fact({
   const inner = (
     <>
       <View style={{ marginBottom: 8 }}>{icon}</View>
-      <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary }]}>
-        {label}
-      </Text>
+      <Text style={[theme.typography.caption, { color: theme.colors.text.tertiary }]}>{label}</Text>
       <Text
         style={[
           theme.typography.bodySmallMedium,
@@ -726,7 +877,12 @@ function Fact({
         {value}
       </Text>
       {actionLabel && (
-        <Text style={[theme.typography.caption, { color: theme.colors.accent, fontWeight: '600', marginTop: 6 }]}>
+        <Text
+          style={[
+            theme.typography.caption,
+            { color: theme.colors.accent, fontWeight: '600', marginTop: 6 },
+          ]}
+        >
           {actionLabel}
         </Text>
       )}
@@ -748,7 +904,12 @@ function Fact({
     );
   }
   return (
-    <View style={[styles.fact, { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default }]}>
+    <View
+      style={[
+        styles.fact,
+        { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default },
+      ]}
+    >
       {inner}
     </View>
   );
@@ -781,9 +942,7 @@ function RSVPButton({
       ]}
     >
       {icon}
-      <Text style={[rsvpStyles.label, { color: active ? '#FFFFFF' : activeColor }]}>
-        {label}
-      </Text>
+      <Text style={[rsvpStyles.label, { color: active ? '#FFFFFF' : activeColor }]}>{label}</Text>
       {active && <View style={rsvpStyles.dot} />}
     </Pressable>
   );

@@ -144,5 +144,5 @@ export type CreateItemizedBillParams = {
   tip_cents: number;
   items: BillItem[];
   // participantKey → amount_cents
-  shares: Array<{ user_id?: string; guest_name?: string; amount_cents: number }>;
+  shares: { user_id?: string; guest_name?: string; amount_cents: number }[];
 };

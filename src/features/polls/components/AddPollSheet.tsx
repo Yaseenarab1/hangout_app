@@ -1,13 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   Activity,
   Building2,
@@ -25,13 +17,9 @@ import { Button, Input } from '@/components/ui';
 import { SummaryRow } from '@/components/ui/SummaryRow';
 import { CuisineOptionPicker } from '@/features/food/components/CuisineOptionPicker';
 import { RestaurantSearchPicker } from '@/features/food/components/RestaurantSearchPicker';
-import type { CuisineOption } from '@/features/food/types';
-import type { RestaurantOption } from '@/features/food/types';
+import type { CuisineOption, RestaurantOption } from '@/features/food/types';
 import { ActivityOptionPicker, type ActivityOption } from './ActivityOptionPicker';
-import {
-  ActivityVenuePicker,
-  type ActivityVenueOption,
-} from './ActivityVenuePicker';
+import { ActivityVenuePicker, type ActivityVenueOption } from './ActivityVenuePicker';
 import { VotingStyleSheet } from './VotingStyleSheet';
 import { VoteDeadlineSheet } from './VoteDeadlineSheet';
 import { useCreatePollOnHangout } from '../hooks/usePolls';
@@ -113,7 +101,7 @@ export function AddPollSheet({
 
   const canCreate = optionCount >= 2;
 
-  function buildOptions(): Array<{ label: string; metadata?: Record<string, unknown> }> {
+  function buildOptions(): { label: string; metadata?: Record<string, unknown> }[] {
     if (kind === 'activity') {
       return activityValue.map((v) => ({
         label: v.label,
@@ -193,16 +181,16 @@ export function AddPollSheet({
             </Pressable>
           </View>
 
-          <ScrollView
-            contentContainerStyle={styles.kindList}
-            showsVerticalScrollIndicator={false}
-          >
+          <ScrollView contentContainerStyle={styles.kindList} showsVerticalScrollIndicator={false}>
             {onCalendarPress && (
               <KindChoice
                 icon={<Clock size={24} color="#22C55E" />}
                 title="Find a time"
                 subtitle="See when everyone is free and pick a date."
-                onPress={() => { onClose(); onCalendarPress(); }}
+                onPress={() => {
+                  onClose();
+                  onCalendarPress();
+                }}
               />
             )}
             <KindChoice
@@ -323,7 +311,12 @@ export function AddPollSheet({
 
         <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: 12 }}>
           {kind === 'activity' ? (
-            <ActivityOptionPicker value={activityValue} onChange={setActivityValue} min={2} max={15} />
+            <ActivityOptionPicker
+              value={activityValue}
+              onChange={setActivityValue}
+              min={2}
+              max={15}
+            />
           ) : kind === 'cuisine' ? (
             <CuisineOptionPicker value={cuisineValue} onChange={setCuisineValue} min={2} max={15} />
           ) : kind === 'venue' ? (
@@ -337,7 +330,13 @@ export function AddPollSheet({
               max={10}
             />
           ) : (
-            <RestaurantSearchPicker value={restaurantValue} onChange={setRestaurantValue} hangoutId={hangoutId} min={2} max={15} />
+            <RestaurantSearchPicker
+              value={restaurantValue}
+              onChange={setRestaurantValue}
+              hangoutId={hangoutId}
+              min={2}
+              max={15}
+            />
           )}
         </View>
 

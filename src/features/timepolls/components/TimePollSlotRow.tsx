@@ -27,12 +27,12 @@ type Props = {
 export function TimePollSlotRow({ slot, isReadOnly, isWinner, onVote }: Props) {
   const theme = useTheme();
 
-  const buttons: Array<{
+  const buttons: {
     r: SlotResponse;
     count: number;
     activeColor: string;
     Icon: typeof Check;
-  }> = [
+  }[] = [
     { r: 'yes', count: slot.yesCount, activeColor: '#22C55E', Icon: Check },
     { r: 'maybe', count: slot.maybeCount, activeColor: '#F59E0B', Icon: Minus },
     { r: 'no', count: slot.noCount, activeColor: theme.colors.danger, Icon: X },
@@ -49,7 +49,9 @@ export function TimePollSlotRow({ slot, isReadOnly, isWinner, onVote }: Props) {
       ]}
     >
       <View style={styles.left}>
-        {isWinner && <Trophy size={14} color="#22C55E" strokeWidth={2} style={{ marginBottom: 2 }} />}
+        {isWinner && (
+          <Trophy size={14} color="#22C55E" strokeWidth={2} style={{ marginBottom: 2 }} />
+        )}
         <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary }]}>
           {formatSlotTime(slot.starts_at, slot.ends_at)}
         </Text>
@@ -62,7 +64,13 @@ export function TimePollSlotRow({ slot, isReadOnly, isWinner, onVote }: Props) {
           return isReadOnly ? (
             <View
               key={r}
-              style={[styles.btn, { backgroundColor: theme.colors.bg.muted, borderColor: theme.colors.border.default }]}
+              style={[
+                styles.btn,
+                {
+                  backgroundColor: theme.colors.bg.muted,
+                  borderColor: theme.colors.border.default,
+                },
+              ]}
             >
               <Icon size={14} strokeWidth={2.5} color={activeColor} />
               <Text style={[styles.btnLabel, { color: theme.colors.text.secondary }]}>{count}</Text>
@@ -81,7 +89,12 @@ export function TimePollSlotRow({ slot, isReadOnly, isWinner, onVote }: Props) {
               ]}
             >
               <Icon size={14} strokeWidth={2.5} color={iconColor} />
-              <Text style={[styles.btnLabel, { color: isActive ? '#fff' : theme.colors.text.secondary }]}>
+              <Text
+                style={[
+                  styles.btnLabel,
+                  { color: isActive ? '#fff' : theme.colors.text.secondary },
+                ]}
+              >
                 {count}
               </Text>
             </Pressable>

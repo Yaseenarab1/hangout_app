@@ -27,27 +27,27 @@ import type { AddDayPlanItemInput } from '@/features/dayplan/types';
 
 type Tab = 'eats' | 'activities' | 'custom';
 
-const TABS: Array<{ key: Tab; label: string; emoji: string }> = [
-  { key: 'eats',       label: 'Eats',       emoji: '🍽️' },
-  { key: 'activities', label: 'Activities',  emoji: '🎯' },
-  { key: 'custom',     label: 'Custom',      emoji: '✏️' },
+const TABS: { key: Tab; label: string; emoji: string }[] = [
+  { key: 'eats', label: 'Eats', emoji: '🍽️' },
+  { key: 'activities', label: 'Activities', emoji: '🎯' },
+  { key: 'custom', label: 'Custom', emoji: '✏️' },
 ];
 
 const ACTIVITY_CHIPS = [
   { label: 'Museum', emoji: '🏛️' },
-  { label: 'Park',   emoji: '🌿' },
-  { label: 'Theater',emoji: '🎭' },
-  { label: 'Bowling',emoji: '🎳' },
+  { label: 'Park', emoji: '🌿' },
+  { label: 'Theater', emoji: '🎭' },
+  { label: 'Bowling', emoji: '🎳' },
   { label: 'Movies', emoji: '🎬' },
-  { label: 'Bar',    emoji: '🍸' },
-  { label: 'Golf',   emoji: '⛳' },
-  { label: 'Art',    emoji: '🎨' },
+  { label: 'Bar', emoji: '🍸' },
+  { label: 'Golf', emoji: '⛳' },
+  { label: 'Art', emoji: '🎨' },
 ];
 
 const PRICE_CHIPS = [
-  { label: '$',    value: 1 },
-  { label: '$$',   value: 2 },
-  { label: '$$$',  value: 3 },
+  { label: '$', value: 1 },
+  { label: '$$', value: 2 },
+  { label: '$$$', value: 3 },
   { label: '$$$$', value: 4 },
 ];
 
@@ -150,9 +150,7 @@ export default function DayPlanAddScreen(): React.ReactElement {
           },
         ]}
       >
-        <Text style={[theme.typography.h3, { color: theme.colors.text.primary }]}>
-          Add a stop
-        </Text>
+        <Text style={[theme.typography.h3, { color: theme.colors.text.primary }]}>Add a stop</Text>
         <Pressable
           onPress={() => router.back()}
           hitSlop={12}
@@ -197,7 +195,12 @@ export default function DayPlanAddScreen(): React.ReactElement {
       {/* Custom stop form */}
       {tab === 'custom' ? (
         <View style={styles.customForm}>
-          <Text style={[theme.typography.bodySmallMedium, { color: theme.colors.text.secondary, marginBottom: 8 }]}>
+          <Text
+            style={[
+              theme.typography.bodySmallMedium,
+              { color: theme.colors.text.secondary, marginBottom: 8 },
+            ]}
+          >
             Name
           </Text>
           <TextInput
@@ -218,7 +221,12 @@ export default function DayPlanAddScreen(): React.ReactElement {
             autoCapitalize="sentences"
             returnKeyType="next"
           />
-          <Text style={[theme.typography.bodySmallMedium, { color: theme.colors.text.secondary, marginTop: 16, marginBottom: 8 }]}>
+          <Text
+            style={[
+              theme.typography.bodySmallMedium,
+              { color: theme.colors.text.secondary, marginTop: 16, marginBottom: 8 },
+            ]}
+          >
             Notes (optional)
           </Text>
           <TextInput
@@ -246,9 +254,7 @@ export default function DayPlanAddScreen(): React.ReactElement {
               styles.addCustomBtn,
               {
                 backgroundColor:
-                  !customTitle.trim() || addMutation.isPending
-                    ? theme.colors.bg.subtle
-                    : '#8B5CF6',
+                  !customTitle.trim() || addMutation.isPending ? theme.colors.bg.subtle : '#8B5CF6',
                 opacity: pressed ? 0.8 : 1,
               },
             ]}
@@ -314,7 +320,10 @@ export default function DayPlanAddScreen(): React.ReactElement {
                     <Text
                       style={[
                         theme.typography.caption,
-                        { color: active ? '#FFFFFF' : theme.colors.text.secondary, fontWeight: '700' },
+                        {
+                          color: active ? '#FFFFFF' : theme.colors.text.secondary,
+                          fontWeight: '700',
+                        },
                       ]}
                     >
                       {chip.label}
@@ -333,7 +342,11 @@ export default function DayPlanAddScreen(): React.ReactElement {
               data={ACTIVITY_CHIPS}
               keyExtractor={(c) => c.label}
               contentContainerStyle={styles.activityChips}
-              style={{ maxHeight: 48, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.border.default }}
+              style={{
+                maxHeight: 48,
+                borderBottomWidth: StyleSheet.hairlineWidth,
+                borderBottomColor: theme.colors.border.default,
+              }}
               renderItem={({ item: chip }) => {
                 const active = query === chip.label;
                 return (
@@ -351,7 +364,11 @@ export default function DayPlanAddScreen(): React.ReactElement {
                     <Text
                       style={[
                         theme.typography.caption,
-                        { color: active ? '#FFFFFF' : theme.colors.text.secondary, marginLeft: 4, fontWeight: '600' },
+                        {
+                          color: active ? '#FFFFFF' : theme.colors.text.secondary,
+                          marginLeft: 4,
+                          fontWeight: '600',
+                        },
                       ]}
                     >
                       {chip.label}
@@ -365,7 +382,12 @@ export default function DayPlanAddScreen(): React.ReactElement {
           {/* Results */}
           {!debouncedQuery || debouncedQuery.length < 2 ? (
             <View style={styles.emptyState}>
-              <Text style={[theme.typography.body, { color: theme.colors.text.tertiary, textAlign: 'center' }]}>
+              <Text
+                style={[
+                  theme.typography.body,
+                  { color: theme.colors.text.tertiary, textAlign: 'center' },
+                ]}
+              >
                 {tab === 'eats' ? 'Search for a restaurant' : 'Pick a category or type to search'}
               </Text>
             </View>
@@ -375,13 +397,20 @@ export default function DayPlanAddScreen(): React.ReactElement {
             </View>
           ) : searchQuery.isError ? (
             <View style={styles.emptyState}>
-              <Text style={[theme.typography.body, { color: theme.colors.danger, textAlign: 'center' }]}>
+              <Text
+                style={[theme.typography.body, { color: theme.colors.danger, textAlign: 'center' }]}
+              >
                 Search failed. Check your connection.
               </Text>
             </View>
           ) : results.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={[theme.typography.body, { color: theme.colors.text.tertiary, textAlign: 'center' }]}>
+              <Text
+                style={[
+                  theme.typography.body,
+                  { color: theme.colors.text.tertiary, textAlign: 'center' },
+                ]}
+              >
                 No results for "{debouncedQuery}"
               </Text>
             </View>
@@ -415,7 +444,16 @@ export default function DayPlanAddScreen(): React.ReactElement {
                         contentFit="cover"
                       />
                     ) : (
-                      <View style={[styles.resultPhoto, { backgroundColor: theme.colors.bg.subtle, alignItems: 'center', justifyContent: 'center' }]}>
+                      <View
+                        style={[
+                          styles.resultPhoto,
+                          {
+                            backgroundColor: theme.colors.bg.subtle,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          },
+                        ]}
+                      >
                         <Text style={{ fontSize: 28 }}>{tab === 'eats' ? '🍽️' : '🎯'}</Text>
                       </View>
                     )}
@@ -428,22 +466,37 @@ export default function DayPlanAddScreen(): React.ReactElement {
                         {item.name}
                       </Text>
                       <Text
-                        style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 2 }]}
+                        style={[
+                          theme.typography.caption,
+                          { color: theme.colors.text.secondary, marginTop: 2 },
+                        ]}
                         numberOfLines={1}
                       >
                         {item.address}
                       </Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                      <View
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}
+                      >
                         {item.rating ? (
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                             <Star size={11} color="#F59E0B" fill="#F59E0B" />
-                            <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>
+                            <Text
+                              style={[
+                                theme.typography.caption,
+                                { color: theme.colors.text.secondary },
+                              ]}
+                            >
                               {item.rating.toFixed(1)}
                             </Text>
                           </View>
                         ) : null}
                         {item.priceLevel ? (
-                          <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>
+                          <Text
+                            style={[
+                              theme.typography.caption,
+                              { color: theme.colors.text.secondary },
+                            ]}
+                          >
                             {priceLevelToSymbol(item.priceLevel)}
                           </Text>
                         ) : null}
@@ -454,7 +507,9 @@ export default function DayPlanAddScreen(): React.ReactElement {
                       <ActivityIndicator size="small" color={theme.colors.accent} />
                     ) : (
                       <View style={[styles.addBtn, { backgroundColor: '#8B5CF6' + '18' }]}>
-                        <Text style={{ color: '#8B5CF6', fontWeight: '700', fontSize: 13 }}>Add</Text>
+                        <Text style={{ color: '#8B5CF6', fontWeight: '700', fontSize: 13 }}>
+                          Add
+                        </Text>
                       </View>
                     )}
                   </Pressable>

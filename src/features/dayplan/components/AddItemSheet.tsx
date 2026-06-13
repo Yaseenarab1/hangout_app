@@ -35,7 +35,7 @@ interface Props {
 
 type Tab = 'eats' | 'activities' | 'custom';
 
-const ACTIVITY_CHIPS: Array<{ label: string; emoji: string }> = [
+const ACTIVITY_CHIPS: { label: string; emoji: string }[] = [
   { label: 'Museum', emoji: '🏛️' },
   { label: 'Park', emoji: '🌿' },
   { label: 'Theater', emoji: '🎭' },
@@ -46,7 +46,7 @@ const ACTIVITY_CHIPS: Array<{ label: string; emoji: string }> = [
   { label: 'Art', emoji: '🎨' },
 ];
 
-const PRICE_CHIPS: Array<{ label: string; value: number }> = [
+const PRICE_CHIPS: { label: string; value: number }[] = [
   { label: '$', value: 1 },
   { label: '$$', value: 2 },
   { label: '$$$', value: 3 },
@@ -142,7 +142,12 @@ export function AddItemSheet({ planId, visible, onClose, onAdded }: Props): Reac
     if (!debouncedQuery || debouncedQuery.length < 2) {
       return (
         <View style={styles.emptySearch}>
-          <Text style={[theme.typography.body, { color: theme.colors.text.tertiary, textAlign: 'center' }]}>
+          <Text
+            style={[
+              theme.typography.body,
+              { color: theme.colors.text.tertiary, textAlign: 'center' },
+            ]}
+          >
             {tab === 'eats' ? 'Search for a restaurant' : 'Search or pick a category above'}
           </Text>
         </View>
@@ -158,7 +163,9 @@ export function AddItemSheet({ planId, visible, onClose, onAdded }: Props): Reac
     if (searchQuery.isError) {
       return (
         <View style={styles.emptySearch}>
-          <Text style={[theme.typography.body, { color: theme.colors.danger, textAlign: 'center' }]}>
+          <Text
+            style={[theme.typography.body, { color: theme.colors.danger, textAlign: 'center' }]}
+          >
             Search failed. Check your connection and try again.
           </Text>
         </View>
@@ -168,7 +175,12 @@ export function AddItemSheet({ planId, visible, onClose, onAdded }: Props): Reac
     if (results.length === 0) {
       return (
         <View style={styles.emptySearch}>
-          <Text style={[theme.typography.body, { color: theme.colors.text.tertiary, textAlign: 'center' }]}>
+          <Text
+            style={[
+              theme.typography.body,
+              { color: theme.colors.text.tertiary, textAlign: 'center' },
+            ]}
+          >
             No results found for "{debouncedQuery}"
           </Text>
         </View>
@@ -202,7 +214,16 @@ export function AddItemSheet({ planId, visible, onClose, onAdded }: Props): Reac
                   contentFit="cover"
                 />
               ) : (
-                <View style={[styles.resultPhoto, { backgroundColor: theme.colors.bg.subtle, alignItems: 'center', justifyContent: 'center' }]}>
+                <View
+                  style={[
+                    styles.resultPhoto,
+                    {
+                      backgroundColor: theme.colors.bg.subtle,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    },
+                  ]}
+                >
                   <Text style={{ fontSize: 28 }}>{tab === 'eats' ? '🍽️' : '🎯'}</Text>
                 </View>
               )}
@@ -214,7 +235,10 @@ export function AddItemSheet({ planId, visible, onClose, onAdded }: Props): Reac
                   {item.name}
                 </Text>
                 <Text
-                  style={[theme.typography.caption, { color: theme.colors.text.secondary, marginTop: 2 }]}
+                  style={[
+                    theme.typography.caption,
+                    { color: theme.colors.text.secondary, marginTop: 2 },
+                  ]}
                   numberOfLines={1}
                 >
                   {item.address}
@@ -223,21 +247,23 @@ export function AddItemSheet({ planId, visible, onClose, onAdded }: Props): Reac
                   {item.rating ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                       <Star size={11} color="#F59E0B" fill="#F59E0B" />
-                      <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>
+                      <Text
+                        style={[theme.typography.caption, { color: theme.colors.text.secondary }]}
+                      >
                         {item.rating.toFixed(1)}
                       </Text>
                     </View>
                   ) : null}
                   {item.priceLevel ? (
-                    <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>
+                    <Text
+                      style={[theme.typography.caption, { color: theme.colors.text.secondary }]}
+                    >
                       {priceLevelToSymbol(item.priceLevel)}
                     </Text>
                   ) : null}
                 </View>
               </View>
-              {isAdding ? (
-                <ActivityIndicator size="small" color={theme.colors.accent} />
-              ) : null}
+              {isAdding ? <ActivityIndicator size="small" color={theme.colors.accent} /> : null}
             </Pressable>
           );
         }}
@@ -365,7 +391,10 @@ export function AddItemSheet({ planId, visible, onClose, onAdded }: Props): Reac
                       <Text
                         style={[
                           theme.typography.caption,
-                          { color: active ? '#FFFFFF' : theme.colors.text.secondary, fontWeight: '600' },
+                          {
+                            color: active ? '#FFFFFF' : theme.colors.text.secondary,
+                            fontWeight: '600',
+                          },
                         ]}
                       >
                         {chip.label}

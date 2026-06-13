@@ -7,6 +7,7 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
+  Share,
 } from 'react-native';
 import Animated, {
   FadeIn,
@@ -20,15 +21,14 @@ import Animated, {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CalendarDays, ChevronRight, Plus, Users, Share2 } from 'lucide-react-native';
-import { Share } from 'react-native';
-
-const SUPABASE_URL = 'https://cruosjnuhcuewjnzhlja.supabase.co';
 import { useQuery } from '@tanstack/react-query';
 import { useTheme } from '@/hooks/useTheme';
 import { useSession } from '@/features/auth';
 import { CreateSessionSheet } from '@/features/availability';
 import { getUserSessions } from '@/features/availability/services/availability.service';
 import type { AvailabilitySession } from '@/features/availability';
+
+const SUPABASE_URL = 'https://cruosjnuhcuewjnzhlja.supabase.co';
 
 const ACCENT = '#8B5CF6';
 
@@ -57,13 +57,20 @@ function SessionCard({ item, index }: { item: AvailabilitySession; index: number
 
   return (
     <Animated.View
-      entering={FadeInDown.delay(index * 60).springify().damping(18).stiffness(260)}
+      entering={FadeInDown.delay(index * 60)
+        .springify()
+        .damping(18)
+        .stiffness(260)}
       style={animStyle}
     >
       <Pressable
         onPress={handlePress}
-        onPressIn={() => { scale.value = withTiming(0.97, { duration: 100, easing: Easing.out(Easing.cubic) }); }}
-        onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 400 }); }}
+        onPressIn={() => {
+          scale.value = withTiming(0.97, { duration: 100, easing: Easing.out(Easing.cubic) });
+        }}
+        onPressOut={() => {
+          scale.value = withSpring(1, { damping: 15, stiffness: 400 });
+        }}
         style={[
           styles.card,
           {
@@ -82,7 +89,13 @@ function SessionCard({ item, index }: { item: AvailabilitySession; index: number
         </View>
 
         <View style={{ flex: 1, gap: 3 }}>
-          <Text style={[theme.typography.bodyMedium, { color: theme.colors.text.primary, fontWeight: '700' }]} numberOfLines={1}>
+          <Text
+            style={[
+              theme.typography.bodyMedium,
+              { color: theme.colors.text.primary, fontWeight: '700' },
+            ]}
+            numberOfLines={1}
+          >
             {item.title}
           </Text>
           <Text style={[theme.typography.caption, { color: theme.colors.text.secondary }]}>
@@ -166,15 +179,31 @@ export default function FindTimeScreen(): React.ReactElement {
         <Animated.View entering={FadeIn.duration(400)} style={styles.emptyWrap}>
           <View style={[styles.emptyHero, { backgroundColor: ACCENT + '10' }]}>
             <CalendarDays size={42} color={ACCENT} strokeWidth={1.5} />
-            <View style={[styles.heroDot, { top: 18, right: 22, width: 8, height: 8, backgroundColor: ACCENT + '40' }]} />
-            <View style={[styles.heroDot, { bottom: 20, left: 26, width: 5, height: 5, backgroundColor: ACCENT + '30' }]} />
+            <View
+              style={[
+                styles.heroDot,
+                { top: 18, right: 22, width: 8, height: 8, backgroundColor: ACCENT + '40' },
+              ]}
+            />
+            <View
+              style={[
+                styles.heroDot,
+                { bottom: 20, left: 26, width: 5, height: 5, backgroundColor: ACCENT + '30' },
+              ]}
+            />
           </View>
 
           <Text style={[styles.emptyTitle, { color: theme.colors.text.primary }]}>
             When to Meet
           </Text>
-          <Text style={[theme.typography.body, { color: theme.colors.text.secondary, textAlign: 'center', lineHeight: 22 }]}>
-            Everyone marks their free times on a grid. Best overlapping times light up green — no voting needed.
+          <Text
+            style={[
+              theme.typography.body,
+              { color: theme.colors.text.secondary, textAlign: 'center', lineHeight: 22 },
+            ]}
+          >
+            Everyone marks their free times on a grid. Best overlapping times light up green — no
+            voting needed.
           </Text>
 
           <Pressable
@@ -186,7 +215,15 @@ export default function FindTimeScreen(): React.ReactElement {
           </Pressable>
 
           {/* How it works */}
-          <View style={[styles.howItWorks, { backgroundColor: theme.colors.bg.surface, borderColor: theme.colors.border.default }]}>
+          <View
+            style={[
+              styles.howItWorks,
+              {
+                backgroundColor: theme.colors.bg.surface,
+                borderColor: theme.colors.border.default,
+              },
+            ]}
+          >
             {[
               { emoji: '1️⃣', text: 'Pick dates you want to check (up to 7)' },
               { emoji: '2️⃣', text: "Share with friends — everyone taps when they're free" },
@@ -194,7 +231,12 @@ export default function FindTimeScreen(): React.ReactElement {
             ].map((step) => (
               <View key={step.emoji} style={styles.stepRow}>
                 <Text style={styles.stepEmoji}>{step.emoji}</Text>
-                <Text style={[theme.typography.caption, { color: theme.colors.text.secondary, flex: 1, lineHeight: 18 }]}>
+                <Text
+                  style={[
+                    theme.typography.caption,
+                    { color: theme.colors.text.secondary, flex: 1, lineHeight: 18 },
+                  ]}
+                >
                   {step.text}
                 </Text>
               </View>
