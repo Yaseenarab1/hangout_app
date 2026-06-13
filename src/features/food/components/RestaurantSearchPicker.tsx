@@ -33,6 +33,7 @@ import { CUISINE_CATALOG } from '../catalog/cuisines';
 import type { RestaurantOption } from '../types';
 import { useFriendCompatibility, FriendCompatibilityBar } from '@/features/ratings';
 import type { PlaceCompatibility } from '@/features/ratings';
+import { SuggestedForGroup, type GroupRecommendation } from '@/features/recommendations';
 
 export type RestaurantSearchPickerProps = {
   value: RestaurantOption[];
@@ -41,6 +42,8 @@ export type RestaurantSearchPickerProps = {
   min?: number;
   max?: number;
   participantIds?: string[];
+  /** When set, recommendations resolve the group from this hangout's participants. */
+  hangoutId?: string;
 };
 
 const QUICK_CATEGORIES = [
@@ -103,6 +106,7 @@ export function RestaurantSearchPicker({
   min = 2,
   max = 8,
   participantIds = [],
+  hangoutId,
 }: RestaurantSearchPickerProps): React.ReactElement {
   const theme = useTheme();
   const [query, setQuery] = useState('');
@@ -232,6 +236,26 @@ export function RestaurantSearchPicker({
         primaryType: (m.primaryType as string) ?? null,
         mapsUrl: (m.mapsUrl as string) ?? null,
         isCustom: !item.google_place_id,
+      },
+    ]);
+  };
+
+  const addRecommendation = (rec: GroupRecommendation): void => {
+    if (isAtMax) return;
+    if (rec.placeId && selectedPlaceIds.has(rec.placeId)) return;
+    if (selectedNames.has(rec.name.toLowerCase())) return;
+    onChange([
+      ...value,
+      {
+        id: rec.placeId ? `place:${rec.placeId}` : `rec:${rec.key}`,
+        name: rec.name,
+        address: rec.address ?? null,
+        placeId: rec.placeId ?? undefined,
+        rating: null,
+        priceLevel: null,
+        primaryType: rec.primaryType ?? null,
+        mapsUrl: null,
+        isCustom: !rec.placeId,
       },
     ]);
   };
@@ -367,6 +391,15 @@ export function RestaurantSearchPicker({
             );
           })}
         </ScrollView>
+
+        {/* Suggested for your group — ranked from the group's combined ratings */}
+        <SuggestedForGroup
+          kind="restaurant"
+          participantIds={participantIds}
+          hangoutId={hangoutId}
+          excludeKeys={Array.from(selectedPlaceIds)}
+          onAdd={addRecommendation}
+        />
 
         {/* Saved places */}
         {customRestaurants.data && customRestaurants.data.length > 0 ? (

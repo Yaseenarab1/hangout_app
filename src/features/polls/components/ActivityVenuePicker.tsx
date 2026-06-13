@@ -27,6 +27,7 @@ import { useSearchLocation } from '@/features/places/hooks/useSearchLocation';
 import { filterByRadius } from '@/features/places/utils/distance';
 import { useQuery } from '@tanstack/react-query';
 import type { Place } from '@/features/places';
+import { SuggestedForGroup, type GroupRecommendation } from '@/features/recommendations';
 
 export type ActivityVenueOption = {
   id: string;
@@ -51,6 +52,10 @@ export type ActivityVenuePickerProps = {
   includedTypes?: string[];
   min?: number;
   max?: number;
+  /** Group whose ratings drive "Suggested for your group". */
+  participantIds?: string[];
+  /** When set, recommendations resolve the group from this hangout's participants. */
+  hangoutId?: string;
 };
 
 const PRICE_LEVELS = [
@@ -87,6 +92,8 @@ export function ActivityVenuePicker({
   includedTypes,
   min = 2,
   max = 8,
+  participantIds = [],
+  hangoutId,
 }: ActivityVenuePickerProps): React.ReactElement {
   const theme = useTheme();
   // Pre-fill the search box with the activity query, but make it editable
@@ -175,6 +182,26 @@ export function ActivityVenuePicker({
         primaryType: place.primaryType,
         mapsUrl: place.mapsUrl,
         isCustom: false,
+      },
+    ]);
+  };
+
+  const addRecommendation = (rec: GroupRecommendation): void => {
+    if (isAtMax) return;
+    if (rec.placeId && selectedPlaceIds.has(rec.placeId)) return;
+    if (selectedNames.has(rec.name.toLowerCase())) return;
+    onChange([
+      ...value,
+      {
+        id: rec.placeId ? `place:${rec.placeId}` : `rec:${rec.key}`,
+        name: rec.name,
+        address: rec.address ?? null,
+        placeId: rec.placeId ?? undefined,
+        rating: null,
+        priceLevel: null,
+        primaryType: rec.primaryType ?? null,
+        mapsUrl: null,
+        isCustom: !rec.placeId,
       },
     ]);
   };
@@ -286,6 +313,15 @@ export function ActivityVenuePicker({
           autoCorrect={false}
           trailing={<SearchIcon size={18} color={theme.colors.text.tertiary} />}
           containerStyle={{ marginBottom: 6 }}
+        />
+
+        {/* Suggested for your group — ranked from the group's combined ratings */}
+        <SuggestedForGroup
+          kind="venue"
+          participantIds={participantIds}
+          hangoutId={hangoutId}
+          excludeKeys={Array.from(selectedPlaceIds)}
+          onAdd={addRecommendation}
         />
 
         {/* Always-visible manual add link — before results so it's never buried */}

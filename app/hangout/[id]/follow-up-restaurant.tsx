@@ -71,6 +71,7 @@ export default function FollowUpRestaurantScreen(): React.ReactElement {
             value={restaurants}
             onChange={setRestaurants}
             presetCuisine={cuisine}
+            hangoutId={hangoutId}
             min={2}
             max={10}
           />

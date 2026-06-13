@@ -79,6 +79,19 @@ export function PollCard({
   }
 }
 
+// Strips venue poll title boilerplate to get the activity term for seeding search
+function venueQueryFromTitle(title: string): string {
+  const prefixes = [
+    'Where should we go for ',
+    'Where should we play ',
+    'Where should we watch ',
+  ];
+  for (const p of prefixes) {
+    if (title.startsWith(p)) return title.slice(p.length).replace(/\?$/, '').trim();
+  }
+  return '';
+}
+
 // ============================================================================
 // Voter count component — clearer than just a badge
 // ============================================================================
@@ -459,6 +472,7 @@ function SimpleVotingCard({
       <ManagePollOptionsSheet
         visible={showManage}
         onClose={() => setShowManage(false)}
+        hangoutId={hangoutId}
         pollKind={poll.kind}
         existing={poll.options.map((o) => ({
           id: o.id,
@@ -468,11 +482,13 @@ function SimpleVotingCard({
         }))}
         onSave={handleApplyChanges}
         isSubmitting={isApplyingChanges}
+        venueQuery={poll.kind === 'venue' ? venueQueryFromTitle(poll.title) : undefined}
       />
 
       <SuggestOptionSheet
         visible={showSuggest}
         onClose={() => setShowSuggest(false)}
+        hangoutId={hangoutId}
         pollId={poll.id}
         pollKind={poll.kind}
         existing={poll.options.map((o) => ({
@@ -481,6 +497,7 @@ function SimpleVotingCard({
           voteCount: o.voteCount,
           metadata: o.metadata,
         }))}
+        venueQuery={poll.kind === 'venue' ? venueQueryFromTitle(poll.title) : undefined}
       />
 
       <PlaceDetailSheet
@@ -811,6 +828,7 @@ function RankedVotingCard({
       <ManagePollOptionsSheet
         visible={showManage}
         onClose={() => setShowManage(false)}
+        hangoutId={hangoutId}
         pollKind={poll.kind}
         existing={poll.options.map((o) => ({
           id: o.id,
@@ -820,11 +838,13 @@ function RankedVotingCard({
         }))}
         onSave={handleApplyChanges}
         isSubmitting={isApplyingChanges}
+        venueQuery={poll.kind === 'venue' ? venueQueryFromTitle(poll.title) : undefined}
       />
 
       <SuggestOptionSheet
         visible={showSuggest}
         onClose={() => setShowSuggest(false)}
+        hangoutId={hangoutId}
         pollId={poll.id}
         pollKind={poll.kind}
         existing={poll.options.map((o) => ({
@@ -833,6 +853,7 @@ function RankedVotingCard({
           voteCount: o.voteCount,
           metadata: o.metadata,
         }))}
+        venueQuery={poll.kind === 'venue' ? venueQueryFromTitle(poll.title) : undefined}
       />
 
       <PlaceDetailSheet

@@ -20,6 +20,9 @@ export type SuggestOptionSheetProps = {
   pollId: string;
   pollKind: PollKind;
   existing: ExistingOption[];
+  venueQuery?: string;
+  /** Drives "Suggested for your group" from this hangout's participants. */
+  hangoutId?: string;
 };
 
 export function SuggestOptionSheet({
@@ -28,6 +31,8 @@ export function SuggestOptionSheet({
   pollId,
   pollKind,
   existing,
+  venueQuery,
+  hangoutId,
 }: SuggestOptionSheetProps): React.ReactElement {
   const theme = useTheme();
   const addBatch = useAddOptionsBatch();
@@ -201,8 +206,9 @@ export function SuggestOptionSheet({
             <ActivityVenuePicker
               value={venueValue}
               onChange={setVenueValue}
-              activityQuery=""
-              activityLabel="venue"
+              activityQuery={venueQuery ?? ''}
+              activityLabel={venueQuery || 'venue'}
+              hangoutId={hangoutId}
               min={0}
               max={5}
             />
@@ -210,6 +216,7 @@ export function SuggestOptionSheet({
             <RestaurantSearchPicker
               value={restaurantValue}
               onChange={setRestaurantValue}
+              hangoutId={hangoutId}
               min={0}
               max={5}
             />

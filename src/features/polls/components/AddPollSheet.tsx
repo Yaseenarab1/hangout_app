@@ -332,11 +332,12 @@ export function AddPollSheet({
               onChange={setVenueValue}
               activityQuery={venueLabel.trim()}
               activityLabel={venueLabel.trim() || 'this activity'}
+              hangoutId={hangoutId}
               min={2}
               max={10}
             />
           ) : (
-            <RestaurantSearchPicker value={restaurantValue} onChange={setRestaurantValue} min={2} max={15} />
+            <RestaurantSearchPicker value={restaurantValue} onChange={setRestaurantValue} hangoutId={hangoutId} min={2} max={15} />
           )}
         </View>
 

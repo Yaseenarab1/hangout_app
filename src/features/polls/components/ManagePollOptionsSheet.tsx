@@ -28,6 +28,9 @@ export type ManagePollOptionsSheetProps = {
     addOptions: Array<{ label: string; metadata?: Record<string, unknown> }>;
   }) => void;
   isSubmitting?: boolean;
+  venueQuery?: string;
+  /** Drives "Suggested for your group" from this hangout's participants. */
+  hangoutId?: string;
 };
 
 /**
@@ -42,6 +45,8 @@ export function ManagePollOptionsSheet({
   existing,
   onSave,
   isSubmitting,
+  venueQuery,
+  hangoutId,
 }: ManagePollOptionsSheetProps): React.ReactElement {
   const theme = useTheme();
 
@@ -273,8 +278,9 @@ export function ManagePollOptionsSheet({
             <ActivityVenuePicker
               value={venueValue}
               onChange={setVenueValue as (v: ActivityVenueOption[]) => void}
-              activityQuery=""
-              activityLabel="venue"
+              activityQuery={venueQuery ?? ''}
+              activityLabel={venueQuery || 'venue'}
+              hangoutId={hangoutId}
               min={1}
               max={15}
             />
@@ -282,6 +288,7 @@ export function ManagePollOptionsSheet({
             <RestaurantSearchPicker
               value={restaurantValue}
               onChange={setRestaurantValue as (v: RestaurantOption[]) => void}
+              hangoutId={hangoutId}
               min={1}
               max={15}
             />
