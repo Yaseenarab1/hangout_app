@@ -15,6 +15,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "e2e": "maestro test .maestro",
     "db:types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/services/supabase/types.gen.ts",
     "db:reset": "supabase db reset",
     "db:push": "supabase db push",

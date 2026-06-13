@@ -1,0 +1,6 @@
+# Maestro workspace config. Flows run in filename order.
+# Run all:           maestro test .maestro
+# Run one:           maestro test .maestro/smoke.yaml
+# With credentials:  EMAIL=you@example.com PASSWORD=secret maestro test .maestro/sign-in.yaml
+flows:
+  - '*.yaml'

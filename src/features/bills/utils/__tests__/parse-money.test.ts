@@ -29,18 +29,8 @@ const cases: Case[] = [
   ['$', null],
 ];
 
-let passed = 0;
-let failed = 0;
-
-for (const [input, expected] of cases) {
-  const result = parseMoney(input);
-  if (result === expected) {
-    passed++;
-  } else {
-    console.error(`FAIL parseMoney(${JSON.stringify(input)}): expected ${expected}, got ${result}`);
-    failed++;
-  }
-}
-
-console.log(`parseMoney: ${passed} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+describe('parseMoney', () => {
+  it.each(cases)('parses %j → %p cents', (input, expected) => {
+    expect(parseMoney(input)).toBe(expected);
+  });
+});

@@ -1,0 +1,12 @@
+# Happy path: sign in, then open the "Plan a hangout" flow.
+#   EMAIL=you@example.com PASSWORD=secret maestro test .maestro/create-hangout.yaml
+appId: com.hangoutplanner.app
+---
+- runFlow: sign-in.yaml
+- tapOn: 'Plan a hangout'
+- assertVisible: 'What kind of hangout?'
+# From here the type picker drives the rest (Food / Movie / Sports / Activity).
+# Extend with the specific type you want to cover, e.g.:
+#   - tapOn: 'Food'
+#   - ... pick options, invite, create ...
+#   - assertVisible: 'Create hangout'

@@ -1,11 +1,13 @@
 module.exports = {
   preset: 'jest-expo',
-  setupFilesAfterEach: ['@testing-library/jest-native/extend-expect'],
+  setupFilesAfterEnv: ['@testing-library/jest-native/extend-expect'],
   transformIgnorePatterns: [
     'node_modules/(?!(' +
-      'jest-)?react-native' +
+      '(jest-)?react-native' +
       '|@react-native(-community)?' +
       '|expo(nent)?|@expo(nent)?/.*' +
+      '|expo-.*' +
+      '|@expo/.*' +
       '|@expo-google-fonts/.*' +
       '|react-clone-referenced-element' +
       '|@react-navigation' +

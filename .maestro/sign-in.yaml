@@ -1,0 +1,16 @@
+# Happy-path sign-in. Requires a real test account:
+#   EMAIL=you@example.com PASSWORD=secret maestro test .maestro/sign-in.yaml
+appId: com.hangoutplanner.app
+---
+- launchApp:
+    clearState: true
+- tapOn: 'I already have an account'
+- tapOn: 'Email'
+- inputText: ${EMAIL}
+- tapOn: 'Password'
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn: 'Sign in'
+# Landed on Home.
+- assertVisible:
+    text: 'Hey .*|Plan a hangout'

@@ -1,0 +1,11 @@
+# Smoke test: the app launches and reaches a known first screen.
+# This is the one flow that should pass with no setup — start here to confirm
+# Maestro is wired up before running the credentialed flows.
+appId: com.hangoutplanner.app
+---
+- launchApp:
+    clearState: true
+# Signed-out users land on the welcome screen; if a session is restored, the
+# Home greeting shows instead. Accept either so the smoke test is stable.
+- assertVisible:
+    text: 'Continue with email|Hey .*|Plan a hangout'
